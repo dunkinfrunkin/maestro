@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import sys
+import os
 
 import uvicorn
 
@@ -19,6 +19,9 @@ def main(argv: list[str] | None = None) -> None:
         help="Path to WORKFLOW.md (default: ./WORKFLOW.md)",
     )
     args = parser.parse_args(argv)
+
+    # Pass workflow path to the app via environment
+    os.environ["MAESTRO_WORKFLOW"] = args.workflow
 
     uvicorn.run(
         "maestro.app:app",

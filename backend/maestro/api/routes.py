@@ -2,43 +2,59 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from maestro.models import OrchestratorState
 
 router = APIRouter(prefix="/api/v1")
 
-# Will be replaced with a real reference once the orchestrator is wired up.
-_state = OrchestratorState()
 
-
-def set_orchestrator_state(state: OrchestratorState) -> None:
-    global _state
-    _state = state
+def _get_orchestrator(request: Request):
+    orch = request.app.state.orchestrator
+    if orch is None:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
+    return orch
 
 
 @router.get("/state")
-async def get_state() -> OrchestratorState:
+async def get_state(request: Request) -> OrchestratorState:
     """Current system state: running agents, retry queue, aggregate totals."""
-    return _state
+    orch = _get_orchestrator(request)
+    return orch.state.to_api_state()
 
 
 @router.get("/{issue_identifier}")
-async def get_issue(issue_identifier: str) -> dict:
+async def get_issue(issue_identifier: str, request: Request) -> dict:
     """Issue-specific details."""
-    attempt = _state.running.get(issue_identifier)
-    retry = _state.retrying.get(issue_identifier)
-    if not attempt and not retry:
+    orch = _get_orchestrator(request)
+    api_state = orch.state.to_api_state()
+
+    # Search by identifier in running/retrying
+    running_match = None
+    for attempt in api_state.running.values():
+        if attempt.issue_identifier == issue_identifier:
+            running_match = attempt
+            break
+
+    retry_match = None
+    for entry in api_state.retrying.values():
+        if entry.issue_identifier == issue_identifier:
+            retry_match = entry
+            break
+
+    if not running_match and not retry_match:
         raise HTTPException(status_code=404, detail="Issue not found")
+
     return {
         "issue_identifier": issue_identifier,
-        "running": attempt,
-        "retrying": retry,
+        "running": running_match,
+        "retrying": retry_match,
     }
 
 
 @router.post("/refresh")
-async def refresh() -> dict:
+async def refresh(request: Request) -> dict:
     """Queue an immediate poll/reconciliation cycle."""
-    # Will trigger the orchestrator's poll loop once wired up.
+    orch = _get_orchestrator(request)
+    orch.trigger_refresh()
     return {"status": "queued"}
