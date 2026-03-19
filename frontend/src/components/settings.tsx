@@ -20,10 +20,14 @@ import {
   deleteConnection,
   fetchMembers,
   addMember,
+  ApiKeyStatus,
+  getApiKeyStatus,
+  setApiKey,
+  deleteApiKey,
   removeMember,
 } from "@/lib/api";
 
-type WorkspaceSubTab = "projects" | "connections" | "users";
+type WorkspaceSubTab = "projects" | "connections" | "api-keys" | "users";
 
 export function SettingsPage({
   activeWorkspace,
@@ -167,7 +171,7 @@ export function SettingsPage({
                 <div className="border-t border-border">
                   {/* Sub-tabs */}
                   <div className="flex gap-0 border-b border-border bg-background/50">
-                    {(["projects", "connections", "users"] as const).map((t) => (
+                    {(["projects", "connections", "api-keys", "users"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setWsSubTab(ws.id, t)}
@@ -177,7 +181,7 @@ export function SettingsPage({
                             : "text-muted hover:text-foreground"
                         }`}
                       >
-                        {t}
+                        {{ projects: "Projects", connections: "Connections", "api-keys": "API Keys", users: "Users" }[t]}
                       </button>
                     ))}
                   </div>
@@ -188,6 +192,9 @@ export function SettingsPage({
                     )}
                     {currentSubTab === "connections" && (
                       <ConnectionsList workspaceId={ws.id} />
+                    )}
+                    {currentSubTab === "api-keys" && (
+                      <ApiKeysList workspaceId={ws.id} />
                     )}
                     {currentSubTab === "users" && (
                       <MembersList workspaceId={ws.id} isOwner={ws.role === "owner"} />
@@ -319,6 +326,112 @@ function ConnectionsList({ workspaceId }: { workspaceId: number }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Members
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// API Keys
+// ---------------------------------------------------------------------------
+
+const API_KEY_PROVIDERS = [
+  { id: "anthropic", name: "Anthropic", description: "Powers the Implementation Agent", placeholder: "sk-ant-..." },
+];
+
+function ApiKeysList({ workspaceId }: { workspaceId: number }) {
+  const [statuses, setStatuses] = useState<Record<string, ApiKeyStatus>>({});
+  const [editingProvider, setEditingProvider] = useState<string | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const results: Record<string, ApiKeyStatus> = {};
+      for (const p of API_KEY_PROVIDERS) {
+        results[p.id] = await getApiKeyStatus(workspaceId, p.id);
+      }
+      setStatuses(results);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    }
+  }, [workspaceId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async (provider: string) => {
+    if (!keyInput.trim()) return;
+    setSaving(true);
+    try {
+      await setApiKey(workspaceId, provider, keyInput.trim());
+      setKeyInput("");
+      setEditingProvider(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (provider: string) => {
+    try {
+      await deleteApiKey(workspaceId, provider);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
+
+  return (
+    <div>
+      {error && <ErrorBanner message={error} />}
+      <div className="space-y-2">
+        {API_KEY_PROVIDERS.map((p) => {
+          const status = statuses[p.id];
+          const isEditing = editingProvider === p.id;
+          return (
+            <div key={p.id} className="rounded-md border border-border bg-background p-3">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${status?.has_key ? "bg-green-500" : "bg-gray-400"}`} />
+                  <span className="text-xs font-medium">{p.name}</span>
+                </div>
+                {status?.has_key && !isEditing && (
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setEditingProvider(p.id); setKeyInput(""); }} className="text-[10px] text-muted hover:text-foreground transition-colors">Replace</button>
+                    <button onClick={() => handleDelete(p.id)} className="text-[10px] text-red-600 hover:text-red-800 transition-colors">Remove</button>
+                  </div>
+                )}
+              </div>
+              <div className="text-[10px] text-muted mb-2">{p.description}</div>
+
+              {(!status?.has_key || isEditing) && (
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder={p.placeholder}
+                    className="flex-1 px-2 py-1.5 text-xs rounded border border-border bg-surface placeholder:text-muted font-mono"
+                  />
+                  <button onClick={() => handleSave(p.id)} disabled={saving} className="px-3 py-1.5 text-xs rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50">
+                    {saving ? "..." : "Save"}
+                  </button>
+                  {isEditing && (
+                    <button onClick={() => setEditingProvider(null)} className="px-2 py-1.5 text-xs text-muted hover:text-foreground transition-colors">Cancel</button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

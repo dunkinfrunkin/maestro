@@ -6,8 +6,6 @@ import {
   ApiKeyStatus,
   getAgentConfig,
   getApiKeyStatus,
-  setApiKey,
-  deleteApiKey,
   updateAgentConfig,
 } from "@/lib/api";
 
@@ -23,10 +21,7 @@ function ImplementationAgent({ workspaceId }: { workspaceId: number }) {
   const [config, setConfig] = useState<AgentConfigResponse | null>(null);
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [expanded, setExpanded] = useState(true);
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyInput, setKeyInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -43,30 +38,6 @@ function ImplementationAgent({ workspaceId }: { workspaceId: number }) {
   }, [workspaceId]);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleSaveKey = async () => {
-    if (!keyInput.trim()) return;
-    setSaving(true);
-    try {
-      await setApiKey(workspaceId, "anthropic", keyInput.trim());
-      setKeyInput("");
-      setShowKeyInput(false);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteKey = async () => {
-    try {
-      await deleteApiKey(workspaceId, "anthropic");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete");
-    }
-  };
 
   const handleModelChange = async (model: string) => {
     try {
@@ -121,68 +92,12 @@ function ImplementationAgent({ workspaceId }: { workspaceId: number }) {
             </div>
           )}
 
-          {/* API Key */}
-          <div>
-            <div className="text-xs font-medium mb-2">Anthropic API Key</div>
-            {keyStatus?.has_key ? (
-              <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-xs">Key configured</span>
-                  {keyStatus.updated_at && (
-                    <span className="text-[10px] text-muted">
-                      Updated {new Date(keyStatus.updated_at).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowKeyInput(true)}
-                    className="text-[10px] text-muted hover:text-foreground transition-colors"
-                  >
-                    Replace
-                  </button>
-                  <button
-                    onClick={handleDeleteKey}
-                    className="text-[10px] text-red-600 hover:text-red-800 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-xs text-muted mb-2">
-                Add your Anthropic API key to activate the agent.
-              </div>
-            )}
-
-            {(!keyStatus?.has_key || showKeyInput) && (
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="password"
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
-                  placeholder="sk-ant-..."
-                  className="flex-1 px-3 py-2 text-xs rounded-md border border-border bg-background placeholder:text-muted font-mono"
-                />
-                <button
-                  onClick={handleSaveKey}
-                  disabled={saving}
-                  className="px-3 py-2 text-xs rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </button>
-                {showKeyInput && (
-                  <button
-                    onClick={() => { setShowKeyInput(false); setKeyInput(""); }}
-                    className="px-3 py-2 text-xs text-muted hover:text-foreground transition-colors"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Status hint */}
+          {!isActive && (
+            <div className="text-xs text-muted rounded-md border border-border border-dashed p-3">
+              Add your Anthropic API key in <strong>Settings &rarr; API Keys</strong> to activate this agent.
+            </div>
+          )}
 
           {/* Model Selection */}
           <div>
