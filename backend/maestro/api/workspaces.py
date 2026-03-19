@@ -144,6 +144,39 @@ async def create_workspace(body: WorkspaceCreate, user: User = Depends(get_curre
     )
 
 
+class WorkspaceUpdate(BaseModel):
+    name: str
+
+
+@router.put("/workspaces/{workspace_id}")
+async def update_workspace(workspace_id: int, body: WorkspaceUpdate, user: User = Depends(get_current_user)) -> WorkspaceResponse:
+    await _require_owner(workspace_id, user.id)
+    async with get_session() as session:
+        ws = await session.get(Workspace, workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        ws.name = body.name
+        ws.slug = _slugify(body.name)
+        await session.commit()
+        await session.refresh(ws)
+    return WorkspaceResponse(
+        id=ws.id, name=ws.name, slug=ws.slug, role="owner",
+        created_at=ws.created_at.isoformat() if ws.created_at else "",
+    )
+
+
+@router.delete("/workspaces/{workspace_id}")
+async def delete_workspace(workspace_id: int, user: User = Depends(get_current_user)) -> dict:
+    await _require_owner(workspace_id, user.id)
+    async with get_session() as session:
+        ws = await session.get(Workspace, workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        await session.delete(ws)
+        await session.commit()
+    return {"status": "deleted"}
+
+
 # ---------------------------------------------------------------------------
 # Members
 # ---------------------------------------------------------------------------
@@ -256,6 +289,28 @@ async def create_project(workspace_id: int, body: ProjectCreate, user: User = De
         workspace_id=project.workspace_id,
         name=project.name,
         slug=project.slug,
+        created_at=project.created_at.isoformat() if project.created_at else "",
+    )
+
+
+class ProjectUpdate(BaseModel):
+    name: str
+
+
+@router.put("/workspaces/{workspace_id}/projects/{project_id}")
+async def update_project(workspace_id: int, project_id: int, body: ProjectUpdate, user: User = Depends(get_current_user)) -> ProjectResponse:
+    await _require_member(workspace_id, user.id)
+    async with get_session() as session:
+        project = await session.get(Project, project_id)
+        if not project or project.workspace_id != workspace_id:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project.name = body.name
+        project.slug = _slugify(body.name)
+        await session.commit()
+        await session.refresh(project)
+    return ProjectResponse(
+        id=project.id, workspace_id=project.workspace_id,
+        name=project.name, slug=project.slug,
         created_at=project.created_at.isoformat() if project.created_at else "",
     )
 
