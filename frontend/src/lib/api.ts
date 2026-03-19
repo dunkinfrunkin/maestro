@@ -1,5 +1,105 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function authHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("maestro-token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    headers: { ...authHeaders(), ...init?.headers },
+    cache: "no-store",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Workspaces & Projects
+// ---------------------------------------------------------------------------
+
+export interface WorkspaceResponse {
+  id: number;
+  name: string;
+  slug: string;
+  role: string;
+  created_at: string;
+}
+
+export interface ProjectResponse {
+  id: number;
+  workspace_id: number;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+
+export interface MemberResponse {
+  id: number;
+  user_id: number;
+  email: string;
+  name: string;
+  role: string;
+}
+
+export async function fetchWorkspaces(): Promise<WorkspaceResponse[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function createWorkspace(name: string): Promise<WorkspaceResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchProjects(workspaceId: number): Promise<ProjectResponse[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/projects`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function createProject(workspaceId: number, name: string): Promise<ProjectResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchMembers(workspaceId: number): Promise<MemberResponse[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/members`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function addMember(workspaceId: number, email: string, role: string): Promise<MemberResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function removeMember(workspaceId: number, memberId: number): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/members/${memberId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
 export interface RunAttempt {
   issue_id: string;
   issue_identifier: string;
@@ -40,13 +140,13 @@ export interface ServiceStatus {
 }
 
 export async function fetchState(): Promise<OrchestratorState> {
-  const res = await fetch(`${API_BASE}/api/v1/state`, { cache: "no-store" });
+  const res = await authFetch(`${API_BASE}/api/v1/state`, { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
 
 export async function fetchServiceStatus(): Promise<ServiceStatus> {
-  const res = await fetch(`${API_BASE}/`, { cache: "no-store" });
+  const res = await authFetch(`${API_BASE}/`, { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -67,7 +167,7 @@ export interface ServiceConfig {
 }
 
 export async function fetchConfig(): Promise<ServiceConfig> {
-  const res = await fetch(`${API_BASE}/api/v1/config`, { cache: "no-store" });
+  const res = await authFetch(`${API_BASE}/api/v1/config`, { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -87,7 +187,7 @@ export interface TrackerConnection {
 }
 
 export async function fetchConnections(): Promise<TrackerConnection[]> {
-  const res = await fetch(`${API_BASE}/api/v1/connections`, { cache: "no-store" });
+  const res = await authFetch(`${API_BASE}/api/v1/connections`, { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -99,7 +199,7 @@ export async function createConnection(body: {
   token: string;
   endpoint?: string;
 }): Promise<TrackerConnection> {
-  const res = await fetch(`${API_BASE}/api/v1/connections`, {
+  const res = await authFetch(`${API_BASE}/api/v1/connections`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -112,7 +212,7 @@ export async function createConnection(body: {
 }
 
 export async function deleteConnection(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/v1/connections/${id}`, { method: "DELETE" });
+  const res = await authFetch(`${API_BASE}/api/v1/connections/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
 
@@ -167,7 +267,7 @@ export async function updateTaskStatus(
   externalRef: string,
   status: string
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -176,14 +276,14 @@ export async function updateTaskStatus(
 }
 
 export async function removeTaskStatus(externalRef: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
 
 export async function triggerRefresh(): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/v1/refresh`, {
+  const res = await authFetch(`${API_BASE}/api/v1/refresh`, {
     method: "POST",
     cache: "no-store",
   });

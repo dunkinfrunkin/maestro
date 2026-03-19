@@ -1,25 +1,93 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { OrchestratorState, fetchState, triggerRefresh } from "@/lib/api";
+import {
+  OrchestratorState,
+  WorkspaceResponse,
+  ProjectResponse,
+  fetchState,
+  fetchWorkspaces,
+  fetchProjects,
+  createWorkspace,
+  createProject,
+  triggerRefresh,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { AuthPage } from "@/components/auth-page";
 import { Sidebar, Page } from "@/components/sidebar";
 import { OperationsPage } from "@/components/operations";
-import { AgentsPage } from "@/components/agents";
-import { SettingsPage } from "@/components/settings";
 import { TasksPage } from "@/components/tasks";
+import { AgentsPage } from "@/components/agents";
+import { UsersPage } from "@/components/users";
+import { SettingsPage } from "@/components/settings";
 
 const POLL_INTERVAL = 3000;
 
 export default function Dashboard() {
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted text-sm">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  return <AuthenticatedApp />;
+}
+
+function AuthenticatedApp() {
   const [page, setPage] = useState<Page>("operations");
-  const [state, setState] = useState<OrchestratorState | null>(null);
+
+  // Workspace state
+  const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceResponse | null>(null);
+
+  // Project state
+  const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const [activeProject, setActiveProject] = useState<ProjectResponse | null>(null);
+
+  // Orchestrator state
+  const [orchState, setOrchState] = useState<OrchestratorState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Load workspaces
+  useEffect(() => {
+    fetchWorkspaces().then(async (wsList) => {
+      if (wsList.length === 0) {
+        // Auto-create a default workspace
+        const ws = await createWorkspace("Default");
+        wsList = [ws];
+      }
+      setWorkspaces(wsList);
+      setActiveWorkspace(wsList[0]);
+    }).catch(() => {});
+  }, []);
+
+  // Load projects when workspace changes
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    fetchProjects(activeWorkspace.id).then(async (pList) => {
+      if (pList.length === 0) {
+        const p = await createProject(activeWorkspace.id, "Default");
+        pList = [p];
+      }
+      setProjects(pList);
+      setActiveProject(pList[0]);
+    }).catch(() => {});
+  }, [activeWorkspace]);
+
+  // Poll orchestrator state
   const refresh = useCallback(async () => {
     try {
       const data = await fetchState();
-      setState(data);
+      setOrchState(data);
       setError(null);
       setLastUpdated(new Date());
     } catch (err) {
@@ -37,24 +105,31 @@ export default function Dashboard() {
     try {
       await triggerRefresh();
       await refresh();
-    } catch {
-      // handled by polling
-    }
+    } catch {}
   };
 
   const pageTitle: Record<Page, string> = {
     operations: "Operations",
     tasks: "Tasks",
     agents: "Agents",
+    users: "Users",
     settings: "Settings",
   };
 
   return (
     <div className="flex h-screen font-[family-name:var(--font-geist-sans)]">
-      <Sidebar activePage={page} onNavigate={setPage} />
+      <Sidebar
+        activePage={page}
+        onNavigate={setPage}
+        workspaces={workspaces}
+        activeWorkspace={activeWorkspace}
+        onWorkspaceChange={setActiveWorkspace}
+        projects={projects}
+        activeProject={activeProject}
+        onProjectChange={setActiveProject}
+      />
 
       <main className="flex-1 overflow-y-auto">
-        {/* Top bar */}
         <header className="sticky top-0 z-10 flex items-center justify-between px-6 h-14 border-b border-border bg-background/80 backdrop-blur-sm">
           <h1 className="text-lg font-semibold">{pageTitle[page]}</h1>
           <div className="flex items-center gap-4">
@@ -72,18 +147,19 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Error banner */}
         {error && (
           <div className="mx-6 mt-4 p-3 rounded-md bg-red-100 border border-red-300 text-red-800 text-sm">
             {error}
           </div>
         )}
 
-        {/* Page content */}
         <div className="p-6">
-          {page === "operations" && <OperationsPage state={state} />}
+          {page === "operations" && <OperationsPage state={orchState} />}
           {page === "tasks" && <TasksPage />}
-          {page === "agents" && <AgentsPage state={state} />}
+          {page === "agents" && <AgentsPage state={orchState} />}
+          {page === "users" && activeWorkspace && (
+            <UsersPage workspaceId={activeWorkspace.id} />
+          )}
           {page === "settings" && <SettingsPage />}
         </div>
       </main>
