@@ -41,7 +41,7 @@ class UnifiedTask(BaseModel):
 class ConnectionCreate(BaseModel):
     kind: str  # "github" or "linear"
     name: str
-    project: str
+    project: str = ""  # optional for GitHub (access all repos)
     token: str
     endpoint: str = ""
 
@@ -117,6 +117,27 @@ async def delete_connection(connection_id: int) -> dict:
         if not ok:
             raise HTTPException(status_code=404, detail="Connection not found")
         return {"status": "deleted"}
+
+
+@router.get("/connections/{connection_id}/repos")
+async def list_connection_repos(connection_id: int) -> list[dict]:
+    """List repos accessible via a GitHub connection's token."""
+    async with get_session() as session:
+        conn = await crud.get_connection(session, connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    if conn.kind != TrackerKind.GITHUB:
+        raise HTTPException(status_code=400, detail="Only GitHub connections support repo listing")
+
+    token = crud.get_decrypted_token(conn)
+    client = GitHubClient(
+        token=token,
+        endpoint=conn.endpoint or "https://api.github.com",
+    )
+    try:
+        return await client.fetch_repos()
+    finally:
+        await client.close()
 
 
 # ---------------------------------------------------------------------------

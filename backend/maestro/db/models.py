@@ -35,8 +35,8 @@ class TrackerConnection(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[TrackerKind] = mapped_column(Enum(TrackerKind), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    # For GitHub: "owner/repo", for Linear: project slug
-    project: Mapped[str] = mapped_column(String(255), nullable=False)
+    # For GitHub: "owner/repo" (optional, blank = all repos), for Linear: project slug
+    project: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     endpoint: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     encrypted_token: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

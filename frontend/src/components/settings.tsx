@@ -85,7 +85,9 @@ export function SettingsPage() {
                         {conn.kind}
                       </span>
                     </div>
-                    <div className="text-xs text-muted font-mono">{conn.project}</div>
+                    <div className="text-xs text-muted font-mono">
+                      {conn.project || "All accessible repos"}
+                    </div>
                     {conn.endpoint && (
                       <div className="text-xs text-muted font-mono">{conn.endpoint}</div>
                     )}
@@ -122,8 +124,12 @@ function ConnectionForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !project || !token) {
-      onError("Name, project, and token are required");
+    if (!name || !token) {
+      onError("Name and token are required");
+      return;
+    }
+    if (kind === "linear" && !project) {
+      onError("Project slug is required for Linear");
       return;
     }
     setSaving(true);
@@ -173,13 +179,15 @@ function ConnectionForm({
       </div>
       <div>
         <label className="block text-xs text-muted mb-1">
-          {kind === "github" ? "Repository (owner/repo)" : "Project Slug"}
+          {kind === "github"
+            ? "Repository (optional — leave blank for all repos)"
+            : "Project Slug"}
         </label>
         <input
           type="text"
           value={project}
           onChange={(e) => setProject(e.target.value)}
-          placeholder={kind === "github" ? "octocat/hello-world" : "my-project"}
+          placeholder={kind === "github" ? "owner/repo or leave blank for all" : "my-project"}
           className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
         />
       </div>
