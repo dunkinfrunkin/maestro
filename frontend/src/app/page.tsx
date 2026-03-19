@@ -62,7 +62,7 @@ function AuthenticatedApp() {
     fetchWorkspaces().then(async (wsList) => {
       if (wsList.length === 0) {
         // Auto-create a default workspace
-        const ws = await createWorkspace("Default");
+        const ws = await createWorkspace("My Workspace");
         wsList = [ws];
       }
       setWorkspaces(wsList);
@@ -75,7 +75,7 @@ function AuthenticatedApp() {
     if (!activeWorkspace) return;
     fetchProjects(activeWorkspace.id).then(async (pList) => {
       if (pList.length === 0) {
-        const p = await createProject(activeWorkspace.id, "Default");
+        const p = await createProject(activeWorkspace.id, "General");
         pList = [p];
       }
       setProjects(pList);

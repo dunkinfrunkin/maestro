@@ -52,39 +52,24 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Workspace / Project switchers */}
-      {!collapsed && (
-        <div className="px-2 py-2 border-b border-border space-y-1">
+      {/* Project switcher */}
+      {!collapsed && projects.length > 0 && (
+        <div className="px-2 py-2 border-b border-border">
+          <div className="text-[10px] text-muted px-1 mb-0.5">Project</div>
           <select
-            value={activeWorkspace?.id ?? ""}
+            value={activeProject?.id ?? ""}
             onChange={(e) => {
-              const ws = workspaces.find((w) => w.id === Number(e.target.value));
-              if (ws) onWorkspaceChange(ws);
+              const p = projects.find((p) => p.id === Number(e.target.value));
+              if (p) onProjectChange(p);
             }}
             className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
           >
-            {workspaces.map((ws) => (
-              <option key={ws.id} value={ws.id}>
-                {ws.name}
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
-          {projects.length > 0 && (
-            <select
-              value={activeProject?.id ?? ""}
-              onChange={(e) => {
-                const p = projects.find((p) => p.id === Number(e.target.value));
-                if (p) onProjectChange(p);
-              }}
-              className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
       )}
 
@@ -117,33 +102,56 @@ export function Sidebar({
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-border px-2 py-3 space-y-1">
-        {!collapsed && user && (
-          <div className="px-3 py-1 text-xs text-muted truncate">{user.email}</div>
+      <div className="border-t border-border">
+        {/* Workspace switcher */}
+        {!collapsed && (
+          <div className="px-3 py-2 border-b border-border">
+            <select
+              value={activeWorkspace?.id ?? ""}
+              onChange={(e) => {
+                const ws = workspaces.find((w) => w.id === Number(e.target.value));
+                if (ws) onWorkspaceChange(ws);
+              }}
+              className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
+            >
+              {workspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {ws.name}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-          title={collapsed ? "Sign out" : undefined}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-          </svg>
-          {!collapsed && <span>Sign out</span>}
-        </button>
 
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 flex-shrink-0 transition-transform ${collapsed ? "rotate-180" : ""}`}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
-          </svg>
-          {!collapsed && <span>Collapse</span>}
-        </button>
-
-        {!collapsed && <div className="px-3 py-1 text-xs text-muted">v0.2.0</div>}
+        {/* User row */}
+        <div className="px-2 py-2 flex items-center justify-between">
+          {!collapsed && user && (
+            <div className="flex-1 min-w-0 px-1">
+              <div className="text-xs font-medium truncate">{user.name}</div>
+              <div className="text-[10px] text-muted truncate">{user.email}</div>
+            </div>
+          )}
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={logout}
+              className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
+              title="Sign out"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
+              title={collapsed ? "Expand" : "Collapse"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </aside>
   );
