@@ -7,9 +7,11 @@ import { GitHubLogo, LinearLogo } from "@/components/icons";
 type Step = "select" | "guide" | "form";
 
 export function ConnectionModal({
+  workspaceId,
   onCreated,
   onClose,
 }: {
+  workspaceId: number;
   onCreated: () => void;
   onClose: () => void;
 }) {
@@ -51,6 +53,7 @@ export function ConnectionModal({
           {step === "form" && (
             <ConnectionForm
               kind={kind}
+              workspaceId={workspaceId}
               onCreated={() => { onCreated(); onClose(); }}
               onBack={() => setStep("guide")}
             />
@@ -202,10 +205,12 @@ function GuideStep({ number, children }: { number: number; children: React.React
 
 function ConnectionForm({
   kind,
+  workspaceId,
   onCreated,
   onBack,
 }: {
   kind: "github" | "linear";
+  workspaceId: number;
   onCreated: () => void;
   onBack: () => void;
 }) {
@@ -223,7 +228,7 @@ function ConnectionForm({
     setSaving(true);
     setError(null);
     try {
-      await createConnection({ kind, name, project, token, endpoint: endpoint || undefined });
+      await createConnection({ kind, name, project, token, endpoint: endpoint || undefined, workspace_id: workspaceId });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create connection");

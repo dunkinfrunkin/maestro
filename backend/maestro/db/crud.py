@@ -21,8 +21,10 @@ async def create_connection(
     project: str,
     token: str,
     endpoint: str = "",
+    workspace_id: int | None = None,
 ) -> TrackerConnection:
     conn = TrackerConnection(
+        workspace_id=workspace_id or 0,
         kind=kind,
         name=name,
         project=project,

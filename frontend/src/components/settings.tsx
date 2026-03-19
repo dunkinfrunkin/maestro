@@ -187,7 +187,7 @@ export function SettingsPage({
                       <ProjectsList workspaceId={ws.id} onChanged={onWorkspacesChanged} />
                     )}
                     {currentSubTab === "connections" && (
-                      <ConnectionsList />
+                      <ConnectionsList workspaceId={ws.id} />
                     )}
                     {currentSubTab === "users" && (
                       <MembersList workspaceId={ws.id} isOwner={ws.role === "owner"} />
@@ -277,7 +277,7 @@ function ProjectsList({ workspaceId, onChanged }: { workspaceId: number; onChang
 // Connections
 // ---------------------------------------------------------------------------
 
-function ConnectionsList() {
+function ConnectionsList({ workspaceId }: { workspaceId: number }) {
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -298,6 +298,7 @@ function ConnectionsList() {
       </div>
       {showModal && (
         <ConnectionModal
+          workspaceId={workspaceId}
           onCreated={() => { setShowModal(false); load(); }}
           onClose={() => setShowModal(false)}
         />

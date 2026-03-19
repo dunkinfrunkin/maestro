@@ -44,6 +44,7 @@ class ConnectionCreate(BaseModel):
     project: str = ""  # optional for GitHub (access all repos)
     token: str
     endpoint: str = ""
+    workspace_id: int | None = None
 
 
 class ConnectionResponse(BaseModel):
@@ -98,6 +99,7 @@ async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
             project=body.project,
             token=body.token,
             endpoint=body.endpoint,
+            workspace_id=body.workspace_id,
         )
         return ConnectionResponse(
             id=conn.id,
