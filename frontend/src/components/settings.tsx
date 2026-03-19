@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { GitHubLogo, LinearLogo } from "@/components/icons";
+import { ConnectionModal } from "@/components/connection-modal";
 import {
   WorkspaceResponse,
   ProjectResponse,
@@ -15,7 +17,6 @@ import {
   updateProject,
   deleteProject,
   fetchConnections,
-  createConnection,
   deleteConnection,
   fetchMembers,
   addMember,
@@ -279,7 +280,7 @@ function ProjectsList({ workspaceId, onChanged }: { workspaceId: number; onChang
 function ConnectionsList() {
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const load = useCallback(async () => {
     try { setConnections(await fetchConnections()); setError(null); }
@@ -291,23 +292,26 @@ function ConnectionsList() {
     <div>
       {error && <ErrorBanner message={error} />}
       <div className="flex justify-end mb-2">
-        <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-surface-hover transition-colors">
-          {showForm ? "Cancel" : "Add"}
+        <button onClick={() => setShowModal(true)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-surface-hover transition-colors">
+          Add
         </button>
       </div>
-      {showForm && (
-        <ConnectionForm onCreated={() => { setShowForm(false); load(); }} onError={setError} />
+      {showModal && (
+        <ConnectionModal
+          onCreated={() => { setShowModal(false); load(); }}
+          onClose={() => setShowModal(false)}
+        />
       )}
-      {connections.length === 0 && !showForm ? (
+      {connections.length === 0 ? (
         <div className="text-xs text-muted py-2">No connections</div>
       ) : (
         <div className="space-y-1">
           {connections.map((conn) => (
             <div key={conn.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover transition-colors">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                {conn.kind === "github" ? <GitHubLogo className="w-4 h-4 flex-shrink-0" /> : <LinearLogo className="w-4 h-4 flex-shrink-0" />}
                 <span className="text-xs font-medium truncate">{conn.name}</span>
-                <span className="text-[10px] px-1 py-0.5 rounded bg-surface-hover text-muted flex-shrink-0">{conn.kind}</span>
+                <span className="text-[10px] text-muted truncate">{conn.project || "all repos"}</span>
               </div>
               <button onClick={async () => { await deleteConnection(conn.id); load(); }} className="text-[10px] text-red-600 hover:text-red-800 transition-colors flex-shrink-0">Remove</button>
             </div>
@@ -315,58 +319,6 @@ function ConnectionsList() {
         </div>
       )}
     </div>
-  );
-}
-
-function ConnectionForm({ onCreated, onError }: { onCreated: () => void; onError: (msg: string) => void }) {
-  const [kind, setKind] = useState("github");
-  const [name, setName] = useState("");
-  const [project, setProject] = useState("");
-  const [token, setToken] = useState("");
-  const [endpoint, setEndpoint] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !token) { onError("Name and token are required"); return; }
-    if (kind === "linear" && !project) { onError("Project slug required for Linear"); return; }
-    setSaving(true);
-    try { await createConnection({ kind, name, project, token, endpoint: endpoint || undefined }); onCreated(); }
-    catch (err) { onError(err instanceof Error ? err.message : "Failed to create"); }
-    finally { setSaving(false); }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="rounded-md border border-border bg-background p-3 mb-2 space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="block text-[10px] text-muted mb-0.5">Type</label>
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background text-foreground">
-            <option value="github">GitHub</option>
-            <option value="linear">Linear</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-[10px] text-muted mb-0.5">Name</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="My GitHub" className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background placeholder:text-muted" />
-        </div>
-      </div>
-      <div>
-        <label className="block text-[10px] text-muted mb-0.5">{kind === "github" ? "Repo (optional)" : "Project Slug"}</label>
-        <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={kind === "github" ? "owner/repo or blank for all" : "my-project"} className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background placeholder:text-muted font-mono" />
-      </div>
-      <div>
-        <label className="block text-[10px] text-muted mb-0.5">Token</label>
-        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="ghp_..." className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background placeholder:text-muted font-mono" />
-      </div>
-      <div>
-        <label className="block text-[10px] text-muted mb-0.5">Endpoint (optional)</label>
-        <input type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="https://api.github.com" className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background placeholder:text-muted font-mono" />
-      </div>
-      <button type="submit" disabled={saving} className="px-3 py-1.5 text-xs rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50">
-        {saving ? "Saving..." : "Add Connection"}
-      </button>
-    </form>
   );
 }
 
