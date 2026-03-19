@@ -51,6 +51,27 @@ export async function fetchServiceStatus(): Promise<ServiceStatus> {
   return res.json();
 }
 
+export interface ServiceConfig {
+  tracker: {
+    kind: string;
+    endpoint: string;
+    project_slug: string;
+    api_key_set: boolean;
+    active_states: string[];
+    terminal_states: string[];
+  };
+  polling: { interval_ms: number };
+  workspace: { root: string };
+  agent: { max_concurrent_agents: number; max_retry_backoff_ms: number };
+  codex: { command: string; turn_timeout_ms: number; stall_timeout_ms: number };
+}
+
+export async function fetchConfig(): Promise<ServiceConfig> {
+  const res = await fetch(`${API_BASE}/api/v1/config`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export async function triggerRefresh(): Promise<void> {
   const res = await fetch(`${API_BASE}/api/v1/refresh`, {
     method: "POST",

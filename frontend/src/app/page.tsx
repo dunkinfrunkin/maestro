@@ -5,6 +5,7 @@ import { OrchestratorState, fetchState, triggerRefresh } from "@/lib/api";
 import { Sidebar, Page } from "@/components/sidebar";
 import { OperationsPage } from "@/components/operations";
 import { AgentsPage } from "@/components/agents";
+import { SettingsPage } from "@/components/settings";
 
 const POLL_INTERVAL = 3000;
 
@@ -80,17 +81,9 @@ export default function Dashboard() {
         <div className="p-6">
           {page === "operations" && <OperationsPage state={state} />}
           {page === "agents" && <AgentsPage state={state} />}
-          {page === "settings" && <SettingsPlaceholder />}
+          {page === "settings" && <SettingsPage />}
         </div>
       </main>
-    </div>
-  );
-}
-
-function SettingsPlaceholder() {
-  return (
-    <div className="rounded-lg border border-border border-dashed p-12 text-center text-muted text-sm">
-      Settings page — coming next
     </div>
   );
 }
