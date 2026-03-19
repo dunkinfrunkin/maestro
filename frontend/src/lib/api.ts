@@ -322,3 +322,63 @@ export async function triggerRefresh(): Promise<void> {
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
+
+// ---------------------------------------------------------------------------
+// API Keys
+// ---------------------------------------------------------------------------
+
+export interface ApiKeyStatus {
+  provider: string;
+  has_key: boolean;
+  updated_at: string | null;
+}
+
+export async function getApiKeyStatus(workspaceId: number, provider: string): Promise<ApiKeyStatus> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/api-keys/${provider}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function setApiKey(workspaceId: number, provider: string, key: string): Promise<ApiKeyStatus> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/api-keys/${provider}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteApiKey(workspaceId: number, provider: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/api-keys/${provider}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+// ---------------------------------------------------------------------------
+// Agent Config
+// ---------------------------------------------------------------------------
+
+export interface AgentConfigResponse {
+  agent_type: string;
+  model: string;
+  active: boolean;
+  available_models: { id: string; name: string; description: string }[];
+}
+
+export async function getAgentConfig(workspaceId: number, agentType: string): Promise<AgentConfigResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/agents/${agentType}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function updateAgentConfig(workspaceId: number, agentType: string, model: string): Promise<AgentConfigResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/agents/${agentType}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
