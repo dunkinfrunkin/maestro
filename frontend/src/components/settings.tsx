@@ -2,30 +2,320 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  WorkspaceResponse,
+  ProjectResponse,
   TrackerConnection,
+  fetchWorkspaces,
+  createWorkspace,
+  updateWorkspace,
+  deleteWorkspace,
+  fetchProjects,
+  createProject,
+  updateProject,
+  deleteProject,
   fetchConnections,
   createConnection,
   deleteConnection,
 } from "@/lib/api";
 
-export function SettingsPage() {
+export function SettingsPage({
+  activeWorkspace,
+  onWorkspacesChanged,
+}: {
+  activeWorkspace: WorkspaceResponse | null;
+  onWorkspacesChanged?: () => void;
+}) {
+  return (
+    <div className="space-y-10 max-w-2xl">
+      <WorkspacesSection onChanged={onWorkspacesChanged} />
+      {activeWorkspace && (
+        <ProjectsSection
+          workspaceId={activeWorkspace.id}
+          onChanged={onWorkspacesChanged}
+        />
+      )}
+      <ConnectionsSection />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workspaces
+// ---------------------------------------------------------------------------
+
+function WorkspacesSection({ onChanged }: { onChanged?: () => void }) {
+  const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setWorkspaces(await fetchWorkspaces());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    try {
+      await createWorkspace(newName.trim());
+      setNewName("");
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create");
+    }
+  };
+
+  const handleRename = async (id: number) => {
+    if (!editName.trim()) return;
+    try {
+      await updateWorkspace(id, editName.trim());
+      setEditingId(null);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to rename");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteWorkspace(id);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-3">Workspaces</h2>
+      {error && <ErrorBanner message={error} />}
+
+      <form onSubmit={handleCreate} className="flex gap-2 mb-3">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="New workspace name"
+          className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-surface placeholder:text-muted"
+        />
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity"
+        >
+          Create
+        </button>
+      </form>
+
+      <div className="space-y-2">
+        {workspaces.map((ws) => (
+          <div key={ws.id} className="rounded-lg border border-border bg-surface p-3 flex items-center justify-between gap-3">
+            {editingId === ws.id ? (
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleRename(ws.id); }}
+                className="flex-1 flex gap-2"
+              >
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  autoFocus
+                  className="flex-1 px-2 py-1 text-sm rounded-md border border-border bg-background"
+                />
+                <button type="submit" className="text-xs text-accent hover:underline">Save</button>
+                <button type="button" onClick={() => setEditingId(null)} className="text-xs text-muted hover:underline">Cancel</button>
+              </form>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{ws.name}</div>
+                  <div className="text-xs text-muted">{ws.slug} &middot; {ws.role}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {ws.role === "owner" && (
+                    <>
+                      <button
+                        onClick={() => { setEditingId(ws.id); setEditName(ws.name); }}
+                        className="text-xs text-muted hover:text-foreground transition-colors"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => handleDelete(ws.id)}
+                        className="text-xs text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+function ProjectsSection({
+  workspaceId,
+  onChanged,
+}: {
+  workspaceId: number;
+  onChanged?: () => void;
+}) {
+  const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setProjects(await fetchProjects(workspaceId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    }
+  }, [workspaceId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    try {
+      await createProject(workspaceId, newName.trim());
+      setNewName("");
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create");
+    }
+  };
+
+  const handleRename = async (id: number) => {
+    if (!editName.trim()) return;
+    try {
+      await updateProject(workspaceId, id, editName.trim());
+      setEditingId(null);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to rename");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteProject(workspaceId, id);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-3">Projects</h2>
+      {error && <ErrorBanner message={error} />}
+
+      <form onSubmit={handleCreate} className="flex gap-2 mb-3">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="New project name"
+          className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-surface placeholder:text-muted"
+        />
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity"
+        >
+          Create
+        </button>
+      </form>
+
+      <div className="space-y-2">
+        {projects.map((p) => (
+          <div key={p.id} className="rounded-lg border border-border bg-surface p-3 flex items-center justify-between gap-3">
+            {editingId === p.id ? (
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleRename(p.id); }}
+                className="flex-1 flex gap-2"
+              >
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  autoFocus
+                  className="flex-1 px-2 py-1 text-sm rounded-md border border-border bg-background"
+                />
+                <button type="submit" className="text-xs text-accent hover:underline">Save</button>
+                <button type="button" onClick={() => setEditingId(null)} className="text-xs text-muted hover:underline">Cancel</button>
+              </form>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{p.name}</div>
+                  <div className="text-xs text-muted">{p.slug}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setEditingId(p.id); setEditName(p.name); }}
+                    className="text-xs text-muted hover:text-foreground transition-colors"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p.id)}
+                    className="text-xs text-red-600 hover:text-red-800 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Connections (existing, kept as-is)
+// ---------------------------------------------------------------------------
+
+function ConnectionsSection() {
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchConnections();
-      setConnections(data);
+      setConnections(await fetchConnections());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load connections");
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id: number) => {
     try {
@@ -37,74 +327,55 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Tracker Connections</h2>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors"
-          >
-            {showForm ? "Cancel" : "Add Connection"}
-          </button>
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Connections</h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors"
+        >
+          {showForm ? "Cancel" : "Add Connection"}
+        </button>
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+
+      {showForm && (
+        <ConnectionForm
+          onCreated={() => { setShowForm(false); load(); }}
+          onError={setError}
+        />
+      )}
+
+      {connections.length === 0 && !showForm ? (
+        <div className="rounded-lg border border-border border-dashed p-6 text-center text-muted text-sm">
+          No connections. Add a GitHub or Linear connection to pull tasks.
         </div>
-
-        {error && (
-          <div className="mb-4 p-3 rounded-md bg-red-100 border border-red-300 text-red-800 text-sm">
-            {error}
-          </div>
-        )}
-
-        {showForm && (
-          <ConnectionForm
-            onCreated={() => {
-              setShowForm(false);
-              load();
-            }}
-            onError={setError}
-          />
-        )}
-
-        {connections.length === 0 && !showForm ? (
-          <div className="rounded-lg border border-border border-dashed p-8 text-center text-muted text-sm">
-            No tracker connections configured. Add a GitHub or Linear connection to get started.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {connections.map((conn) => (
-              <div
-                key={conn.id}
-                className="rounded-lg border border-border bg-surface p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
-                      <span className="font-medium text-sm">{conn.name}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">
-                        {conn.kind}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted font-mono">
-                      {conn.project || "All accessible repos"}
-                    </div>
-                    {conn.endpoint && (
-                      <div className="text-xs text-muted font-mono">{conn.endpoint}</div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleDelete(conn.id)}
-                    className="text-xs text-red-600 hover:text-red-800 transition-colors"
-                  >
-                    Remove
-                  </button>
+      ) : (
+        <div className="space-y-2">
+          {connections.map((conn) => (
+            <div key={conn.id} className="rounded-lg border border-border bg-surface p-3 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium">{conn.name}</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">{conn.kind}</span>
+                </div>
+                <div className="text-xs text-muted font-mono mt-0.5">
+                  {conn.project || "All accessible repos"}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+              <button
+                onClick={() => handleDelete(conn.id)}
+                className="text-xs text-red-600 hover:text-red-800 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -134,13 +405,7 @@ function ConnectionForm({
     }
     setSaving(true);
     try {
-      await createConnection({
-        kind,
-        name,
-        project,
-        token,
-        endpoint: endpoint || undefined,
-      });
+      await createConnection({ kind, name, project, token, endpoint: endpoint || undefined });
       onCreated();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to create connection");
@@ -150,76 +415,45 @@ function ConnectionForm({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-lg border border-border bg-surface p-4 mb-4 space-y-3"
-    >
+    <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-4 mb-3 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs text-muted mb-1">Type</label>
-          <select
-            value={kind}
-            onChange={(e) => setKind(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground"
-          >
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground">
             <option value="github">GitHub</option>
             <option value="linear">Linear</option>
           </select>
         </div>
         <div>
           <label className="block text-xs text-muted mb-1">Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="My GitHub"
-            className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted"
-          />
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="My GitHub" className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted" />
         </div>
       </div>
       <div>
         <label className="block text-xs text-muted mb-1">
-          {kind === "github"
-            ? "Repository (optional — leave blank for all repos)"
-            : "Project Slug"}
+          {kind === "github" ? "Repository (optional — leave blank for all repos)" : "Project Slug"}
         </label>
-        <input
-          type="text"
-          value={project}
-          onChange={(e) => setProject(e.target.value)}
-          placeholder={kind === "github" ? "owner/repo or leave blank for all" : "my-project"}
-          className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
-        />
+        <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={kind === "github" ? "owner/repo or leave blank for all" : "my-project"} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
       </div>
       <div>
         <label className="block text-xs text-muted mb-1">API Token</label>
-        <input
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="ghp_... or lin_api_..."
-          className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
-        />
+        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="ghp_... or lin_api_..." className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
       </div>
       <div>
-        <label className="block text-xs text-muted mb-1">
-          Endpoint (optional, for GitHub Enterprise / custom Linear)
-        </label>
-        <input
-          type="text"
-          value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
-          placeholder={kind === "github" ? "https://api.github.com" : "https://api.linear.app/graphql"}
-          className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
-        />
+        <label className="block text-xs text-muted mb-1">Endpoint (optional)</label>
+        <input type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={kind === "github" ? "https://api.github.com" : "https://api.linear.app/graphql"} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
       </div>
-      <button
-        type="submit"
-        disabled={saving}
-        className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50"
-      >
+      <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50">
         {saving ? "Saving..." : "Add Connection"}
       </button>
     </form>
+  );
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="mb-3 p-3 rounded-md bg-red-100 border border-red-300 text-red-800 text-sm">
+      {message}
+    </div>
   );
 }

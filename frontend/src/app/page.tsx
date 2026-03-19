@@ -58,30 +58,45 @@ function AuthenticatedApp() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Load workspaces
-  useEffect(() => {
-    fetchWorkspaces().then(async (wsList) => {
+  const loadWorkspaces = useCallback(async () => {
+    try {
+      let wsList = await fetchWorkspaces();
       if (wsList.length === 0) {
-        // Auto-create a default workspace
         const ws = await createWorkspace("My Workspace");
         wsList = [ws];
       }
       setWorkspaces(wsList);
-      setActiveWorkspace(wsList[0]);
-    }).catch(() => {});
+      // Keep current selection if still valid, otherwise pick first
+      setActiveWorkspace((prev) =>
+        prev && wsList.find((w) => w.id === prev.id) ? prev : wsList[0]
+      );
+    } catch {}
   }, []);
 
+  useEffect(() => { loadWorkspaces(); }, [loadWorkspaces]);
+
   // Load projects when workspace changes
-  useEffect(() => {
+  const loadProjects = useCallback(async () => {
     if (!activeWorkspace) return;
-    fetchProjects(activeWorkspace.id).then(async (pList) => {
+    try {
+      let pList = await fetchProjects(activeWorkspace.id);
       if (pList.length === 0) {
         const p = await createProject(activeWorkspace.id, "General");
         pList = [p];
       }
       setProjects(pList);
-      setActiveProject(pList[0]);
-    }).catch(() => {});
+      setActiveProject((prev) =>
+        prev && pList.find((p) => p.id === prev.id) ? prev : pList[0]
+      );
+    } catch {}
   }, [activeWorkspace]);
+
+  useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  const reloadAll = useCallback(async () => {
+    await loadWorkspaces();
+    await loadProjects();
+  }, [loadWorkspaces, loadProjects]);
 
   // Poll orchestrator state
   const refresh = useCallback(async () => {
@@ -160,7 +175,12 @@ function AuthenticatedApp() {
           {page === "users" && activeWorkspace && (
             <UsersPage workspaceId={activeWorkspace.id} />
           )}
-          {page === "settings" && <SettingsPage />}
+          {page === "settings" && (
+            <SettingsPage
+              activeWorkspace={activeWorkspace}
+              onWorkspacesChanged={reloadAll}
+            />
+          )}
         </div>
       </main>
     </div>

@@ -58,6 +58,21 @@ export async function createWorkspace(name: string): Promise<WorkspaceResponse> 
   return res.json();
 }
 
+export async function updateWorkspace(id: number, name: string): Promise<WorkspaceResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteWorkspace(id: number): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
 export async function fetchProjects(workspaceId: number): Promise<ProjectResponse[]> {
   const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/projects`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -72,6 +87,23 @@ export async function createProject(workspaceId: number, name: string): Promise<
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
+}
+
+export async function updateProject(workspaceId: number, projectId: number, name: string): Promise<ProjectResponse> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/projects/${projectId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteProject(workspaceId: number, projectId: number): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/projects/${projectId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
 
 export async function fetchMembers(workspaceId: number): Promise<MemberResponse[]> {
