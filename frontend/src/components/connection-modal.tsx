@@ -125,7 +125,9 @@ function GitHubGuide({ onContinue, onBack }: { onContinue: () => void; onBack: (
         <GuideStep number={5}>
           Under <strong>Permissions &rarr; Repository permissions</strong>, grant:
           <ul className="mt-1 ml-4 space-y-1 text-muted">
+            <li>&bull; <strong>Contents</strong> — Read and write</li>
             <li>&bull; <strong>Issues</strong> — Read and write</li>
+            <li>&bull; <strong>Pull requests</strong> — Read and write</li>
             <li>&bull; <strong>Metadata</strong> — Read-only (auto-selected)</li>
           </ul>
         </GuideStep>
