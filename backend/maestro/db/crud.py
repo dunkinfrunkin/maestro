@@ -87,6 +87,7 @@ async def set_pipeline_status(
     external_ref: str,
     tracker_connection_id: int,
     status: PipelineStatus,
+    project_id: int = 0,
 ) -> TaskPipelineRecord:
     record = await get_pipeline_record(session, external_ref)
     if record is None:
@@ -94,6 +95,7 @@ async def set_pipeline_status(
             external_ref=external_ref,
             tracker_connection_id=tracker_connection_id,
             status=status,
+            project_id=project_id or 0,
         )
         session.add(record)
     else:

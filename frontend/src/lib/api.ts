@@ -301,6 +301,7 @@ export async function updateTaskStatus(
   status: string,
   context?: {
     workspace_id?: number;
+    project_id?: number;
     issue_title?: string;
     issue_description?: string;
     issue_url?: string;

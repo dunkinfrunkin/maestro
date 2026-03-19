@@ -60,6 +60,7 @@ class ConnectionResponse(BaseModel):
 class PipelineStatusUpdate(BaseModel):
     status: str  # one of PipelineStatus values
     workspace_id: int | None = None
+    project_id: int | None = None
     issue_title: str = ""
     issue_description: str = ""
     issue_url: str = ""
@@ -238,7 +239,7 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> d
         raise HTTPException(status_code=400, detail="Invalid connection_id in external_ref")
 
     async with get_session() as session:
-        record = await crud.set_pipeline_status(session, external_ref, conn_id, status)
+        record = await crud.set_pipeline_status(session, external_ref, conn_id, status, project_id=body.project_id or 0)
 
     # Dispatch agent for this status change
     agent_run_id = None
