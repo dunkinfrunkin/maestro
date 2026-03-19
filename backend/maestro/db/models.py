@@ -1,16 +1,21 @@
-"""SQLAlchemy models for tracker connections and task pipeline status."""
+"""SQLAlchemy models for auth, workspaces, projects, connections, and pipeline."""
 
 from __future__ import annotations
 
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
 
 
 class TrackerKind(str, enum.Enum):
@@ -27,15 +32,91 @@ class PipelineStatus(str, enum.Enum):
     MONITOR = "monitor"
 
 
-class TrackerConnection(Base):
-    """Stores tracker credentials (token encrypted at rest)."""
+class WorkspaceRole(str, enum.Enum):
+    OWNER = "owner"
+    MEMBER = "member"
 
+
+# ---------------------------------------------------------------------------
+# Users
+# ---------------------------------------------------------------------------
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Workspaces
+# ---------------------------------------------------------------------------
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[WorkspaceRole] = mapped_column(Enum(WorkspaceRole), nullable=False, default=WorkspaceRole.MEMBER)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Projects
+# ---------------------------------------------------------------------------
+
+
+class Project(Base):
+    __tablename__ = "projects"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "slug", name="uq_workspace_project_slug"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tracker Connections (scoped to workspace)
+# ---------------------------------------------------------------------------
+
+
+class TrackerConnection(Base):
     __tablename__ = "tracker_connections"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     kind: Mapped[TrackerKind] = mapped_column(Enum(TrackerKind), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    # For GitHub: "owner/repo" (optional, blank = all repos), for Linear: project slug
     project: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     endpoint: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     encrypted_token: Mapped[str] = mapped_column(Text, nullable=False)
@@ -47,19 +128,17 @@ class TrackerConnection(Base):
     )
 
 
+# ---------------------------------------------------------------------------
+# Task Pipeline (scoped to project)
+# ---------------------------------------------------------------------------
+
+
 class TaskPipelineRecord(Base):
-    """Tracks a task's position in our harness engineering pipeline.
-
-    Only created when a user first moves a task into the pipeline.
-    The task's tracker data (title, description, etc.) is NOT stored here —
-    it's always fetched live from the tracker.
-    """
-
     __tablename__ = "task_pipeline"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Tracker-agnostic identifier: "{tracker_kind}:{external_id}"
-    external_ref: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    external_ref: Mapped[str] = mapped_column(String(512), nullable=False)
     tracker_connection_id: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[PipelineStatus] = mapped_column(
         Enum(PipelineStatus), nullable=False, default=PipelineStatus.QUEUED
@@ -69,4 +148,8 @@ class TaskPipelineRecord(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "external_ref", name="uq_project_external_ref"),
     )
