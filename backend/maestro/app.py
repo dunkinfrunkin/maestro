@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from maestro.api.agents import router as agents_router
 from maestro.api.auth import router as auth_router
 from maestro.api.routes import router as api_router
 from maestro.api.tasks import router as tasks_router
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(agents_router)
     app.include_router(auth_router)
     app.include_router(api_router)
     app.include_router(tasks_router)

@@ -153,3 +153,57 @@ class TaskPipelineRecord(Base):
     __table_args__ = (
         UniqueConstraint("project_id", "external_ref", name="uq_project_external_ref"),
     )
+
+
+# ---------------------------------------------------------------------------
+# API Keys (provider keys stored encrypted, scoped to workspace)
+# ---------------------------------------------------------------------------
+
+
+class ApiKeyProvider(str, enum.Enum):
+    ANTHROPIC = "anthropic"
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "provider", name="uq_workspace_provider"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[ApiKeyProvider] = mapped_column(Enum(ApiKeyProvider), nullable=False)
+    encrypted_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent Configuration (per workspace)
+# ---------------------------------------------------------------------------
+
+
+class AgentType(str, enum.Enum):
+    IMPLEMENTATION = "implementation"
+
+
+class AgentConfig(Base):
+    __tablename__ = "agent_configs"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "agent_type", name="uq_workspace_agent_type"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    agent_type: Mapped[AgentType] = mapped_column(Enum(AgentType), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, default="claude-sonnet-4-6")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

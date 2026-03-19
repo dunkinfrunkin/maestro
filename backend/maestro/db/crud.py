@@ -6,7 +6,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from maestro.db.encryption import decrypt_token, encrypt_token
-from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerConnection, TrackerKind
+from maestro.db.models import (
+    AgentConfig,
+    AgentType,
+    ApiKey,
+    ApiKeyProvider,
+    PipelineStatus,
+    TaskPipelineRecord,
+    TrackerConnection,
+    TrackerKind,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -112,3 +121,114 @@ async def list_pipeline_records(
         stmt = stmt.where(TaskPipelineRecord.status == status)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+# ---------------------------------------------------------------------------
+# API Keys
+# ---------------------------------------------------------------------------
+
+
+async def set_api_key(
+    session: AsyncSession,
+    workspace_id: int,
+    provider: ApiKeyProvider,
+    key: str,
+) -> ApiKey:
+    result = await session.execute(
+        select(ApiKey).where(
+            ApiKey.workspace_id == workspace_id,
+            ApiKey.provider == provider,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        existing.encrypted_key = encrypt_token(key)
+        await session.commit()
+        await session.refresh(existing)
+        return existing
+    else:
+        api_key = ApiKey(
+            workspace_id=workspace_id,
+            provider=provider,
+            encrypted_key=encrypt_token(key),
+        )
+        session.add(api_key)
+        await session.commit()
+        await session.refresh(api_key)
+        return api_key
+
+
+async def get_api_key(
+    session: AsyncSession,
+    workspace_id: int,
+    provider: ApiKeyProvider,
+) -> ApiKey | None:
+    result = await session.execute(
+        select(ApiKey).where(
+            ApiKey.workspace_id == workspace_id,
+            ApiKey.provider == provider,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_api_key(
+    session: AsyncSession,
+    workspace_id: int,
+    provider: ApiKeyProvider,
+) -> bool:
+    api_key = await get_api_key(session, workspace_id, provider)
+    if not api_key:
+        return False
+    await session.delete(api_key)
+    await session.commit()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Agent Config
+# ---------------------------------------------------------------------------
+
+
+async def get_agent_config(
+    session: AsyncSession,
+    workspace_id: int,
+    agent_type: AgentType,
+) -> AgentConfig | None:
+    result = await session.execute(
+        select(AgentConfig).where(
+            AgentConfig.workspace_id == workspace_id,
+            AgentConfig.agent_type == agent_type,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def set_agent_config(
+    session: AsyncSession,
+    workspace_id: int,
+    agent_type: AgentType,
+    model: str,
+) -> AgentConfig:
+    result = await session.execute(
+        select(AgentConfig).where(
+            AgentConfig.workspace_id == workspace_id,
+            AgentConfig.agent_type == agent_type,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        existing.model = model
+        await session.commit()
+        await session.refresh(existing)
+        return existing
+    else:
+        config = AgentConfig(
+            workspace_id=workspace_id,
+            agent_type=agent_type,
+            model=model,
+        )
+        session.add(config)
+        await session.commit()
+        await session.refresh(config)
+        return config
