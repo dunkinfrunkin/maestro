@@ -113,14 +113,21 @@ function AgentCard({ agent, workspaceId, isActive }: { agent: AgentDef; workspac
     }
   };
 
+  const enabled = (config?.extra_config?.enabled ?? true) as boolean;
+
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await handleExtraConfigChange("enabled", !enabled);
+  };
+
   return (
-    <div className="rounded-lg border border-border bg-surface overflow-hidden">
-      <button
+    <div className={`rounded-lg border border-border bg-surface overflow-hidden ${!enabled ? "opacity-60" : ""}`}>
+      <div
         onClick={() => setExpanded(!expanded)}
-        className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors"
+        className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive && enabled ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d={agent.icon} />
             </svg>
@@ -134,12 +141,20 @@ function AgentCard({ agent, workspaceId, isActive }: { agent: AgentDef; workspac
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-muted">
             on {agent.triggerStatus}
           </span>
+          {/* Toggle */}
+          <button
+            onClick={handleToggle}
+            className={`relative w-9 h-5 rounded-full transition-colors ${enabled ? "bg-green-500" : "bg-gray-300"}`}
+            title={enabled ? "Disable agent" : "Enable agent"}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-4" : ""}`} />
+          </button>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
             className={`w-4 h-4 text-muted transition-transform ${expanded ? "rotate-90" : ""}`}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
           </svg>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-border p-4 space-y-4">
