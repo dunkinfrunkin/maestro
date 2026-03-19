@@ -18,7 +18,6 @@ import { Sidebar, Page } from "@/components/sidebar";
 import { OperationsPage } from "@/components/operations";
 import { TasksPage } from "@/components/tasks";
 import { AgentsPage } from "@/components/agents";
-import { UsersPage } from "@/components/users";
 import { SettingsPage } from "@/components/settings";
 
 const POLL_INTERVAL = 3000;
@@ -127,7 +126,6 @@ function AuthenticatedApp() {
     operations: "Operations",
     tasks: "Tasks",
     agents: "Agents",
-    users: "Users",
     settings: "Settings",
   };
 
@@ -172,9 +170,6 @@ function AuthenticatedApp() {
           {page === "operations" && <OperationsPage state={orchState} />}
           {page === "tasks" && <TasksPage />}
           {page === "agents" && <AgentsPage state={orchState} />}
-          {page === "users" && activeWorkspace && (
-            <UsersPage workspaceId={activeWorkspace.id} />
-          )}
           {page === "settings" && (
             <SettingsPage
               activeWorkspace={activeWorkspace}
