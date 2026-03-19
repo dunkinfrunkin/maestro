@@ -1,6 +1,8 @@
 # Maestro
 
-A Python/FastAPI + Next.js implementation of the [Symphony specification](https://github.com/openai/symphony/blob/main/SPEC.md) — an orchestration daemon that manages coding agents to execute work from issue trackers.
+Symphony, but for enterprise.
+
+A production-grade Python/FastAPI + Next.js implementation of the [Symphony specification](https://github.com/openai/symphony/blob/main/SPEC.md) — an orchestration daemon that manages coding agents to execute work from issue trackers. Built for teams that need reliable, observable, and scalable agent orchestration in enterprise environments.
 
 ## Architecture
 
