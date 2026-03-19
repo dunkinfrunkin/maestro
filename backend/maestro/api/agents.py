@@ -34,10 +34,12 @@ class AgentConfigResponse(BaseModel):
     model: str
     active: bool  # has API key
     available_models: list[dict]
+    extra_config: dict = {}
 
 
 class AgentConfigUpdate(BaseModel):
-    model: str
+    model: str | None = None
+    extra_config: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -126,11 +128,20 @@ async def get_agent_config(
         config = await crud.get_agent_config(session, workspace_id, at)
         api_key = await crud.get_api_key(session, workspace_id, ApiKeyProvider.ANTHROPIC)
 
+    import json
+    extra = {}
+    if config and config.extra_config:
+        try:
+            extra = json.loads(config.extra_config)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return AgentConfigResponse(
         agent_type=agent_type,
         model=config.model if config else DEFAULT_MODEL,
         active=api_key is not None,
         available_models=AVAILABLE_MODELS,
+        extra_config=extra,
     )
 
 
@@ -141,22 +152,35 @@ async def update_agent_config(
     body: AgentConfigUpdate,
     user: User = Depends(get_current_user),
 ) -> AgentConfigResponse:
+    import json
+
     try:
         at = AgentType(agent_type)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid agent type: {agent_type}")
 
+    model = body.model or DEFAULT_MODEL
     valid_models = [m["id"] for m in AVAILABLE_MODELS]
-    if body.model not in valid_models:
+    if model not in valid_models:
         raise HTTPException(status_code=400, detail=f"Invalid model. Valid: {valid_models}")
 
+    extra_json = json.dumps(body.extra_config) if body.extra_config is not None else None
+
     async with get_session() as session:
-        config = await crud.set_agent_config(session, workspace_id, at, body.model)
+        config = await crud.set_agent_config(session, workspace_id, at, model, extra_json)
         api_key = await crud.get_api_key(session, workspace_id, ApiKeyProvider.ANTHROPIC)
+
+    extra = {}
+    if config.extra_config:
+        try:
+            extra = json.loads(config.extra_config)
+        except (json.JSONDecodeError, TypeError):
+            pass
 
     return AgentConfigResponse(
         agent_type=agent_type,
         model=config.model,
         active=api_key is not None,
         available_models=AVAILABLE_MODELS,
+        extra_config=extra,
     )

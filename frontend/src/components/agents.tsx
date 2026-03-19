@@ -101,6 +101,16 @@ function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: numbe
     }
   };
 
+  const handleExtraConfigChange = async (key: string, value: unknown) => {
+    try {
+      const extra = { ...(config?.extra_config || {}), [key]: value };
+      const updated = await updateAgentConfig(workspaceId, agent.type, undefined, extra);
+      setConfig(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update");
+    }
+  };
+
   const isActive = keyStatus?.has_key ?? false;
 
   return (
@@ -181,6 +191,25 @@ function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: numbe
               ))}
             </div>
           </div>
+
+          {/* Agent-specific config */}
+          {agent.type === "risk_profile" && (
+            <div>
+              <div className="text-xs font-medium mb-2">Auto-approve threshold</div>
+              <div className="text-[10px] text-muted mb-2">
+                PRs at or below this risk level will be auto-approved. Higher risk PRs require human review.
+              </div>
+              <select
+                value={(config?.extra_config?.auto_approve_threshold as string) || "low"}
+                onChange={(e) => handleExtraConfigChange("auto_approve_threshold", e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-md border border-border bg-background text-foreground"
+              >
+                <option value="low">Low — only auto-approve minimal risk</option>
+                <option value="medium">Medium — auto-approve low and medium risk</option>
+                <option value="high">High — auto-approve most PRs (not recommended)</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
     </div>

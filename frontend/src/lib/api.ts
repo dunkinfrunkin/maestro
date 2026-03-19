@@ -365,6 +365,7 @@ export interface AgentConfigResponse {
   model: string;
   active: boolean;
   available_models: { id: string; name: string; description: string }[];
+  extra_config: Record<string, unknown>;
 }
 
 export async function getAgentConfig(workspaceId: number, agentType: string): Promise<AgentConfigResponse> {
@@ -373,11 +374,16 @@ export async function getAgentConfig(workspaceId: number, agentType: string): Pr
   return res.json();
 }
 
-export async function updateAgentConfig(workspaceId: number, agentType: string, model: string): Promise<AgentConfigResponse> {
+export async function updateAgentConfig(
+  workspaceId: number,
+  agentType: string,
+  model?: string,
+  extraConfig?: Record<string, unknown>,
+): Promise<AgentConfigResponse> {
   const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/agents/${agentType}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model }),
+    body: JSON.stringify({ model, extra_config: extraConfig }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();

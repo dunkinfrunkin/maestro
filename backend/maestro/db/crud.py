@@ -209,6 +209,7 @@ async def set_agent_config(
     workspace_id: int,
     agent_type: AgentType,
     model: str,
+    extra_config: str | None = None,
 ) -> AgentConfig:
     result = await session.execute(
         select(AgentConfig).where(
@@ -219,6 +220,8 @@ async def set_agent_config(
     existing = result.scalar_one_or_none()
     if existing:
         existing.model = model
+        if extra_config is not None:
+            existing.extra_config = extra_config
         await session.commit()
         await session.refresh(existing)
         return existing
@@ -227,6 +230,7 @@ async def set_agent_config(
             workspace_id=workspace_id,
             agent_type=agent_type,
             model=model,
+            extra_config=extra_config or "{}",
         )
         session.add(config)
         await session.commit()
