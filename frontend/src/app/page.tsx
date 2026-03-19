@@ -72,7 +72,7 @@ export default function Dashboard() {
 
         {/* Error banner */}
         {error && (
-          <div className="mx-6 mt-4 p-3 rounded-md bg-red-100 border border-red-300 text-red-800 text-sm dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">
+          <div className="mx-6 mt-4 p-3 rounded-md bg-red-100 border border-red-300 text-red-800 text-sm">
             {error}
           </div>
         )}

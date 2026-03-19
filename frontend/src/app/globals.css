@@ -22,16 +22,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --surface: #141414;
-  --surface-hover: #1e1e1e;
-  --border: #2a2a2a;
-  --muted: #737373;
-  --accent: #a3a3a3;
-}
-
 body {
   background: var(--background);
   color: var(--foreground);

@@ -121,7 +121,7 @@ function RunningCard({ attempt }: { attempt: RunAttempt }) {
           </div>
         )}
         {attempt.error && (
-          <div className="text-red-600 dark:text-red-400 mt-1">
+          <div className="text-red-600 mt-1">
             {attempt.error}
           </div>
         )}
@@ -137,7 +137,7 @@ function RetryCard({ entry }: { entry: RetryEntry }) {
         <span className="font-mono font-semibold">
           {entry.issue_identifier}
         </span>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300">
           retry #{entry.attempt_number}
         </span>
       </div>
@@ -154,30 +154,30 @@ function RetryCard({ entry }: { entry: RetryEntry }) {
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     preparing_workspace:
-      "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
+      "bg-blue-100 text-blue-800 border-blue-300",
     building_prompt:
-      "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20",
+      "bg-blue-100 text-blue-800 border-blue-300",
     launching_agent:
-      "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20",
+      "bg-purple-100 text-purple-800 border-purple-300",
     streaming_turn:
-      "bg-green-100 text-green-800 border-green-300 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20",
+      "bg-green-100 text-green-800 border-green-300",
     succeeded:
-      "bg-green-100 text-green-800 border-green-300 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20",
+      "bg-green-100 text-green-800 border-green-300",
     failed:
-      "bg-red-100 text-red-800 border-red-300 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20",
+      "bg-red-100 text-red-800 border-red-300",
     timed_out:
-      "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20",
+      "bg-orange-100 text-orange-800 border-orange-300",
     stalled:
-      "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20",
+      "bg-orange-100 text-orange-800 border-orange-300",
     canceled:
-      "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/20",
+      "bg-gray-100 text-gray-800 border-gray-300",
   };
 
   return (
     <span
       className={`text-xs px-2 py-0.5 rounded-full border ${
         colors[status] ||
-        "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/20"
+        "bg-gray-100 text-gray-800 border-gray-300"
       }`}
     >
       {status.replace(/_/g, " ")}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useTheme } from "@/lib/theme";
 
 type Page = "operations" | "agents" | "settings";
 
@@ -19,7 +18,6 @@ export function Sidebar({
   onNavigate: (page: Page) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { theme, toggle } = useTheme();
 
   return (
     <aside
@@ -67,29 +65,6 @@ export function Sidebar({
 
       {/* Footer */}
       <div className="border-t border-border px-2 py-3 space-y-1">
-        {/* Theme toggle */}
-        <button
-          onClick={toggle}
-          className="flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground transition-colors"
-          title={collapsed ? `Switch to ${theme === "light" ? "dark" : "light"} mode` : undefined}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-5 h-5 flex-shrink-0"
-          >
-            {theme === "light" ? (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-            )}
-          </svg>
-          {!collapsed && <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>}
-        </button>
-
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
