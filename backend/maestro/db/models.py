@@ -189,6 +189,10 @@ class ApiKey(Base):
 
 class AgentType(str, enum.Enum):
     IMPLEMENTATION = "implementation"
+    REVIEW = "review"
+    RISK_PROFILE = "risk_profile"
+    DEPLOYMENT = "deployment"
+    MONITOR = "monitor"
 
 
 class AgentConfig(Base):
