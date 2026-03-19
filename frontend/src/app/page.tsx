@@ -65,14 +65,22 @@ function AuthenticatedApp() {
         wsList = [ws];
       }
       setWorkspaces(wsList);
-      // Keep current selection if still valid, otherwise pick first
-      setActiveWorkspace((prev) =>
-        prev && wsList.find((w) => w.id === prev.id) ? prev : wsList[0]
-      );
+      setActiveWorkspace((prev) => {
+        if (prev && wsList.find((w) => w.id === prev.id)) return prev;
+        // Restore from localStorage
+        const savedId = localStorage.getItem("maestro-workspace-id");
+        const saved = savedId ? wsList.find((w) => w.id === Number(savedId)) : null;
+        return saved || wsList[0];
+      });
     } catch {}
   }, []);
 
   useEffect(() => { loadWorkspaces(); }, [loadWorkspaces]);
+
+  // Persist active workspace
+  useEffect(() => {
+    if (activeWorkspace) localStorage.setItem("maestro-workspace-id", String(activeWorkspace.id));
+  }, [activeWorkspace]);
 
   // Load projects when workspace changes
   const loadProjects = useCallback(async () => {
@@ -84,13 +92,21 @@ function AuthenticatedApp() {
         pList = [p];
       }
       setProjects(pList);
-      setActiveProject((prev) =>
-        prev && pList.find((p) => p.id === prev.id) ? prev : pList[0]
-      );
+      setActiveProject((prev) => {
+        if (prev && pList.find((p) => p.id === prev.id)) return prev;
+        const savedId = localStorage.getItem("maestro-project-id");
+        const saved = savedId ? pList.find((p) => p.id === Number(savedId)) : null;
+        return saved || pList[0];
+      });
     } catch {}
   }, [activeWorkspace]);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  // Persist active project
+  useEffect(() => {
+    if (activeProject) localStorage.setItem("maestro-project-id", String(activeProject.id));
+  }, [activeProject]);
 
   const reloadAll = useCallback(async () => {
     await loadWorkspaces();
