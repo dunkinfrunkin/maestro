@@ -32,6 +32,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Failed to initialize database")
 
+    # Initialize plugin registry
+    from maestro.agent.plugin import init_plugins
+    init_plugins()
+
     workflow_path = os.environ.get("MAESTRO_WORKFLOW", "WORKFLOW.md")
 
     orchestrator = None

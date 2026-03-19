@@ -10,8 +10,24 @@ from maestro.db import crud
 from maestro.db.engine import get_session
 from maestro.db.models import AgentType, ApiKeyProvider, User
 from maestro.agent.implementation import AVAILABLE_MODELS, DEFAULT_MODEL
+from maestro.agent.plugin import registry
 
 router = APIRouter(prefix="/api/v1")
+
+
+@router.get("/plugins")
+async def list_plugins(user: User = Depends(get_current_user)) -> list[dict]:
+    """List all registered agent plugins (built-in + custom)."""
+    return [
+        {
+            "name": p.name,
+            "display_name": p.display_name,
+            "description": p.description,
+            "trigger_status": p.trigger_status,
+            "configurable_fields": p.configurable_fields,
+        }
+        for p in registry.list_all()
+    ]
 
 
 # ---------------------------------------------------------------------------
