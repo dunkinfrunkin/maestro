@@ -298,14 +298,41 @@ export async function fetchTasks(params?: {
 
 export async function updateTaskStatus(
   externalRef: string,
-  status: string
-): Promise<void> {
+  status: string,
+  context?: {
+    workspace_id?: number;
+    issue_title?: string;
+    issue_description?: string;
+    issue_url?: string;
+  },
+): Promise<{ agent_run_id?: number }> {
   const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...context }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export interface AgentRunResponse {
+  id: number;
+  agent_type: string;
+  task_pipeline_id: number;
+  status: string;
+  model: string;
+  summary: string;
+  error: string;
+  cost_usd: number;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string | null;
+}
+
+export async function fetchAgentRuns(workspaceId: number): Promise<AgentRunResponse[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/agent-runs`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
 }
 
 export async function removeTaskStatus(externalRef: string): Promise<void> {

@@ -59,6 +59,10 @@ class ConnectionResponse(BaseModel):
 
 class PipelineStatusUpdate(BaseModel):
     status: str  # one of PipelineStatus values
+    workspace_id: int | None = None
+    issue_title: str = ""
+    issue_description: str = ""
+    issue_url: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +219,7 @@ async def list_tasks(
 
 @router.put("/tasks/{external_ref:path}/status")
 async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> dict:
-    """Set or update a task's pipeline status. Creates the record if it doesn't exist."""
+    """Set or update a task's pipeline status. Dispatches agent if applicable."""
     try:
         status = PipelineStatus(body.status)
     except ValueError:
@@ -235,11 +239,26 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> d
 
     async with get_session() as session:
         record = await crud.set_pipeline_status(session, external_ref, conn_id, status)
-        return {
-            "external_ref": record.external_ref,
-            "status": record.status.value,
-            "updated_at": record.updated_at.isoformat() if record.updated_at else None,
-        }
+
+    # Dispatch agent for this status change
+    agent_run_id = None
+    if body.workspace_id:
+        from maestro.agent.dispatcher import dispatch_agent_for_status
+        agent_run_id = await dispatch_agent_for_status(
+            workspace_id=body.workspace_id,
+            task_pipeline_id=record.id,
+            status=body.status,
+            issue_title=body.issue_title,
+            issue_description=body.issue_description,
+            issue_url=body.issue_url,
+        )
+
+    return {
+        "external_ref": record.external_ref,
+        "status": record.status.value,
+        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+        "agent_run_id": agent_run_id,
+    }
 
 
 @router.delete("/tasks/{external_ref:path}/status")

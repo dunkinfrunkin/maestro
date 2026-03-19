@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AgentConfigResponse,
+  AgentRunResponse,
   ApiKeyStatus,
   getAgentConfig,
   getApiKeyStatus,
   updateAgentConfig,
+  fetchAgentRuns,
 } from "@/lib/api";
 
 interface AgentDef {
@@ -74,7 +76,63 @@ export function AgentsPage({ workspaceId }: { workspaceId: number }) {
       {AGENTS.map((agent) => (
         <AgentCard key={agent.type} agent={agent} workspaceId={workspaceId} isActive={isActive} />
       ))}
+
+      {/* Recent Runs */}
+      <AgentRunsList workspaceId={workspaceId} />
     </div>
+  );
+}
+
+function AgentRunsList({ workspaceId }: { workspaceId: number }) {
+  const [runs, setRuns] = useState<AgentRunResponse[]>([]);
+
+  useEffect(() => {
+    fetchAgentRuns(workspaceId).then(setRuns).catch(() => {});
+    const interval = setInterval(() => {
+      fetchAgentRuns(workspaceId).then(setRuns).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [workspaceId]);
+
+  if (runs.length === 0) return null;
+
+  const statusColors: Record<string, string> = {
+    pending: "bg-gray-100 text-gray-600 border-gray-300",
+    running: "bg-blue-100 text-blue-700 border-blue-300",
+    completed: "bg-green-100 text-green-700 border-green-300",
+    failed: "bg-red-100 text-red-700 border-red-300",
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2 text-xs text-muted">
+        <div className="h-px flex-1 bg-border" />
+        <span>Recent Runs</span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+      <div className="space-y-2">
+        {runs.map((run) => (
+          <div key={run.id} className="rounded-lg border border-border bg-surface p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium capitalize">{run.agent_type.replace("_", " ")}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${statusColors[run.status] || ""}`}>
+                  {run.status}
+                </span>
+              </div>
+              <span className="text-[10px] text-muted">
+                {run.created_at ? new Date(run.created_at).toLocaleTimeString() : ""}
+              </span>
+            </div>
+            {run.summary && <div className="text-xs text-muted">{run.summary}</div>}
+            {run.error && <div className="text-xs text-red-600 mt-1">{run.error}</div>}
+            {run.cost_usd > 0 && (
+              <div className="text-[10px] text-muted mt-1">${run.cost_usd.toFixed(4)}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 

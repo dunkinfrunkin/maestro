@@ -8,7 +8,9 @@ from pydantic import BaseModel
 from maestro.auth import get_current_user
 from maestro.db import crud
 from maestro.db.engine import get_session
-from maestro.db.models import AgentType, ApiKeyProvider, User
+from sqlalchemy import select
+
+from maestro.db.models import AgentRun, AgentType, ApiKeyProvider, User
 from maestro.agent.implementation import AVAILABLE_MODELS, DEFAULT_MODEL
 from maestro.agent.plugin import registry
 
@@ -200,3 +202,42 @@ async def update_agent_config(
         available_models=AVAILABLE_MODELS,
         extra_config=extra,
     )
+
+
+# ---------------------------------------------------------------------------
+# Agent Runs
+# ---------------------------------------------------------------------------
+
+
+@router.get("/workspaces/{workspace_id}/agent-runs")
+async def list_agent_runs(
+    workspace_id: int,
+    user: User = Depends(get_current_user),
+    limit: int = 20,
+) -> list[dict]:
+    """List recent agent runs for a workspace."""
+    async with get_session() as session:
+        result = await session.execute(
+            select(AgentRun)
+            .where(AgentRun.workspace_id == workspace_id)
+            .order_by(AgentRun.created_at.desc())
+            .limit(limit)
+        )
+        runs = result.scalars().all()
+
+    return [
+        {
+            "id": r.id,
+            "agent_type": r.agent_type.value if r.agent_type else "",
+            "task_pipeline_id": r.task_pipeline_id,
+            "status": r.status.value if r.status else "",
+            "model": r.model,
+            "summary": r.summary,
+            "error": r.error,
+            "cost_usd": r.cost_usd,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in runs
+    ]

@@ -30,7 +30,7 @@ const STATUS_COLORS: Record<string, string> = {
   monitor: "bg-green-100 text-green-800 border-green-300",
 };
 
-export function TasksPage() {
+export function TasksPage({ workspaceId }: { workspaceId?: number }) {
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [search, setSearch] = useState("");
@@ -69,11 +69,15 @@ export function TasksPage() {
       if (status === "") {
         await removeTaskStatus(task.external_ref);
       } else {
-        await updateTaskStatus(task.external_ref, status);
+        await updateTaskStatus(task.external_ref, status, {
+          workspace_id: workspaceId,
+          issue_title: task.title,
+          issue_description: task.description || "",
+          issue_url: task.url || "",
+        });
       }
       await loadTasks();
     } catch {
-      // reload anyway
       await loadTasks();
     }
   };

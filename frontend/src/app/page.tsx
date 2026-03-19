@@ -184,7 +184,7 @@ function AuthenticatedApp() {
 
         <div className="p-6">
           {page === "operations" && <OperationsPage state={orchState} />}
-          {page === "tasks" && <TasksPage />}
+          {page === "tasks" && <TasksPage workspaceId={activeWorkspace?.id} />}
           {page === "agents" && activeWorkspace && (
             <AgentsPage workspaceId={activeWorkspace.id} />
           )}

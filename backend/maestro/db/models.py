@@ -143,6 +143,9 @@ class TaskPipelineRecord(Base):
     status: Mapped[PipelineStatus] = mapped_column(
         Enum(PipelineStatus), nullable=False, default=PipelineStatus.QUEUED
     )
+    pr_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    pr_number: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    repo: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -212,4 +215,35 @@ class AgentConfig(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent Runs (tracks each agent execution)
+# ---------------------------------------------------------------------------
+
+
+class AgentRunStatus(str, enum.Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    task_pipeline_id: Mapped[int] = mapped_column(ForeignKey("task_pipeline.id", ondelete="CASCADE"), nullable=False)
+    agent_type: Mapped[AgentType] = mapped_column(Enum(AgentType), nullable=False)
+    status: Mapped[AgentRunStatus] = mapped_column(Enum(AgentRunStatus), nullable=False, default=AgentRunStatus.PENDING)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    cost_usd: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )
