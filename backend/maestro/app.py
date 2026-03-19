@@ -10,7 +10,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from maestro.api.routes import router as api_router
+from maestro.api.tasks import router as tasks_router
 from maestro.config.loader import ConfigLoader
+from maestro.db.engine import close_db, init_db
 from maestro.orchestrator.engine import Orchestrator
 from maestro.tracker.linear import LinearClient
 
@@ -19,7 +21,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start orchestrator on startup, stop on shutdown."""
+    """Start DB + orchestrator on startup, stop on shutdown."""
+    # Initialize database
+    try:
+        await init_db()
+        logger.info("Database initialized")
+    except Exception:
+        logger.exception("Failed to initialize database")
+
     workflow_path = os.environ.get("MAESTRO_WORKFLOW", "WORKFLOW.md")
 
     orchestrator = None
@@ -56,6 +65,7 @@ async def lifespan(app: FastAPI):
         await orchestrator.stop()
     if tracker:
         await tracker.close()
+    await close_db()
 
 
 def create_app() -> FastAPI:
@@ -75,6 +85,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+    app.include_router(tasks_router)
 
     @app.get("/")
     async def root():
