@@ -56,37 +56,39 @@ const AGENTS: AgentDef[] = [
 ];
 
 export function AgentsPage({ workspaceId }: { workspaceId: number }) {
+  const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
+
+  useEffect(() => {
+    getApiKeyStatus(workspaceId, "anthropic").then(setKeyStatus).catch(() => {});
+  }, [workspaceId]);
+
+  const isActive = keyStatus?.has_key ?? false;
+
   return (
     <div className="max-w-2xl space-y-4">
-      <p className="text-sm text-muted mb-2">
-        Agents are triggered when tasks move through the harness engineering pipeline.
-      </p>
+      {!isActive && (
+        <div className="text-xs text-muted rounded-md border border-border border-dashed p-3">
+          Add your Anthropic API key in <strong>Settings &rarr; API Keys</strong> to activate agents.
+        </div>
+      )}
       {AGENTS.map((agent) => (
-        <AgentCard key={agent.type} agent={agent} workspaceId={workspaceId} />
+        <AgentCard key={agent.type} agent={agent} workspaceId={workspaceId} isActive={isActive} />
       ))}
     </div>
   );
 }
 
-function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: number }) {
+function AgentCard({ agent, workspaceId, isActive }: { agent: AgentDef; workspaceId: number; isActive: boolean }) {
   const [config, setConfig] = useState<AgentConfigResponse | null>(null);
-  const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [cfg, ks] = await Promise.all([
-        getAgentConfig(workspaceId, agent.type),
-        getApiKeyStatus(workspaceId, "anthropic"),
-      ]);
-      setConfig(cfg);
-      setKeyStatus(ks);
+      setConfig(await getAgentConfig(workspaceId, agent.type));
       setError(null);
     } catch {
-      // Agent type may not exist in DB yet — show defaults
       setConfig(null);
-      setKeyStatus(null);
     }
   }, [workspaceId, agent.type]);
 
@@ -111,8 +113,6 @@ function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: numbe
     }
   };
 
-  const isActive = keyStatus?.has_key ?? false;
-
   return (
     <div className="rounded-lg border border-border bg-surface overflow-hidden">
       <button
@@ -134,13 +134,6 @@ function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: numbe
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-muted">
             on {agent.triggerStatus}
           </span>
-          <span className={`text-xs px-2 py-0.5 rounded-full border ${
-            isActive
-              ? "bg-green-100 text-green-700 border-green-300"
-              : "bg-gray-100 text-gray-500 border-gray-300"
-          }`}>
-            {isActive ? "Active" : "Inactive"}
-          </span>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
             className={`w-4 h-4 text-muted transition-transform ${expanded ? "rotate-90" : ""}`}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -152,12 +145,6 @@ function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: numbe
         <div className="border-t border-border p-4 space-y-4">
           {error && (
             <div className="p-2 rounded-md bg-red-100 border border-red-300 text-red-800 text-xs">{error}</div>
-          )}
-
-          {!isActive && (
-            <div className="text-xs text-muted rounded-md border border-border border-dashed p-3">
-              Add your Anthropic API key in <strong>Settings &rarr; API Keys</strong> to activate this agent.
-            </div>
           )}
 
           <div>
@@ -192,12 +179,11 @@ function AgentCard({ agent, workspaceId }: { agent: AgentDef; workspaceId: numbe
             </div>
           </div>
 
-          {/* Agent-specific config */}
           {agent.type === "risk_profile" && (
             <div>
               <div className="text-xs font-medium mb-2">Auto-approve threshold</div>
               <div className="text-[10px] text-muted mb-2">
-                PRs at or below this risk level will be auto-approved. Higher risk PRs require human review.
+                PRs at or below this risk level will be auto-approved.
               </div>
               <select
                 value={(config?.extra_config?.auto_approve_threshold as string) || "low"}
