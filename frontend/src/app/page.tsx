@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OrchestratorState, fetchState, triggerRefresh } from "@/lib/api";
 import { Sidebar, Page } from "@/components/sidebar";
 import { OperationsPage } from "@/components/operations";
+import { AgentsPage } from "@/components/agents";
 
 const POLL_INTERVAL = 3000;
 
@@ -78,18 +79,10 @@ export default function Dashboard() {
         {/* Page content */}
         <div className="p-6">
           {page === "operations" && <OperationsPage state={state} />}
-          {page === "agents" && <AgentsPlaceholder state={state} />}
+          {page === "agents" && <AgentsPage state={state} />}
           {page === "settings" && <SettingsPlaceholder />}
         </div>
       </main>
-    </div>
-  );
-}
-
-function AgentsPlaceholder({ state }: { state: OrchestratorState | null }) {
-  return (
-    <div className="rounded-lg border border-border border-dashed p-12 text-center text-muted text-sm">
-      Agents page — coming next
     </div>
   );
 }
