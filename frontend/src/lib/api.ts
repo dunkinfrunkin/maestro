@@ -72,6 +72,116 @@ export async function fetchConfig(): Promise<ServiceConfig> {
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// Connections
+// ---------------------------------------------------------------------------
+
+export interface TrackerConnection {
+  id: number;
+  kind: string;
+  name: string;
+  project: string;
+  endpoint: string;
+  has_token: boolean;
+  created_at: string;
+}
+
+export async function fetchConnections(): Promise<TrackerConnection[]> {
+  const res = await fetch(`${API_BASE}/api/v1/connections`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function createConnection(body: {
+  kind: string;
+  name: string;
+  project: string;
+  token: string;
+  endpoint?: string;
+}): Promise<TrackerConnection> {
+  const res = await fetch(`${API_BASE}/api/v1/connections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteConnection(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/v1/connections/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+export interface UnifiedTask {
+  external_ref: string;
+  tracker_kind: string;
+  connection_id: number;
+  identifier: string;
+  title: string;
+  description: string | null;
+  state: string;
+  priority: number | null;
+  labels: string[];
+  url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  pipeline_status: string | null;
+}
+
+export const PIPELINE_STATUSES = [
+  "queued",
+  "implement",
+  "review",
+  "risk_profile",
+  "deploy",
+  "monitor",
+] as const;
+
+export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
+
+export async function fetchTasks(params?: {
+  connection_id?: number;
+  search?: string;
+  label?: string;
+  pipeline_status?: string;
+}): Promise<UnifiedTask[]> {
+  const url = new URL(`${API_BASE}/api/v1/tasks`);
+  if (params?.connection_id) url.searchParams.set("connection_id", String(params.connection_id));
+  if (params?.search) url.searchParams.set("search", params.search);
+  if (params?.label) url.searchParams.set("label", params.label);
+  if (params?.pipeline_status) url.searchParams.set("pipeline_status", params.pipeline_status);
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function updateTaskStatus(
+  externalRef: string,
+  status: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export async function removeTaskStatus(externalRef: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
 export async function triggerRefresh(): Promise<void> {
   const res = await fetch(`${API_BASE}/api/v1/refresh`, {
     method: "POST",

@@ -1,140 +1,217 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ServiceConfig, fetchConfig } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  TrackerConnection,
+  fetchConnections,
+  createConnection,
+  deleteConnection,
+} from "@/lib/api";
 
 export function SettingsPage() {
-  const [config, setConfig] = useState<ServiceConfig | null>(null);
+  const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    fetchConfig()
-      .then(setConfig)
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Failed to fetch config")
-      );
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchConnections();
+      setConnections(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load connections");
+    }
   }, []);
 
-  if (error) {
-    return (
-      <div className="rounded-lg border border-border border-dashed p-8 text-center text-muted text-sm">
-        {error === "API error: 503"
-          ? "Orchestrator not connected — no WORKFLOW.md loaded"
-          : error}
-      </div>
-    );
-  }
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  if (!config) {
-    return (
-      <div className="text-sm text-muted">Loading configuration...</div>
-    );
-  }
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteConnection(id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Tracker Connection */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">Tracker Connection</h2>
-        <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className={`w-2.5 h-2.5 rounded-full ${
-                config.tracker.api_key_set
-                  ? "bg-green-500"
-                  : "bg-red-500"
-              }`}
-            />
-            <span className="text-sm font-medium">
-              {config.tracker.api_key_set ? "Connected" : "Not connected"}
-            </span>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Tracker Connections</h2>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors"
+          >
+            {showForm ? "Cancel" : "Add Connection"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-md bg-red-100 border border-red-300 text-red-800 text-sm">
+            {error}
           </div>
+        )}
 
-          <SettingsRow label="Tracker" value={config.tracker.kind} />
-          <SettingsRow label="Endpoint" value={config.tracker.endpoint} mono />
-          <SettingsRow
-            label="Project"
-            value={config.tracker.project_slug || "—"}
-            mono
+        {showForm && (
+          <ConnectionForm
+            onCreated={() => {
+              setShowForm(false);
+              load();
+            }}
+            onError={setError}
           />
-          <SettingsRow
-            label="API Key"
-            value={config.tracker.api_key_set ? "********" : "Not set"}
-          />
-          <SettingsRow
-            label="Active States"
-            value={config.tracker.active_states.join(", ")}
-          />
-          <SettingsRow
-            label="Terminal States"
-            value={config.tracker.terminal_states.join(", ")}
-          />
-        </div>
-      </section>
+        )}
 
-      {/* Polling */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Polling</h2>
-        <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
-          <SettingsRow
-            label="Interval"
-            value={`${(config.polling.interval_ms / 1000).toFixed(0)}s`}
-          />
-        </div>
-      </section>
-
-      {/* Agent */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Agent</h2>
-        <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
-          <SettingsRow label="Command" value={config.codex.command} mono />
-          <SettingsRow
-            label="Max Concurrent"
-            value={String(config.agent.max_concurrent_agents)}
-          />
-          <SettingsRow
-            label="Max Retry Backoff"
-            value={`${(config.agent.max_retry_backoff_ms / 1000).toFixed(0)}s`}
-          />
-          <SettingsRow
-            label="Turn Timeout"
-            value={`${(config.codex.turn_timeout_ms / 1000 / 60).toFixed(0)}m`}
-          />
-          <SettingsRow
-            label="Stall Timeout"
-            value={`${(config.codex.stall_timeout_ms / 1000).toFixed(0)}s`}
-          />
-        </div>
-      </section>
-
-      {/* Workspace */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Workspace</h2>
-        <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
-          <SettingsRow label="Root" value={config.workspace.root} mono />
-        </div>
+        {connections.length === 0 && !showForm ? (
+          <div className="rounded-lg border border-border border-dashed p-8 text-center text-muted text-sm">
+            No tracker connections configured. Add a GitHub or Linear connection to get started.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {connections.map((conn) => (
+              <div
+                key={conn.id}
+                className="rounded-lg border border-border bg-surface p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="font-medium text-sm">{conn.name}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">
+                        {conn.kind}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted font-mono">{conn.project}</div>
+                    {conn.endpoint && (
+                      <div className="text-xs text-muted font-mono">{conn.endpoint}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDelete(conn.id)}
+                    className="text-xs text-red-600 hover:text-red-800 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
 }
 
-function SettingsRow({
-  label,
-  value,
-  mono = false,
+function ConnectionForm({
+  onCreated,
+  onError,
 }: {
-  label: string;
-  value: string;
-  mono?: boolean;
+  onCreated: () => void;
+  onError: (msg: string) => void;
 }) {
+  const [kind, setKind] = useState("github");
+  const [name, setName] = useState("");
+  const [project, setProject] = useState("");
+  const [token, setToken] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !project || !token) {
+      onError("Name, project, and token are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      await createConnection({
+        kind,
+        name,
+        project,
+        token,
+        endpoint: endpoint || undefined,
+      });
+      onCreated();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to create connection");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-sm text-muted whitespace-nowrap">{label}</span>
-      <span
-        className={`text-sm text-right break-all ${mono ? "font-mono" : ""}`}
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-lg border border-border bg-surface p-4 mb-4 space-y-3"
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted mb-1">Type</label>
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground"
+          >
+            <option value="github">GitHub</option>
+            <option value="linear">Linear</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="My GitHub"
+            className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-muted mb-1">
+          {kind === "github" ? "Repository (owner/repo)" : "Project Slug"}
+        </label>
+        <input
+          type="text"
+          value={project}
+          onChange={(e) => setProject(e.target.value)}
+          placeholder={kind === "github" ? "octocat/hello-world" : "my-project"}
+          className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-muted mb-1">API Token</label>
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="ghp_... or lin_api_..."
+          className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-muted mb-1">
+          Endpoint (optional, for GitHub Enterprise / custom Linear)
+        </label>
+        <input
+          type="text"
+          value={endpoint}
+          onChange={(e) => setEndpoint(e.target.value)}
+          placeholder={kind === "github" ? "https://api.github.com" : "https://api.linear.app/graphql"}
+          className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={saving}
+        className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50"
       >
-        {value}
-      </span>
-    </div>
+        {saving ? "Saving..." : "Add Connection"}
+      </button>
+    </form>
   );
 }
