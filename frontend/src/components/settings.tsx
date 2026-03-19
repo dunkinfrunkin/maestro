@@ -18,6 +18,8 @@ import {
   deleteConnection,
 } from "@/lib/api";
 
+type SettingsTab = "workspaces" | "connections";
+
 export function SettingsPage({
   activeWorkspace,
   onWorkspacesChanged,
@@ -25,27 +27,55 @@ export function SettingsPage({
   activeWorkspace: WorkspaceResponse | null;
   onWorkspacesChanged?: () => void;
 }) {
+  const [tab, setTab] = useState<SettingsTab>("workspaces");
+
   return (
-    <div className="space-y-10 max-w-2xl">
-      <WorkspacesSection onChanged={onWorkspacesChanged} />
-      {activeWorkspace && (
-        <ProjectsSection
-          workspaceId={activeWorkspace.id}
+    <div className="max-w-2xl">
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-border">
+        {([
+          { id: "workspaces", label: "Workspaces" },
+          { id: "connections", label: "Connections" },
+        ] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm -mb-px transition-colors ${
+              tab === t.id
+                ? "border-b-2 border-accent text-foreground font-medium"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "workspaces" && (
+        <WorkspacesTab
+          activeWorkspace={activeWorkspace}
           onChanged={onWorkspacesChanged}
         />
       )}
-      <ConnectionsSection />
+      {tab === "connections" && <ConnectionsSection />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Workspaces
+// Workspaces tab (workspaces with nested projects)
 // ---------------------------------------------------------------------------
 
-function WorkspacesSection({ onChanged }: { onChanged?: () => void }) {
+function WorkspacesTab({
+  activeWorkspace,
+  onChanged,
+}: {
+  activeWorkspace: WorkspaceResponse | null;
+  onChanged?: () => void;
+}) {
   const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
   const [newName, setNewName] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(activeWorkspace?.id ?? null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +90,18 @@ function WorkspacesSection({ onChanged }: { onChanged?: () => void }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Auto-expand active workspace
+  useEffect(() => {
+    if (activeWorkspace) setExpandedId(activeWorkspace.id);
+  }, [activeWorkspace]);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
     try {
-      await createWorkspace(newName.trim());
+      const ws = await createWorkspace(newName.trim());
       setNewName("");
+      setExpandedId(ws.id);
       await load();
       onChanged?.();
     } catch (err) {
@@ -88,6 +124,7 @@ function WorkspacesSection({ onChanged }: { onChanged?: () => void }) {
   const handleDelete = async (id: number) => {
     try {
       await deleteWorkspace(id);
+      if (expandedId === id) setExpandedId(null);
       await load();
       onChanged?.();
     } catch (err) {
@@ -96,11 +133,10 @@ function WorkspacesSection({ onChanged }: { onChanged?: () => void }) {
   };
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold mb-3">Workspaces</h2>
+    <div>
       {error && <ErrorBanner message={error} />}
 
-      <form onSubmit={handleCreate} className="flex gap-2 mb-3">
+      <form onSubmit={handleCreate} className="flex gap-2 mb-4">
         <input
           type="text"
           value={newName}
@@ -108,70 +144,71 @@ function WorkspacesSection({ onChanged }: { onChanged?: () => void }) {
           placeholder="New workspace name"
           className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-surface placeholder:text-muted"
         />
-        <button
-          type="submit"
-          className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity"
-        >
+        <button type="submit" className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity">
           Create
         </button>
       </form>
 
       <div className="space-y-2">
         {workspaces.map((ws) => (
-          <div key={ws.id} className="rounded-lg border border-border bg-surface p-3 flex items-center justify-between gap-3">
-            {editingId === ws.id ? (
-              <form
-                onSubmit={(e) => { e.preventDefault(); handleRename(ws.id); }}
-                className="flex-1 flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  autoFocus
-                  className="flex-1 px-2 py-1 text-sm rounded-md border border-border bg-background"
-                />
-                <button type="submit" className="text-xs text-accent hover:underline">Save</button>
-                <button type="button" onClick={() => setEditingId(null)} className="text-xs text-muted hover:underline">Cancel</button>
-              </form>
-            ) : (
-              <>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{ws.name}</div>
-                  <div className="text-xs text-muted">{ws.slug} &middot; {ws.role}</div>
-                </div>
-                <div className="flex items-center gap-2">
+          <div key={ws.id} className="rounded-lg border border-border bg-surface overflow-hidden">
+            {/* Workspace header */}
+            <div className="p-3 flex items-center justify-between gap-3">
+              {editingId === ws.id ? (
+                <form onSubmit={(e) => { e.preventDefault(); handleRename(ws.id); }} className="flex-1 flex gap-2">
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus className="flex-1 px-2 py-1 text-sm rounded-md border border-border bg-background" />
+                  <button type="submit" className="text-xs text-accent hover:underline">Save</button>
+                  <button type="button" onClick={() => setEditingId(null)} className="text-xs text-muted hover:underline">Cancel</button>
+                </form>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setExpandedId(expandedId === ws.id ? null : ws.id)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className={`w-4 h-4 text-muted transition-transform ${expandedId === ws.id ? "rotate-90" : ""}`}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
+                      <span className="text-sm font-medium">{ws.name}</span>
+                      <span className="text-xs text-muted">{ws.role}</span>
+                    </div>
+                  </button>
                   {ws.role === "owner" && (
-                    <>
-                      <button
-                        onClick={() => { setEditingId(ws.id); setEditName(ws.name); }}
-                        className="text-xs text-muted hover:text-foreground transition-colors"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ws.id)}
-                        className="text-xs text-red-600 hover:text-red-800 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => { setEditingId(ws.id); setEditName(ws.name); }} className="text-xs text-muted hover:text-foreground transition-colors">Rename</button>
+                      <button onClick={() => handleDelete(ws.id)} className="text-xs text-red-600 hover:text-red-800 transition-colors">Delete</button>
+                    </div>
                   )}
-                </div>
-              </>
+                </>
+              )}
+            </div>
+
+            {/* Nested projects */}
+            {expandedId === ws.id && (
+              <div className="border-t border-border bg-background/50 p-3">
+                <ProjectsList workspaceId={ws.id} onChanged={onChanged} />
+              </div>
             )}
           </div>
         ))}
       </div>
-    </section>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Projects
+// Projects (nested under a workspace)
 // ---------------------------------------------------------------------------
 
-function ProjectsSection({
+function ProjectsList({
   workspaceId,
   onChanged,
 }: {
@@ -188,7 +225,7 @@ function ProjectsSection({
     try {
       setProjects(await fetchProjects(workspaceId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : "Failed to load projects");
     }
   }, [workspaceId]);
 
@@ -230,75 +267,54 @@ function ProjectsSection({
   };
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold mb-3">Projects</h2>
+    <div>
+      <div className="text-xs font-medium text-muted mb-2">Projects</div>
       {error && <ErrorBanner message={error} />}
 
-      <form onSubmit={handleCreate} className="flex gap-2 mb-3">
+      <form onSubmit={handleCreate} className="flex gap-2 mb-2">
         <input
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="New project name"
-          className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-surface placeholder:text-muted"
+          placeholder="New project"
+          className="flex-1 px-2 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted"
         />
-        <button
-          type="submit"
-          className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity"
-        >
-          Create
+        <button type="submit" className="px-3 py-1.5 text-xs rounded-md bg-accent text-background hover:opacity-90 transition-opacity">
+          Add
         </button>
       </form>
 
-      <div className="space-y-2">
-        {projects.map((p) => (
-          <div key={p.id} className="rounded-lg border border-border bg-surface p-3 flex items-center justify-between gap-3">
-            {editingId === p.id ? (
-              <form
-                onSubmit={(e) => { e.preventDefault(); handleRename(p.id); }}
-                className="flex-1 flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  autoFocus
-                  className="flex-1 px-2 py-1 text-sm rounded-md border border-border bg-background"
-                />
-                <button type="submit" className="text-xs text-accent hover:underline">Save</button>
-                <button type="button" onClick={() => setEditingId(null)} className="text-xs text-muted hover:underline">Cancel</button>
-              </form>
-            ) : (
-              <>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{p.name}</div>
-                  <div className="text-xs text-muted">{p.slug}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => { setEditingId(p.id); setEditName(p.name); }}
-                    className="text-xs text-muted hover:text-foreground transition-colors"
-                  >
-                    Rename
-                  </button>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="text-xs text-red-600 hover:text-red-800 transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
+      {projects.length === 0 ? (
+        <div className="text-xs text-muted py-2">No projects yet</div>
+      ) : (
+        <div className="space-y-1">
+          {projects.map((p) => (
+            <div key={p.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover transition-colors">
+              {editingId === p.id ? (
+                <form onSubmit={(e) => { e.preventDefault(); handleRename(p.id); }} className="flex-1 flex gap-2">
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus className="flex-1 px-2 py-0.5 text-xs rounded border border-border bg-background" />
+                  <button type="submit" className="text-[10px] text-accent hover:underline">Save</button>
+                  <button type="button" onClick={() => setEditingId(null)} className="text-[10px] text-muted hover:underline">Cancel</button>
+                </form>
+              ) : (
+                <>
+                  <div className="text-xs">{p.name}</div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setEditingId(p.id); setEditName(p.name); }} className="text-[10px] text-muted hover:text-foreground transition-colors">Rename</button>
+                    <button onClick={() => handleDelete(p.id)} className="text-[10px] text-red-600 hover:text-red-800 transition-colors">Delete</button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Connections (existing, kept as-is)
+// Connections tab
 // ---------------------------------------------------------------------------
 
 function ConnectionsSection() {
@@ -327,9 +343,10 @@ function ConnectionsSection() {
   };
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold">Connections</h2>
+    <div>
+      {error && <ErrorBanner message={error} />}
+
+      <div className="flex justify-end mb-3">
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors"
@@ -337,8 +354,6 @@ function ConnectionsSection() {
           {showForm ? "Cancel" : "Add Connection"}
         </button>
       </div>
-
-      {error && <ErrorBanner message={error} />}
 
       {showForm && (
         <ConnectionForm
@@ -365,17 +380,14 @@ function ConnectionsSection() {
                   {conn.project || "All accessible repos"}
                 </div>
               </div>
-              <button
-                onClick={() => handleDelete(conn.id)}
-                className="text-xs text-red-600 hover:text-red-800 transition-colors"
-              >
+              <button onClick={() => handleDelete(conn.id)} className="text-xs text-red-600 hover:text-red-800 transition-colors">
                 Remove
               </button>
             </div>
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -395,14 +407,8 @@ function ConnectionForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !token) {
-      onError("Name and token are required");
-      return;
-    }
-    if (kind === "linear" && !project) {
-      onError("Project slug is required for Linear");
-      return;
-    }
+    if (!name || !token) { onError("Name and token are required"); return; }
+    if (kind === "linear" && !project) { onError("Project slug is required for Linear"); return; }
     setSaving(true);
     try {
       await createConnection({ kind, name, project, token, endpoint: endpoint || undefined });
@@ -433,7 +439,7 @@ function ConnectionForm({
         <label className="block text-xs text-muted mb-1">
           {kind === "github" ? "Repository (optional — leave blank for all repos)" : "Project Slug"}
         </label>
-        <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={kind === "github" ? "owner/repo or leave blank for all" : "my-project"} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+        <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={kind === "github" ? "owner/repo or leave blank" : "my-project"} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
       </div>
       <div>
         <label className="block text-xs text-muted mb-1">API Token</label>
