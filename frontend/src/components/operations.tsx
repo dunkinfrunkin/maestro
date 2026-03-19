@@ -1,18 +1,61 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
+  AgentRunResponse,
   CodexTotals,
   OrchestratorState,
   RetryEntry,
   RunAttempt,
+  fetchActiveRuns,
 } from "@/lib/api";
 
-export function OperationsPage({ state }: { state: OrchestratorState | null }) {
+export function OperationsPage({ state, workspaceId }: { state: OrchestratorState | null; workspaceId?: number }) {
   const running = state ? Object.values(state.running) : [];
   const retrying = state ? Object.values(state.retrying) : [];
+  const [activeRuns, setActiveRuns] = useState<AgentRunResponse[]>([]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    const load = () => fetchActiveRuns(workspaceId).then(setActiveRuns).catch(() => {});
+    load();
+    const interval = setInterval(load, 3000);
+    return () => clearInterval(interval);
+  }, [workspaceId]);
 
   return (
     <>
+      {/* Active Agent Runs */}
+      {activeRuns.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-3">
+            Active Agents
+            <span className="ml-2 text-sm font-normal text-muted">({activeRuns.length})</span>
+          </h2>
+          <div className="space-y-2">
+            {activeRuns.map((run) => (
+              <div key={run.id} className="rounded-lg border border-border bg-surface p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${run.status === "running" ? "bg-blue-500 animate-pulse" : "bg-gray-400"}`} />
+                  <div>
+                    <div className="text-xs font-medium capitalize">{(run as any).agent_type?.replace("_", " ") || "agent"}</div>
+                    <div className="text-[10px] text-muted">{(run as any).task_ref || ""}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-blue-100 text-blue-700 border-blue-300">
+                    {run.status}
+                  </span>
+                  <span className="text-[10px] text-muted">
+                    {run.started_at ? new Date(run.started_at).toLocaleTimeString() : ""}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {state && (
         <MetricsBar
           totals={state.codex_totals}

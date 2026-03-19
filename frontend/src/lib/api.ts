@@ -343,6 +343,18 @@ export async function removeTaskStatus(externalRef: string): Promise<void> {
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
 
+export async function fetchTaskRuns(externalRef: string): Promise<AgentRunResponse[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/runs`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchActiveRuns(workspaceId: number): Promise<AgentRunResponse[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/active-runs`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export async function triggerRefresh(): Promise<void> {
   const res = await authFetch(`${API_BASE}/api/v1/refresh`, {
     method: "POST",

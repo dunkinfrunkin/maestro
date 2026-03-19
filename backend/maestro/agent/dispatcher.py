@@ -73,7 +73,8 @@ async def dispatch_agent_for_status(
         if not api_key_record:
             logger.warning("No Anthropic API key for workspace %d, skipping agent", workspace_id)
             return None
-        api_key = crud.get_decrypted_token(api_key_record)
+        from maestro.db.encryption import decrypt_token
+        api_key = decrypt_token(api_key_record.encrypted_key)
 
         # Get task pipeline record for PR info
         task_record = await session.get(TaskPipelineRecord, task_pipeline_id)
