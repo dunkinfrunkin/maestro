@@ -27,9 +27,11 @@ type WorkspaceSubTab = "projects" | "connections" | "users";
 export function SettingsPage({
   activeWorkspace,
   onWorkspacesChanged,
+  onWorkspaceSwitch,
 }: {
   activeWorkspace: WorkspaceResponse | null;
   onWorkspacesChanged?: () => void;
+  onWorkspaceSwitch?: (ws: WorkspaceResponse) => void;
 }) {
   const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(activeWorkspace?.id ?? null);
@@ -134,14 +136,27 @@ export function SettingsPage({
                         </svg>
                         <span className="text-sm font-medium">{ws.name}</span>
                         <span className="text-xs text-muted">{ws.role}</span>
+                        {activeWorkspace?.id === ws.id && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-300">Active</span>
+                        )}
                       </div>
                     </button>
-                    {ws.role === "owner" && (
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      {activeWorkspace?.id !== ws.id && (
+                        <button
+                          onClick={() => { onWorkspaceSwitch?.(ws); }}
+                          className="text-xs text-accent hover:underline transition-colors"
+                        >
+                          Switch
+                        </button>
+                      )}
+                      {ws.role === "owner" && (
+                        <>
                         <button onClick={() => { setEditingId(ws.id); setEditName(ws.name); }} className="text-xs text-muted hover:text-foreground transition-colors">Rename</button>
                         <button onClick={() => handleDelete(ws.id)} className="text-xs text-red-600 hover:text-red-800 transition-colors">Delete</button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </>
                 )}
               </div>

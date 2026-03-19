@@ -174,6 +174,7 @@ function AuthenticatedApp() {
             <SettingsPage
               activeWorkspace={activeWorkspace}
               onWorkspacesChanged={reloadAll}
+              onWorkspaceSwitch={setActiveWorkspace}
             />
           )}
         </div>

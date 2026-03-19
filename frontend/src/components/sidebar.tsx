@@ -121,22 +121,10 @@ export function Sidebar({
         {/* Dropdown menu (opens upward) */}
         {userMenuOpen && !collapsed && (
           <div className="absolute bottom-full left-0 right-0 mx-2 mb-1 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
-            {/* Workspace switcher */}
+            {/* Current workspace display */}
             <div className="px-3 py-2 border-b border-border">
-              <div className="text-[10px] text-muted mb-1">Workspace</div>
-              {workspaces.map((ws) => (
-                <button
-                  key={ws.id}
-                  onClick={() => { onWorkspaceChange(ws); setUserMenuOpen(false); }}
-                  className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs transition-colors ${
-                    activeWorkspace?.id === ws.id
-                      ? "bg-surface-hover text-foreground font-medium"
-                      : "text-muted hover:bg-surface-hover hover:text-foreground"
-                  }`}
-                >
-                  {ws.name}
-                </button>
-              ))}
+              <div className="text-[10px] text-muted">Workspace</div>
+              <div className="text-xs font-medium">{activeWorkspace?.name}</div>
             </div>
 
             {/* Actions */}
