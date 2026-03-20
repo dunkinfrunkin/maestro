@@ -245,17 +245,31 @@ async def _execute_agent(
             prompt_parts.append(f"Repository: {repo}")
 
         # Add context for feedback loop
+        iteration = iteration_count // 2 + 1
         if plugin.name == "implementation" and pr_url:
+            pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             prompt_parts.append(
-                "\nThis may be a follow-up iteration. Check `gh pr view --comments` for "
-                "review feedback that needs to be addressed. Fix the issues, commit, and push."
+                f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                f"\nPR #{pr_num} already exists with review comments that MUST be addressed."
+                f"\n1. Checkout the PR branch: `gh pr checkout {pr_num} --repo {repo}`"
+                f"\n2. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
+                f"\n3. Address EVERY comment — do not skip any"
+                f"\n4. Commit and push your fixes"
+            )
+        elif plugin.name == "review" and iteration > 1:
+            pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
+            prompt_parts.append(
+                f"\n## THIS IS A RE-REVIEW (iteration {iteration}/{max_iterations})"
+                f"\nThe implementation agent has pushed fixes for previous review comments."
+                f"\n1. List previous comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
+                f"\n2. Check if EACH comment was addressed in the latest code"
+                f"\n3. Resolve addressed comments, flag remaining ones"
+                f"\n4. Only APPROVE if ALL comments are resolved and no new issues"
             )
         elif plugin.name == "review":
             prompt_parts.append(
-                "\nReview the PR thoroughly. At the end, output one of:\n"
-                "REVIEW_VERDICT: APPROVE\n"
-                "REVIEW_VERDICT: REQUEST_CHANGES\n"
-                "If you request changes, be specific about what needs fixing."
+                "\nThis is the first review. Be thorough. Post inline comments on specific lines."
+                "\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
             )
 
         prompt_parts.append("\nProceed with your task.")

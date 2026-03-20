@@ -44,8 +44,25 @@ Then compute an overall risk level:
 - **HIGH** (avg <= 4.0): Requires senior review and staged rollout
 - **CRITICAL** (avg > 4.0): Block deployment, requires architecture review
 
-Output your assessment as structured text with the following format at the end:
+## Post your assessment as a PR comment
 
+After scoring, post your risk assessment as a comment on the PR:
+```bash
+gh pr comment <number> --repo <owner/repo> --body "<your formatted risk assessment>"
+```
+
+If the risk is LOW, approve the PR:
+```bash
+gh api repos/<owner>/<repo>/pulls/<number>/reviews -X POST --input - <<'EOF'
+{"body": "Risk Profile: LOW — auto-approved for deployment.", "event": "APPROVE", "comments": []}
+EOF
+```
+
+If MEDIUM or higher, do NOT approve. Post the risk assessment comment and let a human decide.
+
+## Output format
+
+At the end, output:
 RISK_LEVEL: LOW|MEDIUM|HIGH|CRITICAL
 RISK_SCORE: <average score as float>
 AUTO_APPROVE: YES|NO
