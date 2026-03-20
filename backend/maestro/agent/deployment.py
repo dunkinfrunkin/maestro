@@ -92,7 +92,7 @@ async def run_deployment_agent(
                         result.messages.append({"type": "tool_use", "tool": block.name})
 
             elif isinstance(message, ResultMessage):
-                result.total_cost_usd = message.total_cost_usd or 0.0
+                result.total_cost_usd = getattr(message, "total_cost_usd", 0.0) or 0.0
                 result.status = "completed" if message.subtype == "success" else "failed"
                 if message.subtype != "success":
                     result.error = message.subtype

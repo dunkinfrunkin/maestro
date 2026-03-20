@@ -102,9 +102,9 @@ async def run_implementation_agent(
                         })
 
             elif isinstance(message, ResultMessage):
-                run.total_cost_usd = message.total_cost_usd or 0.0
-                run.input_tokens = message.input_tokens or 0
-                run.output_tokens = message.output_tokens or 0
+                run.total_cost_usd = getattr(message, "total_cost_usd", 0.0) or 0.0
+                run.input_tokens = getattr(message, "input_tokens", 0) or 0
+                run.output_tokens = getattr(message, "output_tokens", 0) or 0
 
                 if message.subtype == "success":
                     run.status = "completed"
