@@ -286,6 +286,7 @@ async def _execute_agent(
         )
 
         # Update run record
+        print(f"[MAESTRO] Agent run {run_id} ({plugin.name}) SDK finished: {result['status']}")
         async with get_session() as session:
             run = await session.get(AgentRun, run_id)
             if run:
@@ -299,26 +300,28 @@ async def _execute_agent(
                 run.cost_usd = result.get("total_cost_usd", 0.0)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
+                print(f"[MAESTRO] Run {run_id} status updated to {run.status}")
 
-            # Save PR URL to pipeline record if detected
-            detected_pr = result.get("pr_url", "")
-            if detected_pr:
+        # Save PR URL to pipeline record if detected
+        detected_pr = result.get("pr_url", "")
+        if detected_pr:
+            async with get_session() as session:
                 task = await session.get(TaskPipelineRecord, task_pipeline_id)
                 if task and not task.pr_url:
                     task.pr_url = detected_pr
-                    # Extract PR number from URL
                     try:
                         task.pr_number = detected_pr.rstrip("/").split("/")[-1]
                     except (IndexError, AttributeError):
                         pass
                     await session.commit()
+                    print(f"[MAESTRO] PR URL saved: {detected_pr}")
 
-        logger.info("Agent run %d (%s) finished: %s", run_id, plugin.name, result["status"])
+        print(f"[MAESTRO] Agent run {run_id} ({plugin.name}) finished: {result['status']}")
 
         # --- Auto-transition logic ---
         if result["status"] == "completed":
             try:
-                logger.info("Attempting auto-transition for %s (run %d)", plugin.name, run_id)
+                print(f"[MAESTRO] Attempting auto-transition for {plugin.name} (run {run_id})")
                 await _auto_transition(
                     plugin_name=plugin.name,
                     result=result,
@@ -330,11 +333,16 @@ async def _execute_agent(
                     iteration_count=iteration_count,
                     max_iterations=max_iterations,
                 )
+                print(f"[MAESTRO] Auto-transition completed for {plugin.name}")
             except Exception as trans_exc:
-                logger.exception("Auto-transition failed for run %d: %s", run_id, trans_exc)
+                print(f"[MAESTRO] Auto-transition FAILED for run {run_id}: {trans_exc}")
+                import traceback
+                traceback.print_exc()
 
     except Exception as exc:
-        logger.exception("Agent run %d failed", run_id)
+        print(f"[MAESTRO] Agent run {run_id} EXCEPTION: {exc}")
+        import traceback
+        traceback.print_exc()
         async with get_session() as session:
             run = await session.get(AgentRun, run_id)
             if run:
