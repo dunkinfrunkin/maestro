@@ -109,8 +109,8 @@ export function TaskDetailPage({
           </div>
         )}
 
-        {/* Status selector */}
-        <div className="mt-4 flex items-center gap-2">
+        {/* Status selector + re-run */}
+        <div className="mt-4 flex items-center gap-3">
           <span className="text-xs text-muted">Pipeline:</span>
           <select
             value={task.pipeline_status || ""}
@@ -122,6 +122,18 @@ export function TaskDetailPage({
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
             ))}
           </select>
+          {task.pipeline_status && task.pipeline_status !== "queued" && (
+            <button
+              onClick={() => handleStatusChange(task.pipeline_status!)}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:bg-surface-hover transition-colors text-muted hover:text-foreground"
+              title="Re-run the current stage agent"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+              </svg>
+              Re-run
+            </button>
+          )}
         </div>
       </div>
 
@@ -138,7 +150,11 @@ export function TaskDetailPage({
           ) : (
             <div className="space-y-4">
               {runs.map((run) => (
-                <RunEntry key={run.id} run={run} />
+                <RunEntry
+                  key={run.id}
+                  run={run}
+                  onRerun={() => handleStatusChange(run.agent_type === "implementation" ? "implement" : run.agent_type === "risk_profile" ? "risk_profile" : run.agent_type)}
+                />
               ))}
             </div>
           )}
@@ -148,7 +164,7 @@ export function TaskDetailPage({
   );
 }
 
-function RunEntry({ run }: { run: AgentRunResponse }) {
+function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void }) {
   const [logs, setLogs] = useState<AgentLogEntry[]>([]);
   const [lastLogId, setLastLogId] = useState(0);
   const isLive = run.status === "running" || run.status === "pending";
@@ -188,11 +204,25 @@ function RunEntry({ run }: { run: AgentRunResponse }) {
         <div className="w-px flex-1 bg-border mt-1" />
       </div>
       <div className="flex-1 pb-4">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium capitalize">{run.agent_type.replace("_", " ")} Agent</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${RUN_STATUS_COLORS[run.status] || ""}`}>
-            {run.status}
-          </span>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium capitalize">{run.agent_type.replace("_", " ")} Agent</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${RUN_STATUS_COLORS[run.status] || ""}`}>
+              {run.status}
+            </span>
+          </div>
+          {(run.status === "completed" || run.status === "failed") && (
+            <button
+              onClick={onRerun}
+              className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground transition-colors"
+              title="Re-run this agent"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+              </svg>
+              Re-run
+            </button>
+          )}
         </div>
         <div className="text-xs text-muted mb-2">
           {run.started_at && `Started ${new Date(run.started_at).toLocaleString()}`}
