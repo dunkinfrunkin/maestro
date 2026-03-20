@@ -67,7 +67,7 @@ async def run_cli_with_logging(
     ]
 
     if system_prompt:
-        cmd.extend(["--systemPrompt", system_prompt])
+        cmd.extend(["--system-prompt", system_prompt])
 
     env = {
         "ANTHROPIC_API_KEY": api_key,
