@@ -62,6 +62,7 @@ class PipelineStatusUpdate(BaseModel):
     status: str  # one of PipelineStatus values
     workspace_id: int | None = None
     project_id: int | None = None
+    repo: str = ""
     issue_title: str = ""
     issue_description: str = ""
     issue_url: str = ""
@@ -242,6 +243,11 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> d
 
     async with get_session() as session:
         record = await crud.set_pipeline_status(session, external_ref, conn_id, status, project_id=body.project_id or 0)
+        # Save repo if provided
+        if body.repo and not record.repo:
+            record.repo = body.repo
+            await session.commit()
+            await session.refresh(record)
 
     # Dispatch agent for this status change
     agent_run_id = None

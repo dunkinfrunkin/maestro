@@ -303,6 +303,7 @@ export async function updateTaskStatus(
   context?: {
     workspace_id?: number;
     project_id?: number;
+    repo?: string;
     issue_title?: string;
     issue_description?: string;
     issue_url?: string;

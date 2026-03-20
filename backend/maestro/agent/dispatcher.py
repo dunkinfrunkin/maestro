@@ -82,6 +82,26 @@ async def dispatch_agent_for_status(
         pr_number = task_record.pr_number if task_record else ""
         repo = task_record.repo if task_record else ""
 
+        # If repo is empty, try to get it from the connection or external_ref
+        if not repo and task_record:
+            conn = await crud.get_connection(session, task_record.tracker_connection_id)
+            if conn and conn.project:
+                repo = conn.project
+            elif task_record.external_ref:
+                # external_ref format: "github:conn_id:issue_id"
+                # issue identifier might be "owner/repo#number"
+                parts = task_record.external_ref.split(":")
+                if len(parts) >= 3:
+                    issue_id = parts[2]
+                    # For issues fetched across all repos, identifier has repo in it
+                    # but issue_id here is just the number
+                    # Fall back to connection project
+                    pass
+            # Save repo back to task record for future runs
+            if repo:
+                task_record.repo = repo
+                await session.commit()
+
         model = agent_config.model if agent_config else "claude-sonnet-4-6"
 
         # Create agent run record

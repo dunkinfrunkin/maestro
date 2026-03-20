@@ -73,9 +73,11 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
       if (status === "") {
         await removeTaskStatus(task.external_ref);
       } else {
+        const repo = task.identifier.includes("#") ? task.identifier.split("#")[0] : "";
         await updateTaskStatus(task.external_ref, status, {
           workspace_id: workspaceId,
           project_id: projectId,
+          repo,
           issue_title: task.title,
           issue_description: task.description || "",
           issue_url: task.url || "",
