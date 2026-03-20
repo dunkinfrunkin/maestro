@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AgentRunResponse,
   AgentLogEntry,
@@ -166,16 +166,18 @@ export function TaskDetailPage({
 
 function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void }) {
   const [logs, setLogs] = useState<AgentLogEntry[]>([]);
-  const [lastLogId, setLastLogId] = useState(0);
+  const lastLogIdRef = useRef(0);
   const isLive = run.status === "running" || run.status === "pending";
 
   useEffect(() => {
+    lastLogIdRef.current = 0;
+    setLogs([]);
     const load = async () => {
       try {
-        const newLogs = await fetchRunLogs(run.id, lastLogId);
+        const newLogs = await fetchRunLogs(run.id, lastLogIdRef.current);
         if (newLogs.length > 0) {
           setLogs((prev) => [...prev, ...newLogs]);
-          setLastLogId(newLogs[newLogs.length - 1].id);
+          lastLogIdRef.current = newLogs[newLogs.length - 1].id;
         }
       } catch {}
     };
