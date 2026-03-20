@@ -317,17 +317,21 @@ async def _execute_agent(
 
         # --- Auto-transition logic ---
         if result["status"] == "completed":
-            await _auto_transition(
-                plugin_name=plugin.name,
-                result=result,
-                workspace_id=workspace_id,
-                task_pipeline_id=task_pipeline_id,
-                issue_title=issue_title,
-                issue_description=issue_description,
-                issue_url=issue_url,
-                iteration_count=iteration_count,
-                max_iterations=max_iterations,
-            )
+            try:
+                logger.info("Attempting auto-transition for %s (run %d)", plugin.name, run_id)
+                await _auto_transition(
+                    plugin_name=plugin.name,
+                    result=result,
+                    workspace_id=workspace_id,
+                    task_pipeline_id=task_pipeline_id,
+                    issue_title=issue_title,
+                    issue_description=issue_description,
+                    issue_url=issue_url,
+                    iteration_count=iteration_count,
+                    max_iterations=max_iterations,
+                )
+            except Exception as trans_exc:
+                logger.exception("Auto-transition failed for run %d: %s", run_id, trans_exc)
 
     except Exception as exc:
         logger.exception("Agent run %d failed", run_id)
