@@ -267,6 +267,7 @@ export interface UnifiedTask {
   created_at: string | null;
   updated_at: string | null;
   pipeline_status: string | null;
+  pr_url: string | null;
 }
 
 export const PIPELINE_STATUSES = [

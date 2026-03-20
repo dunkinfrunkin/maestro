@@ -36,6 +36,7 @@ class UnifiedTask(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     pipeline_status: str | None = None  # our harness engineering status
+    pr_url: str | None = None
 
 
 class ConnectionCreate(BaseModel):
@@ -196,6 +197,7 @@ async def list_tasks(
                         created_at=issue.created_at.isoformat() if issue.created_at else None,
                         updated_at=issue.updated_at.isoformat() if issue.updated_at else None,
                         pipeline_status=record.status.value if record else None,
+                        pr_url=record.pr_url if record and record.pr_url else None,
                     )
 
                     # Apply filters

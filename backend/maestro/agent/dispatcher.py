@@ -231,6 +231,19 @@ async def _execute_agent(
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
 
+            # Save PR URL to pipeline record if detected
+            detected_pr = result.get("pr_url", "")
+            if detected_pr:
+                task = await session.get(TaskPipelineRecord, task_pipeline_id)
+                if task and not task.pr_url:
+                    task.pr_url = detected_pr
+                    # Extract PR number from URL
+                    try:
+                        task.pr_number = detected_pr.rstrip("/").split("/")[-1]
+                    except (IndexError, AttributeError):
+                        pass
+                    await session.commit()
+
         logger.info("Agent run %d (%s) finished: %s", run_id, plugin.name, result["status"])
 
     except Exception as exc:

@@ -40,11 +40,14 @@ async def run_sdk_with_logging(
 
     Returns dict with: status, summary, error, total_cost_usd, messages
     """
+    import re
     messages: list[dict[str, Any]] = []
     status = "completed"
     error = None
     total_cost_usd = 0.0
     last_text = ""
+    pr_url = ""
+    _pr_pattern = re.compile(r"https://github\.com/[^\s]+/pull/\d+")
 
     await _write_log(run_id, "status", "Agent starting...")
 
@@ -79,10 +82,22 @@ async def run_sdk_with_logging(
                         await _write_log(run_id, "tool_use", log_content)
                         messages.append({"type": "tool_use", "tool": tool_name})
 
+                    # Check tool results for PR URLs
+                    if hasattr(block, "content") and isinstance(block.content, str):
+                        pr_match = _pr_pattern.search(block.content)
+                        if pr_match and not pr_url:
+                            pr_url = pr_match.group(0)
+                            await _write_log(run_id, "status", f"PR created: {pr_url}")
+
                     elif hasattr(block, "text") and block.text:
                         text = block.text.strip()
                         if text:
                             last_text = text
+                            # Detect PR URLs
+                            pr_match = _pr_pattern.search(text)
+                            if pr_match and not pr_url:
+                                pr_url = pr_match.group(0)
+                                await _write_log(run_id, "status", f"PR created: {pr_url}")
                             # Log text in chunks if long
                             if len(text) > 300:
                                 await _write_log(run_id, "text", text[:300] + "...")
@@ -112,4 +127,5 @@ async def run_sdk_with_logging(
         "total_cost_usd": total_cost_usd,
         "messages": messages,
         "last_text": last_text,
+        "pr_url": pr_url,
     }
