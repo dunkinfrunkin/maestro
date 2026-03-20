@@ -119,6 +119,26 @@ async def dispatch_agent_for_status(
     return run_id
 
 
+    # Map agent type to system prompt and tools
+AGENT_CONFIGS = {
+    "implementation": {
+        "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    },
+    "review": {
+        "tools": ["Read", "Bash", "Glob", "Grep"],
+    },
+    "risk_profile": {
+        "tools": ["Read", "Bash", "Glob", "Grep"],
+    },
+    "deployment": {
+        "tools": ["Bash", "Read", "Glob"],
+    },
+    "monitor": {
+        "tools": ["Bash", "Read", "Glob", "Grep"],
+    },
+}
+
+
 async def _execute_agent(
     run_id: int,
     plugin,
@@ -134,7 +154,9 @@ async def _execute_agent(
     repo: str,
     extra_config: dict,
 ) -> None:
-    """Execute an agent in the background."""
+    """Execute an agent in the background with live log streaming."""
+    from maestro.agent.sdk_runner import run_sdk_with_logging
+
     # Mark as running
     async with get_session() as session:
         run = await session.get(AgentRun, run_id)
@@ -143,14 +165,14 @@ async def _execute_agent(
             run.started_at = datetime.now(timezone.utc)
             await session.commit()
 
-    # Set API key as env var (Claude Agent SDK reads from ANTHROPIC_API_KEY)
+    # Set API key as env var
     import os
     os.environ["ANTHROPIC_API_KEY"] = api_key
 
     # Create workspace directory
     workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
 
-    # If we have a repo, clone it
+    # Clone repo if available
     if repo:
         proc = await asyncio.create_subprocess_shell(
             f"git clone https://github.com/{repo}.git {workspace_path}/repo",
@@ -162,22 +184,37 @@ async def _execute_agent(
             workspace_path = f"{workspace_path}/repo"
 
     try:
-        context = {
-            "api_key": api_key,
-            "model": model,
-            "workspace_path": workspace_path,
-            "issue_title": issue_title,
-            "issue_description": issue_description,
-            "issue_url": issue_url,
-            "pr_url": pr_url,
-            "pr_number": pr_number,
-            "repo": repo,
-            "repo_url": f"https://github.com/{repo}" if repo else "",
-            "deployment_ref": pr_number or issue_title,
-            "extra_config": extra_config,
-        }
+        # Get system prompt from the agent module
+        agent_cfg = AGENT_CONFIGS.get(plugin.name, {"tools": ["Read", "Bash"]})
 
-        result = await plugin.run(context)
+        # Import the system prompt from the agent module
+        system_prompt = ""
+        try:
+            mod = __import__(f"maestro.agent.{plugin.name}", fromlist=["SYSTEM_PROMPT"])
+            system_prompt = getattr(mod, "SYSTEM_PROMPT", "")
+        except (ImportError, AttributeError):
+            system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
+
+        # Build prompt
+        prompt_parts = [f"## Issue: {issue_title}"]
+        if issue_description:
+            prompt_parts.append(issue_description)
+        if pr_url:
+            prompt_parts.append(f"\nPR: {pr_url}")
+        if repo:
+            prompt_parts.append(f"Repository: {repo}")
+        prompt_parts.append("\nProceed with your task.")
+        prompt = "\n".join(prompt_parts)
+
+        # Run with live logging
+        result = await run_sdk_with_logging(
+            run_id=run_id,
+            system_prompt=system_prompt,
+            prompt=prompt,
+            model=model,
+            workspace_path=workspace_path,
+            allowed_tools=agent_cfg["tools"],
+        )
 
         # Update run record
         async with get_session() as session:
@@ -185,33 +222,16 @@ async def _execute_agent(
             if run:
                 run.status = (
                     AgentRunStatus.COMPLETED
-                    if result.status == "completed"
+                    if result["status"] == "completed"
                     else AgentRunStatus.FAILED
                 )
-                run.summary = result.summary or ""
-                run.error = result.error or ""
-                run.cost_usd = result.total_cost_usd
+                run.summary = result.get("last_text", "")[:500]
+                run.error = result.get("error") or ""
+                run.cost_usd = result.get("total_cost_usd", 0.0)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
 
-            # If implementation agent completed, try to extract PR URL from result
-            if (
-                plugin.name == "implementation"
-                and result.status == "completed"
-                and result.data.get("pr_url")
-            ):
-                task = await session.get(TaskPipelineRecord, task_pipeline_id)
-                if task:
-                    task.pr_url = result.data["pr_url"]
-                    task.pr_number = result.data.get("pr_number", "")
-                    await session.commit()
-
-        logger.info(
-            "Agent run %d (%s) finished: %s",
-            run_id,
-            plugin.name,
-            result.status,
-        )
+        logger.info("Agent run %d (%s) finished: %s", run_id, plugin.name, result["status"])
 
     except Exception as exc:
         logger.exception("Agent run %d failed", run_id)

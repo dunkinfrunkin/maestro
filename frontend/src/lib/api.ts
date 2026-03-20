@@ -355,6 +355,20 @@ export async function fetchActiveRuns(workspaceId: number): Promise<AgentRunResp
   return res.json();
 }
 
+export interface AgentLogEntry {
+  id: number;
+  entry_type: string;
+  content: string;
+  created_at: string | null;
+}
+
+export async function fetchRunLogs(runId: number, afterId: number = 0): Promise<AgentLogEntry[]> {
+  const url = `${API_BASE}/api/v1/agent-runs/${runId}/logs${afterId ? `?after_id=${afterId}` : ""}`;
+  const res = await authFetch(url);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export async function triggerRefresh(): Promise<void> {
   const res = await authFetch(`${API_BASE}/api/v1/refresh`, {
     method: "POST",

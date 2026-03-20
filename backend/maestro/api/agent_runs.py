@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from maestro.auth import get_current_user
 from maestro.db.engine import get_session
-from maestro.db.models import AgentRun, TaskPipelineRecord, User
+from maestro.db.models import AgentRun, AgentRunLog, TaskPipelineRecord, User
 
 router = APIRouter(prefix="/api/v1")
 
@@ -82,4 +82,34 @@ async def get_active_runs(
             "created_at": run.created_at.isoformat() if run.created_at else None,
         }
         for run, task in rows
+    ]
+
+
+@router.get("/agent-runs/{run_id}/logs")
+async def get_run_logs(
+    run_id: int,
+    user: User = Depends(get_current_user),
+    after_id: int = 0,
+) -> list[dict]:
+    """Get log entries for a specific agent run. Use after_id for polling new entries."""
+    async with get_session() as session:
+        stmt = (
+            select(AgentRunLog)
+            .where(AgentRunLog.agent_run_id == run_id)
+        )
+        if after_id > 0:
+            stmt = stmt.where(AgentRunLog.id > after_id)
+        stmt = stmt.order_by(AgentRunLog.id)
+
+        result = await session.execute(stmt)
+        logs = result.scalars().all()
+
+    return [
+        {
+            "id": log.id,
+            "entry_type": log.entry_type,
+            "content": log.content,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
     ]
