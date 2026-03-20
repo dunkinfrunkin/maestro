@@ -378,11 +378,15 @@ async def _auto_transition(
                 logger.warning(reason)
 
     elif plugin_name == "risk_profile":
-        # Check if auto-approved
-        last_text = result.get("last_text", "")
-        if "AUTO_APPROVE: YES" in last_text or "RISK_LEVEL: LOW" in last_text.upper():
+        import re
+        last_text = re.sub(r'[*`_~]', '', result.get("last_text", ""))
+        upper = last_text.upper()
+        if "AUTO_APPROVE: YES" in upper or "RISK_LEVEL: LOW" in upper or "RISK LEVEL: LOW" in upper:
             next_status = PipelineStatus.DEPLOY
             reason = "Risk profile: low risk, auto-approved — moving to deploy"
+        elif "RISK_LEVEL: MEDIUM" in upper or "RISK_LEVEL: HIGH" in upper or "RISK_LEVEL: CRITICAL" in upper:
+            reason = "Risk profile: requires human review — not auto-deploying"
+            logger.info(reason)
 
     elif plugin_name == "deployment":
         next_status = PipelineStatus.MONITOR
