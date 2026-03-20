@@ -126,12 +126,17 @@ async def run_sdk_with_logging(
                     error = message.subtype
                     await _write_log(run_id, "error", f"Agent failed: {message.subtype}")
 
+        print(f"[MAESTRO-SDK] Run {run_id} async for loop completed. Status: {status}")
+
     except Exception as exc:
         status = "failed"
         error = str(exc)
         await _write_log(run_id, "error", f"Agent error: {exc}")
-        logger.exception("SDK runner failed for run %d", run_id)
+        print(f"[MAESTRO-SDK] Run {run_id} EXCEPTION: {exc}")
+        import traceback
+        traceback.print_exc()
 
+    print(f"[MAESTRO-SDK] Run {run_id} returning: status={status}, pr_url={pr_url}")
     return {
         "status": status,
         "error": error,
