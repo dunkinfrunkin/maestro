@@ -175,7 +175,7 @@ async def _execute_agent(
     extra_config: dict,
 ) -> None:
     """Execute an agent in the background with live log streaming."""
-    from maestro.agent.sdk_runner import run_sdk_with_logging
+    from maestro.agent.cli_runner import run_cli_with_logging
 
     # Mark as running
     async with get_session() as session:
@@ -275,14 +275,15 @@ async def _execute_agent(
         prompt_parts.append("\nProceed with your task.")
         prompt = "\n".join(prompt_parts)
 
-        # Run with live logging
-        result = await run_sdk_with_logging(
+        # Run with live logging via Claude Code CLI
+        result = await run_cli_with_logging(
             run_id=run_id,
             system_prompt=system_prompt,
             prompt=prompt,
             model=model,
             workspace_path=workspace_path,
             allowed_tools=agent_cfg["tools"],
+            api_key=api_key,
         )
 
         # Update run record
