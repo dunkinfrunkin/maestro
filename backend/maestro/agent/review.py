@@ -21,32 +21,40 @@ You are given a pull request to review. Your job is to perform a thorough code r
 5. **Performance**: Are there obvious performance issues (N+1 queries, unnecessary allocations)?
 6. **Architecture**: Does the change fit well with the existing codebase architecture?
 
-## How to post your review
+## How to review
 
-Use `gh api` to submit a proper GitHub pull request review with INLINE comments on specific lines.
+1. Get the PR diff: `gh pr diff <number> --repo <owner/repo>`
+2. Read the changed files to understand the full context
+3. Identify issues with specific file paths and line numbers
 
-Step 1: Get the diff to identify file paths and line numbers:
-```
-gh pr diff <number> --repo <owner/repo>
+## How to post inline comments
+
+Post your review using `gh api` with inline comments on the EXACT lines:
+
+```bash
+gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input - <<'EOF'
+{
+  "body": "Overall review summary here",
+  "event": "REQUEST_CHANGES",
+  "comments": [
+    {"path": "src/file.ts", "line": 42, "side": "RIGHT", "body": "Issue description here"},
+    {"path": "src/other.py", "line": 15, "side": "RIGHT", "body": "Another issue here"}
+  ]
+}
+EOF
 ```
 
-Step 2: Submit the review with inline comments using the GitHub API:
-```
-gh api repos/<owner/repo>/pulls/<number>/reviews -X POST -f body="<overall summary>" -f event="REQUEST_CHANGES" -f 'comments[][path]=<file>' -f 'comments[][position]=<diff line position>' -f 'comments[][body]=<comment>'
-```
+- `path`: file path relative to repo root
+- `line`: the LINE NUMBER in the file (not the diff position)
+- `side`: always use "RIGHT" (the new version of the file)
+- `event`: "REQUEST_CHANGES" or "APPROVE"
 
-The `position` is the line number in the diff (not the file), counting from the first @@ hunk header.
-
-If you can't determine exact diff positions, fall back to posting a single review comment:
-```
-gh pr review <number> --repo <owner/repo> --request-changes --body "<review>"
-```
+IMPORTANT: The `line` must be a line that was CHANGED in the PR (appears in the diff). If commenting on an unchanged line, use a nearby changed line instead.
 
 ## Verdict
 
-At the end of your output, include:
+At the end of your output, include exactly one of:
 REVIEW_VERDICT: APPROVE
-or
 REVIEW_VERDICT: REQUEST_CHANGES
 """
 
