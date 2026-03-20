@@ -46,6 +46,7 @@ async def run_sdk_with_logging(
     error = None
     total_cost_usd = 0.0
     last_text = ""
+    review_verdict = ""
     pr_url = ""
     _pr_pattern = re.compile(r"https://github\.com/[^\s]+/pull/\d+")
 
@@ -93,6 +94,12 @@ async def run_sdk_with_logging(
                         text = block.text.strip()
                         if text:
                             last_text = text
+                            # Detect review verdict
+                            if "REVIEW_VERDICT:" in text:
+                                for vline in text.split("\n"):
+                                    if vline.strip().startswith("REVIEW_VERDICT:"):
+                                        review_verdict = vline.strip().split(":", 1)[1].strip().upper()
+                                        await _write_log(run_id, "status", f"Review verdict: {review_verdict}")
                             # Detect PR URLs
                             pr_match = _pr_pattern.search(text)
                             if pr_match and not pr_url:
@@ -128,4 +135,5 @@ async def run_sdk_with_logging(
         "messages": messages,
         "last_text": last_text,
         "pr_url": pr_url,
+        "review_verdict": review_verdict,
     }

@@ -223,14 +223,41 @@ async def _execute_agent(
         except (ImportError, AttributeError):
             system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
 
-        # Build prompt
+        # Count previous iterations for this task (prevent infinite loops)
+        from sqlalchemy import select, func as sqlfunc
+        async with get_session() as session:
+            iteration_count = (await session.execute(
+                select(sqlfunc.count(AgentRun.id)).where(
+                    AgentRun.task_pipeline_id == task_pipeline_id
+                )
+            )).scalar() or 0
+
+        max_iterations = extra_config.get("max_review_iterations", 3)
+
+        # Build prompt with context
         prompt_parts = [f"## Issue: {issue_title}"]
         if issue_description:
             prompt_parts.append(issue_description)
         if pr_url:
             prompt_parts.append(f"\nPR: {pr_url}")
+            prompt_parts.append("Read the PR comments with `gh pr view --comments` to understand feedback.")
         if repo:
             prompt_parts.append(f"Repository: {repo}")
+
+        # Add context for feedback loop
+        if plugin.name == "implementation" and pr_url:
+            prompt_parts.append(
+                "\nThis may be a follow-up iteration. Check `gh pr view --comments` for "
+                "review feedback that needs to be addressed. Fix the issues, commit, and push."
+            )
+        elif plugin.name == "review":
+            prompt_parts.append(
+                "\nReview the PR thoroughly. At the end, output one of:\n"
+                "REVIEW_VERDICT: APPROVE\n"
+                "REVIEW_VERDICT: REQUEST_CHANGES\n"
+                "If you request changes, be specific about what needs fixing."
+            )
+
         prompt_parts.append("\nProceed with your task.")
         prompt = "\n".join(prompt_parts)
 
@@ -274,6 +301,20 @@ async def _execute_agent(
 
         logger.info("Agent run %d (%s) finished: %s", run_id, plugin.name, result["status"])
 
+        # --- Auto-transition logic ---
+        if result["status"] == "completed":
+            await _auto_transition(
+                plugin_name=plugin.name,
+                result=result,
+                workspace_id=workspace_id,
+                task_pipeline_id=task_pipeline_id,
+                issue_title=issue_title,
+                issue_description=issue_description,
+                issue_url=issue_url,
+                iteration_count=iteration_count,
+                max_iterations=max_iterations,
+            )
+
     except Exception as exc:
         logger.exception("Agent run %d failed", run_id)
         async with get_session() as session:
@@ -283,3 +324,89 @@ async def _execute_agent(
                 run.error = str(exc)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
+
+
+async def _auto_transition(
+    plugin_name: str,
+    result: dict,
+    workspace_id: int,
+    task_pipeline_id: int,
+    issue_title: str,
+    issue_description: str,
+    issue_url: str,
+    iteration_count: int,
+    max_iterations: int,
+) -> None:
+    """Auto-transition pipeline status based on agent result."""
+    from maestro.agent.sdk_runner import _write_log
+    from maestro.db import crud
+
+    next_status = None
+    reason = ""
+
+    if plugin_name == "implementation":
+        # Implementation done → move to review
+        next_status = PipelineStatus.REVIEW
+        reason = "Implementation completed — moving to review"
+
+    elif plugin_name == "review":
+        # Check the verdict from agent output
+        verdict = _extract_verdict(result)
+        if verdict == "APPROVE":
+            next_status = PipelineStatus.RISK_PROFILE
+            reason = "Review approved — moving to risk profile"
+        elif verdict == "REQUEST_CHANGES":
+            if iteration_count < max_iterations * 2:  # *2 because each loop is impl+review
+                next_status = PipelineStatus.IMPLEMENT
+                reason = f"Review requested changes — sending back to implement (iteration {iteration_count // 2 + 1}/{max_iterations})"
+            else:
+                reason = f"Review requested changes but max iterations ({max_iterations}) reached — needs human intervention"
+                logger.warning(reason)
+
+    elif plugin_name == "risk_profile":
+        # Check if auto-approved
+        last_text = result.get("last_text", "")
+        if "AUTO_APPROVE: YES" in last_text or "RISK_LEVEL: LOW" in last_text.upper():
+            next_status = PipelineStatus.DEPLOY
+            reason = "Risk profile: low risk, auto-approved — moving to deploy"
+
+    elif plugin_name == "deployment":
+        next_status = PipelineStatus.MONITOR
+        reason = "Deployment completed — moving to monitor"
+
+    if next_status:
+        logger.info("Auto-transition for task %d: %s (%s)", task_pipeline_id, next_status.value, reason)
+
+        async with get_session() as session:
+            task = await session.get(TaskPipelineRecord, task_pipeline_id)
+            if task:
+                task.status = next_status
+                await session.commit()
+
+        # Dispatch the next agent
+        await dispatch_agent_for_status(
+            workspace_id=workspace_id,
+            task_pipeline_id=task_pipeline_id,
+            status=next_status.value,
+            issue_title=issue_title,
+            issue_description=issue_description,
+            issue_url=issue_url,
+        )
+
+
+def _extract_verdict(result: dict) -> str:
+    """Extract review verdict from agent output."""
+    last_text = result.get("last_text", "")
+    for line in last_text.split("\n"):
+        line = line.strip()
+        if line.startswith("REVIEW_VERDICT:"):
+            verdict = line.split(":", 1)[1].strip().upper()
+            if verdict in ("APPROVE", "REQUEST_CHANGES"):
+                return verdict
+    # Fallback: look for keywords
+    upper = last_text.upper()
+    if "APPROVE" in upper and "REQUEST_CHANGES" not in upper:
+        return "APPROVE"
+    if "REQUEST_CHANGES" in upper or "REQUEST CHANGES" in upper:
+        return "REQUEST_CHANGES"
+    return "APPROVE"  # default to approve if unclear
