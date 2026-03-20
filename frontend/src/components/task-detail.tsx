@@ -186,7 +186,7 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
       const interval = setInterval(load, 2000);
       return () => clearInterval(interval);
     }
-  }, [run.id, isLive, lastLogId]);
+  }, [run.id, isLive]);
 
   const logTypeIcons: Record<string, string> = {
     tool_use: "wrench",
