@@ -292,7 +292,7 @@ export async function fetchTasks(params?: {
   if (params?.search) url.searchParams.set("search", params.search);
   if (params?.label) url.searchParams.set("label", params.label);
   if (params?.pipeline_status) url.searchParams.set("pipeline_status", params.pipeline_status);
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await authFetch(url.toString(), { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
