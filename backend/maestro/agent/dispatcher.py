@@ -379,8 +379,8 @@ async def _auto_transition(
 
     elif plugin_name == "risk_profile":
         import re
-        last_text = re.sub(r'[*`_~]', '', result.get("last_text", ""))
-        upper = last_text.upper()
+        all_text = re.sub(r'[*`_~]', '', result.get("all_text", "") or result.get("last_text", ""))
+        upper = all_text.upper()
         if "AUTO_APPROVE: YES" in upper or "RISK_LEVEL: LOW" in upper or "RISK LEVEL: LOW" in upper:
             next_status = PipelineStatus.DEPLOY
             reason = "Risk profile: low risk, auto-approved — moving to deploy"
@@ -415,9 +415,9 @@ async def _auto_transition(
 def _extract_verdict(result: dict) -> str:
     """Extract review verdict from agent output."""
     import re
-    last_text = result.get("last_text", "")
-    # Strip markdown formatting (**, *, `, etc.)
-    clean = re.sub(r'[*`_~]', '', last_text)
+    # Use all_text to search across all messages, not just the last one
+    all_text = result.get("all_text", "") or result.get("last_text", "")
+    clean = re.sub(r'[*`_~]', '', all_text)
     for line in clean.split("\n"):
         line = line.strip()
         if "REVIEW_VERDICT:" in line:

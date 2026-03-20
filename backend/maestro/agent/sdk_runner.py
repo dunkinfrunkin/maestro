@@ -46,6 +46,7 @@ async def run_sdk_with_logging(
     error = None
     total_cost_usd = 0.0
     last_text = ""
+    all_text = ""  # accumulate all text for keyword detection
     review_verdict = ""
     pr_url = ""
     _pr_pattern = re.compile(r"https://github\.com/[^\s]+/pull/\d+")
@@ -94,6 +95,7 @@ async def run_sdk_with_logging(
                         text = block.text.strip()
                         if text:
                             last_text = text
+                            all_text += "\n" + text
                             # Detect review verdict (handle markdown formatting)
                             clean_text = re.sub(r'[*`_~]', '', text)
                             if "REVIEW_VERDICT:" in clean_text:
@@ -136,6 +138,7 @@ async def run_sdk_with_logging(
         "total_cost_usd": total_cost_usd,
         "messages": messages,
         "last_text": last_text,
+        "all_text": all_text,
         "pr_url": pr_url,
         "review_verdict": review_verdict,
     }
