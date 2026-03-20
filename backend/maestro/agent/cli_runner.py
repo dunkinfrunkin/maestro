@@ -53,9 +53,8 @@ async def run_cli_with_logging(
     pr_url = ""
     review_verdict = ""
 
-    await _write_log(run_id, "status", "Agent starting...")
-
     tools_str = ",".join(allowed_tools)
+    await _write_log(run_id, "status", f"Starting Claude Code CLI (model: {model}, tools: {tools_str})")
 
     cmd = [
         "claude",
@@ -68,6 +67,8 @@ async def run_cli_with_logging(
 
     if system_prompt:
         cmd.extend(["--system-prompt", system_prompt])
+
+    await _write_log(run_id, "status", f"$ claude -p '...' --model {model} --output-format stream-json")
 
     env = {
         "ANTHROPIC_API_KEY": api_key,
@@ -191,7 +192,7 @@ async def run_cli_with_logging(
                     await _write_log(run_id, "error", f"Agent failed: {error}")
                 else:
                     status = "completed"
-                    await _write_log(run_id, "status", "Agent completed successfully")
+                    await _write_log(run_id, "status", f"Claude Code CLI completed (cost: ${total_cost_usd:.4f})")
 
         # Wait for process to exit
         await proc.wait()
