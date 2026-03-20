@@ -92,7 +92,6 @@ async def run_monitor_agent(
             prompt=prompt,
             options=ClaudeAgentOptions(
                 model=model,
-                api_key=api_key,
                 system_prompt=SYSTEM_PROMPT,
                 allowed_tools=["Bash", "Read", "Glob", "Grep"],
                 cwd=workspace_path,

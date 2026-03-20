@@ -91,7 +91,6 @@ async def run_risk_profile_agent(
             prompt=prompt,
             options=ClaudeAgentOptions(
                 model=model,
-                api_key=api_key,
                 system_prompt=SYSTEM_PROMPT,
                 allowed_tools=["Read", "Bash", "Glob", "Grep"],
                 cwd=workspace_path,

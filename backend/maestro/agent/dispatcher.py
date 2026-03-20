@@ -143,6 +143,10 @@ async def _execute_agent(
             run.started_at = datetime.now(timezone.utc)
             await session.commit()
 
+    # Set API key as env var (Claude Agent SDK reads from ANTHROPIC_API_KEY)
+    import os
+    os.environ["ANTHROPIC_API_KEY"] = api_key
+
     # Create workspace directory
     workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
 

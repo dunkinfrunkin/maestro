@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { TaskDetailPage } from "@/components/task-detail";
 import {
   PIPELINE_STATUSES,
   PipelineStatus,
@@ -33,6 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; projectId?: number }) {
+  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [search, setSearch] = useState("");
@@ -84,6 +86,18 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
       await loadTasks();
     }
   };
+
+  if (selectedTask) {
+    return (
+      <TaskDetailPage
+        task={selectedTask}
+        workspaceId={workspaceId}
+        projectId={projectId}
+        onBack={() => { setSelectedTask(null); loadTasks(); }}
+        onTaskUpdated={() => loadTasks()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -155,6 +169,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
               key={task.external_ref}
               task={task}
               onStatusChange={handleStatusChange}
+              onClick={() => setSelectedTask(task)}
             />
           ))}
         </div>
@@ -166,137 +181,64 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
 function TaskCard({
   task,
   onStatusChange,
+  onClick,
 }: {
   task: UnifiedTask;
   onStatusChange: (task: UnifiedTask, status: string) => void;
+  onClick: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [runs, setRuns] = useState<AgentRunResponse[]>([]);
-
-  useEffect(() => {
-    if (!expanded || !task.pipeline_status) return;
-    const load = () => fetchTaskRuns(task.external_ref).then(setRuns).catch(() => {});
-    load();
-    const interval = setInterval(load, 3000);
-    return () => clearInterval(interval);
-  }, [expanded, task.external_ref, task.pipeline_status]);
-
-  const runStatusColors: Record<string, string> = {
-    pending: "bg-gray-100 text-gray-600 border-gray-300",
-    running: "bg-blue-100 text-blue-700 border-blue-300",
-    completed: "bg-green-100 text-green-700 border-green-300",
-    failed: "bg-red-100 text-red-700 border-red-300",
-  };
-
   return (
-    <div className="rounded-lg border border-border bg-surface overflow-hidden">
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-muted">{task.identifier}</span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">
-                {task.tracker_kind}
-              </span>
-              <span className="text-xs text-muted">{task.state}</span>
-            </div>
-            <div className="font-medium text-sm mb-1">
-              {task.url ? (
-                <a href={task.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                  {task.title}
-                </a>
-              ) : (
-                task.title
-              )}
-            </div>
-            {task.labels.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {task.labels.map((label) => (
-                  <span key={label} className="text-xs px-1.5 py-0.5 rounded-full bg-surface-hover text-muted">
-                    {label}
-                  </span>
-                ))}
-              </div>
-            )}
+    <div
+      className="rounded-lg border border-border bg-surface p-4 cursor-pointer hover:bg-surface-hover transition-colors"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-mono text-muted">{task.identifier}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">{task.tracker_kind}</span>
+            <span className="text-xs text-muted">{task.state}</span>
           </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {task.pipeline_status ? (
-              <>
-                <span className={`text-xs px-2 py-1 rounded-full border ${STATUS_COLORS[task.pipeline_status] || "bg-gray-200 text-gray-800 border-gray-300"}`}>
-                  {STATUS_LABELS[task.pipeline_status] || task.pipeline_status}
-                </span>
-                <select
-                  value={task.pipeline_status}
-                  onChange={(e) => onStatusChange(task, e.target.value)}
-                  className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-foreground"
-                >
-                  {PIPELINE_STATUSES.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                  ))}
-                  <option value="">Remove status</option>
-                </select>
-              </>
-            ) : (
-              <select
-                value=""
-                onChange={(e) => onStatusChange(task, e.target.value)}
-                className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-muted"
-              >
-                <option value="" disabled>Set status...</option>
-                {PIPELINE_STATUSES.map((s) => (
-                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-
-        {/* Expand to see activity */}
-        {task.pipeline_status && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="mt-2 text-[10px] text-muted hover:text-foreground transition-colors"
-          >
-            {expanded ? "Hide activity" : "Show activity"}
-          </button>
-        )}
-      </div>
-
-      {/* Activity log */}
-      {expanded && (
-        <div className="border-t border-border bg-background/50 p-3">
-          {runs.length === 0 ? (
-            <div className="text-xs text-muted">No agent activity yet</div>
-          ) : (
-            <div className="space-y-2">
-              {runs.map((run) => (
-                <div key={run.id} className="flex items-start gap-2">
-                  <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                    run.status === "completed" ? "bg-green-500" :
-                    run.status === "running" ? "bg-blue-500 animate-pulse" :
-                    run.status === "failed" ? "bg-red-500" :
-                    "bg-gray-400"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium capitalize">{run.agent_type.replace("_", " ")}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${runStatusColors[run.status] || ""}`}>
-                        {run.status}
-                      </span>
-                      <span className="text-[10px] text-muted">
-                        {run.created_at ? new Date(run.created_at).toLocaleTimeString() : ""}
-                      </span>
-                    </div>
-                    {run.summary && <div className="text-[10px] text-muted mt-0.5">{run.summary}</div>}
-                    {run.error && <div className="text-[10px] text-red-600 mt-0.5">{run.error}</div>}
-                  </div>
-                </div>
+          <div className="font-medium text-sm">{task.title}</div>
+          {task.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {task.labels.map((label) => (
+                <span key={label} className="text-xs px-1.5 py-0.5 rounded-full bg-surface-hover text-muted">{label}</span>
               ))}
             </div>
           )}
         </div>
-      )}
+        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {task.pipeline_status ? (
+            <>
+              <span className={`text-xs px-2 py-1 rounded-full border ${STATUS_COLORS[task.pipeline_status] || "bg-gray-200 text-gray-800 border-gray-300"}`}>
+                {STATUS_LABELS[task.pipeline_status] || task.pipeline_status}
+              </span>
+              <select
+                value={task.pipeline_status}
+                onChange={(e) => onStatusChange(task, e.target.value)}
+                className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-foreground"
+              >
+                {PIPELINE_STATUSES.map((s) => (
+                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                ))}
+                <option value="">Remove</option>
+              </select>
+            </>
+          ) : (
+            <select
+              value=""
+              onChange={(e) => onStatusChange(task, e.target.value)}
+              className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-muted"
+            >
+              <option value="" disabled>Set status...</option>
+              {PIPELINE_STATUSES.map((s) => (
+                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

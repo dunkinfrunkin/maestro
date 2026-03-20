@@ -77,7 +77,6 @@ async def run_deployment_agent(
             prompt=prompt,
             options=ClaudeAgentOptions(
                 model=model,
-                api_key=api_key,
                 system_prompt=SYSTEM_PROMPT,
                 allowed_tools=["Bash", "Read", "Glob"],
                 cwd=workspace_path,
