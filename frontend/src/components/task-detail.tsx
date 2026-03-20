@@ -257,13 +257,14 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
         {/* Live logs */}
         {logs.length > 0 && (
           <div className="rounded-md border border-border bg-background overflow-hidden">
-            <div className="max-h-64 overflow-y-auto">
+            <div className="max-h-[500px] overflow-y-auto">
               {logs.map((log) => (
                 <div
                   key={log.id}
                   className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono ${
                     log.entry_type === "error" ? "bg-red-50 text-red-700" :
                     log.entry_type === "tool_use" ? "text-blue-700" :
+                    log.entry_type === "tool_result" ? "text-gray-500 text-[10px] pl-6" :
                     log.entry_type === "status" ? "text-muted italic" :
                     "text-foreground"
                   }`}

@@ -112,6 +112,18 @@ async def run_cli_with_logging(
 
             event_type = event.get("type", "")
 
+            # Log tool results (what the tool returned)
+            if event_type == "tool_result":
+                tool_name = event.get("tool", "")
+                output = event.get("output", "")
+                if output and isinstance(output, str):
+                    truncated = output[:300] + "..." if len(output) > 300 else output
+                    await _write_log(run_id, "tool_result", f"[{tool_name}] {truncated}")
+
+            # Log system messages
+            if event_type == "system" and event.get("message"):
+                await _write_log(run_id, "status", event["message"][:500])
+
             if event_type == "assistant":
                 msg = event.get("message", {})
                 for block in msg.get("content", []):
