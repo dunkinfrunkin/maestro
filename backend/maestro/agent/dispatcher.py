@@ -173,15 +173,23 @@ async def _execute_agent(
     workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
 
     # Clone repo if available
+    from maestro.agent.sdk_runner import _write_log
     if repo:
+        await _write_log(run_id, "status", f"Cloning repository: {repo}")
         proc = await asyncio.create_subprocess_shell(
             f"git clone https://github.com/{repo}.git {workspace_path}/repo",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        await proc.communicate()
+        stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
             workspace_path = f"{workspace_path}/repo"
+            await _write_log(run_id, "status", f"Repository cloned successfully")
+        else:
+            err_msg = stderr.decode(errors="replace")[:300] if stderr else "Unknown error"
+            await _write_log(run_id, "error", f"Clone failed: {err_msg}")
+    else:
+        await _write_log(run_id, "status", "No repository configured — working in empty workspace")
 
     try:
         # Get system prompt from the agent module
