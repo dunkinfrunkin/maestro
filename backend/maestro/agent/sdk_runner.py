@@ -94,11 +94,13 @@ async def run_sdk_with_logging(
                         text = block.text.strip()
                         if text:
                             last_text = text
-                            # Detect review verdict
-                            if "REVIEW_VERDICT:" in text:
-                                for vline in text.split("\n"):
-                                    if vline.strip().startswith("REVIEW_VERDICT:"):
-                                        review_verdict = vline.strip().split(":", 1)[1].strip().upper()
+                            # Detect review verdict (handle markdown formatting)
+                            clean_text = re.sub(r'[*`_~]', '', text)
+                            if "REVIEW_VERDICT:" in clean_text:
+                                for vline in clean_text.split("\n"):
+                                    if "REVIEW_VERDICT:" in vline:
+                                        review_verdict = vline.split("REVIEW_VERDICT:", 1)[1].strip().upper()
+                                        review_verdict = re.sub(r'[^A-Z_]', '', review_verdict)
                                         await _write_log(run_id, "status", f"Review verdict: {review_verdict}")
                             # Detect PR URLs
                             pr_match = _pr_pattern.search(text)

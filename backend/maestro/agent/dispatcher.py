@@ -396,17 +396,22 @@ async def _auto_transition(
 
 def _extract_verdict(result: dict) -> str:
     """Extract review verdict from agent output."""
+    import re
     last_text = result.get("last_text", "")
-    for line in last_text.split("\n"):
+    # Strip markdown formatting (**, *, `, etc.)
+    clean = re.sub(r'[*`_~]', '', last_text)
+    for line in clean.split("\n"):
         line = line.strip()
-        if line.startswith("REVIEW_VERDICT:"):
-            verdict = line.split(":", 1)[1].strip().upper()
+        if "REVIEW_VERDICT:" in line:
+            verdict = line.split("REVIEW_VERDICT:", 1)[1].strip().upper()
+            # Clean any trailing markdown or punctuation
+            verdict = re.sub(r'[^A-Z_]', '', verdict)
             if verdict in ("APPROVE", "REQUEST_CHANGES"):
                 return verdict
-    # Fallback: look for keywords
-    upper = last_text.upper()
-    if "APPROVE" in upper and "REQUEST_CHANGES" not in upper:
-        return "APPROVE"
+    # Fallback: look for keywords in cleaned text
+    upper = clean.upper()
     if "REQUEST_CHANGES" in upper or "REQUEST CHANGES" in upper:
         return "REQUEST_CHANGES"
+    if "APPROVE" in upper:
+        return "APPROVE"
     return "APPROVE"  # default to approve if unclear
