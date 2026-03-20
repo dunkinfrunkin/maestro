@@ -21,18 +21,33 @@ You are given a pull request to review. Your job is to perform a thorough code r
 5. **Performance**: Are there obvious performance issues (N+1 queries, unnecessary allocations)?
 6. **Architecture**: Does the change fit well with the existing codebase architecture?
 
-For each issue found, provide:
-- Severity: critical, major, minor, nit
-- File and line reference
-- Clear explanation of the issue
-- Suggested fix
+## How to post your review
 
-At the end, provide an overall summary:
-- APPROVE: No blocking issues found
-- REQUEST_CHANGES: Blocking issues that must be fixed
-- COMMENT: Non-blocking suggestions
+Use `gh api` to submit a proper GitHub pull request review with INLINE comments on specific lines.
 
-Post your review as a PR comment using the GitHub CLI if available.
+Step 1: Get the diff to identify file paths and line numbers:
+```
+gh pr diff <number> --repo <owner/repo>
+```
+
+Step 2: Submit the review with inline comments using the GitHub API:
+```
+gh api repos/<owner/repo>/pulls/<number>/reviews -X POST -f body="<overall summary>" -f event="REQUEST_CHANGES" -f 'comments[][path]=<file>' -f 'comments[][position]=<diff line position>' -f 'comments[][body]=<comment>'
+```
+
+The `position` is the line number in the diff (not the file), counting from the first @@ hunk header.
+
+If you can't determine exact diff positions, fall back to posting a single review comment:
+```
+gh pr review <number> --repo <owner/repo> --request-changes --body "<review>"
+```
+
+## Verdict
+
+At the end of your output, include:
+REVIEW_VERDICT: APPROVE
+or
+REVIEW_VERDICT: REQUEST_CHANGES
 """
 
 
