@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from maestro.db import crud
 from maestro.db.engine import get_session
-from maestro.db.models import PipelineStatus, TrackerKind
+from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerKind
 from maestro.tracker.github import GitHubClient
 from maestro.tracker.linear import LinearClient
 
