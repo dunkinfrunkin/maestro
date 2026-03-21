@@ -80,29 +80,37 @@ If approving with no issues:
 echo '{"body": "LGTM!", "event": "APPROVE", "comments": []}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
-### Step 5 (follow-up reviews only): Check and resolve previous comments
+### Step 5 (follow-up reviews only): Check previous comments and verify fixes
+
+Get all inline comments:
 ```bash
-gh api repos/<owner>/<repo>/pulls/<number>/comments
+gh api repos/<owner>/<repo>/pulls/<number>/comments --jq '.[] | {id, in_reply_to_id, path, line, body}'
 ```
 
-For EACH previous inline comment:
-1. Check if it has replies (the implementation agent replies with "Fixed: ...")
-2. Read the current code at the referenced file and line
-3. Verify the issue was actually fixed
-4. If fixed: resolve the comment thread by minimizing it:
-   `gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "<node_id>", classifier: RESOLVED}) { minimizedComment { isMinimized } } }'`
+Top-level comments have `in_reply_to_id: null`. Replies have the parent's ID.
 
-   If the graphql approach fails, just reply confirming it's resolved:
-   `gh api repos/<owner>/<repo>/pulls/comments/<comment_id>/replies -X POST -f body="✅ Verified — issue has been addressed."`
-5. If NOT fixed: note it as unresolved
+For EACH top-level comment:
+1. Check if the implementation agent replied (look for replies with "Fixed:" in the body)
+2. Read the CURRENT code at the referenced file and line to verify the fix
+3. If the fix is correct: reply to confirm
+   ```bash
+   gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="✅ Verified — fix looks good."
+   ```
+4. If NOT fixed: reply explaining what's still wrong
+   ```bash
+   gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="❌ Still not fixed: <explanation>"
+   ```
+
+DO NOT use `minimizeComment` or hide comments. Just reply to the thread.
+The conversation thread on each comment should look like:
+  - Reviewer: "Issue: ..."
+  - Implementer: "Fixed: ..."
+  - Reviewer: "✅ Verified" or "❌ Still not fixed"
 
 ## Verdict rules
 
-CRITICAL:
-- If ALL previous comments are resolved AND no new issues found → REVIEW_VERDICT: APPROVE
-- If ANY previous comment is NOT resolved → REVIEW_VERDICT: REQUEST_CHANGES
-- If you find NEW issues → post new inline comments and REVIEW_VERDICT: REQUEST_CHANGES
-- ONLY approve when there are ZERO unresolved issues
+- If ALL comments have been verified (you replied "✅ Verified") AND no new issues → REVIEW_VERDICT: APPROVE
+- If ANY comment is not fixed OR you found new issues → REVIEW_VERDICT: REQUEST_CHANGES
 
 At the end of your output, include exactly one of:
 REVIEW_VERDICT: APPROVE
