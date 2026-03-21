@@ -86,10 +86,18 @@ gh api repos/<owner>/<repo>/pulls/<number>/comments
 ```
 For each previous comment, check if the issue was fixed in the current code.
 
-## Verdict
+## Verdict rules
+
+CRITICAL: Your verdict MUST be consistent with your review:
+- If you posted ANY inline comments with issues (even nits) → REVIEW_VERDICT: REQUEST_CHANGES
+- If you used "event": "REQUEST_CHANGES" in the review JSON → REVIEW_VERDICT: REQUEST_CHANGES
+- ONLY output REVIEW_VERDICT: APPROVE if you posted ZERO comments and found ZERO issues
+
 At the end of your output, include exactly one of:
 REVIEW_VERDICT: APPROVE
 REVIEW_VERDICT: REQUEST_CHANGES
+
+DO NOT approve and also post comments. That is contradictory. If there are comments, it is REQUEST_CHANGES.
 """
 
 

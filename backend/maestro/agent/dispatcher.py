@@ -383,6 +383,14 @@ async def _auto_transition(
     elif plugin_name == "review":
         # Check the verdict from agent output
         verdict = _extract_verdict(result)
+
+        # Double-check: if agent said APPROVE but there are unresolved inline comments, override to REQUEST_CHANGES
+        if verdict == "APPROVE":
+            has_unresolved = await _check_unresolved_comments(task_pipeline_id)
+            if has_unresolved:
+                verdict = "REQUEST_CHANGES"
+                print(f"[MAESTRO] Overriding APPROVE → REQUEST_CHANGES: unresolved inline comments exist")
+
         if verdict == "APPROVE":
             next_status = PipelineStatus.RISK_PROFILE
             reason = "Review approved — moving to risk profile"
@@ -427,6 +435,38 @@ async def _auto_transition(
             issue_description=issue_description,
             issue_url=issue_url,
         )
+
+
+async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
+    """Check if the PR has unresolved inline review comments."""
+    try:
+        async with get_session() as session:
+            task = await session.get(TaskPipelineRecord, task_pipeline_id)
+        if not task or not task.pr_url or not task.repo:
+            return False
+
+        pr_number = task.pr_url.rstrip("/").split("/")[-1]
+        repo = task.repo
+
+        proc = await asyncio.create_subprocess_exec(
+            "gh", "api", f"repos/{repo}/pulls/{pr_number}/comments",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return False
+
+        import json
+        comments = json.loads(stdout.decode())
+        # Any inline comments that exist = unresolved (GitHub doesn't have a resolved state for PR comments via API easily)
+        if len(comments) > 0:
+            print(f"[MAESTRO] Found {len(comments)} inline comments on PR #{pr_number}")
+            return True
+        return False
+    except Exception as exc:
+        print(f"[MAESTRO] Error checking comments: {exc}")
+        return False
 
 
 def _extract_verdict(result: dict) -> str:
