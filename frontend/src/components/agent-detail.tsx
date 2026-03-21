@@ -4,48 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AgentConfigResponse,
   getAgentConfig,
+  getDefaultPrompt,
   updateAgentConfig,
 } from "@/lib/api";
 
 type Tab = "config" | "prompt";
-
-// Agent system prompts (read-only display for now)
-const AGENT_PROMPTS: Record<string, string> = {
-  implementation: `You are an implementation agent. Your job is to:
-1. Read the issue requirements
-2. Read the relevant code
-3. Implement the changes
-4. Write/update tests
-5. Create a branch, commit, push, and open a PR
-
-On follow-up runs, checkout the PR branch, read ALL review comments, address EVERY one, and push fixes.`,
-
-  review: `You are a senior code reviewer. Your job is to:
-1. Checkout the PR branch
-2. Read the changed files with the Read tool
-3. Identify issues with exact file paths and line numbers
-4. Post inline review comments via gh api
-5. Output REVIEW_VERDICT: APPROVE or REQUEST_CHANGES`,
-
-  risk_profile: `You assess PRs for deployment risk across 7 dimensions:
-Change Scope, Blast Radius, Complexity, Reversibility, Test Coverage, Security Surface, Dependency Changes.
-
-Score each 1-5, compute overall risk level (LOW/MEDIUM/HIGH/CRITICAL).
-Post risk assessment as PR comment. Auto-approve if LOW.`,
-
-  deployment: `You handle PR deployment:
-1. Verify CI checks passing
-2. Merge PR with squash merge
-3. Monitor deployment pipeline
-4. Report status updates`,
-
-  monitor: `You verify deployment health:
-1. Check GitHub Actions status
-2. Look for error spikes in logs
-3. Check response times and metrics
-4. Classify issues by severity (P0-P3)
-5. Recommend rollback if P0`,
-};
 
 interface AgentDef {
   type: string;
@@ -64,11 +27,24 @@ export function AgentDetailPage({
 }) {
   const [tab, setTab] = useState<Tab>("config");
   const [config, setConfig] = useState<AgentConfigResponse | null>(null);
+  const [defaultPrompt, setDefaultPrompt] = useState("");
+  const [promptDraft, setPromptDraft] = useState("");
+  const [promptDirty, setPromptDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setConfig(await getAgentConfig(workspaceId, agent.type));
+      const [cfg, dp] = await Promise.all([
+        getAgentConfig(workspaceId, agent.type),
+        getDefaultPrompt(agent.type),
+      ]);
+      setConfig(cfg);
+      setDefaultPrompt(dp);
+      // Use custom prompt from DB if set, otherwise default
+      const currentPrompt = (cfg.extra_config?.custom_prompt as string) || dp;
+      setPromptDraft(currentPrompt);
+      setPromptDirty(false);
       setError(null);
     } catch {
       setConfig(null);
@@ -95,6 +71,25 @@ export function AgentDetailPage({
       setError(err instanceof Error ? err.message : "Failed to update");
     }
   };
+
+  const handleSavePrompt = async () => {
+    setSaving(true);
+    try {
+      await handleExtraConfigChange("custom_prompt", promptDraft);
+      setPromptDirty(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetPrompt = () => {
+    setPromptDraft(defaultPrompt);
+    setPromptDirty(true);
+  };
+
+  const isUsingDefault = !config?.extra_config?.custom_prompt;
 
   return (
     <div className="max-w-2xl">
@@ -128,6 +123,9 @@ export function AgentDetailPage({
             }`}
           >
             {t.label}
+            {t.id === "prompt" && promptDirty && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-accent inline-block" />
+            )}
           </button>
         ))}
       </div>
@@ -139,7 +137,6 @@ export function AgentDetailPage({
       {/* Config tab */}
       {tab === "config" && (
         <div className="space-y-6">
-          {/* Model */}
           <div>
             <div className="text-sm font-medium mb-2">Model</div>
             <div className="space-y-1.5">
@@ -172,13 +169,10 @@ export function AgentDetailPage({
             </div>
           </div>
 
-          {/* Agent-specific config */}
           {agent.type === "risk_profile" && (
             <div>
               <div className="text-sm font-medium mb-2">Auto-approve threshold</div>
-              <div className="text-xs text-muted mb-2">
-                PRs at or below this risk level will be auto-approved.
-              </div>
+              <div className="text-xs text-muted mb-2">PRs at or below this risk level will be auto-approved.</div>
               <select
                 value={(config?.extra_config?.auto_approve_threshold as string) || "low"}
                 onChange={(e) => handleExtraConfigChange("auto_approve_threshold", e.target.value)}
@@ -191,7 +185,6 @@ export function AgentDetailPage({
             </div>
           )}
 
-          {/* Enable/Disable */}
           <div className="flex items-center justify-between rounded-md border border-border p-3">
             <div>
               <div className="text-sm font-medium">Enabled</div>
@@ -210,12 +203,46 @@ export function AgentDetailPage({
       {/* Prompt tab */}
       {tab === "prompt" && (
         <div>
-          <div className="text-sm font-medium mb-2">System Prompt</div>
-          <div className="text-xs text-muted mb-3">
-            This prompt is sent to Claude Code CLI when the agent runs.
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <div className="text-sm font-medium">System Prompt</div>
+              <div className="text-xs text-muted">
+                {isUsingDefault && !promptDirty ? "Using default prompt" : "Custom prompt"}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {!isUsingDefault && (
+                <button
+                  onClick={handleResetPrompt}
+                  className="text-xs text-muted hover:text-foreground transition-colors"
+                >
+                  Reset to default
+                </button>
+              )}
+            </div>
           </div>
-          <div className="rounded-md border border-border bg-background p-4 font-mono text-xs whitespace-pre-wrap text-foreground leading-relaxed">
-            {AGENT_PROMPTS[agent.type] || "No prompt configured."}
+
+          <textarea
+            value={promptDraft}
+            onChange={(e) => {
+              setPromptDraft(e.target.value);
+              setPromptDirty(true);
+            }}
+            rows={16}
+            className="w-full px-3 py-2 text-xs font-mono rounded-md border border-border bg-background text-foreground leading-relaxed resize-y"
+          />
+
+          <div className="flex items-center justify-between mt-3">
+            <div className="text-[10px] text-muted">
+              {promptDirty ? "Unsaved changes" : "Saved"}
+            </div>
+            <button
+              onClick={handleSavePrompt}
+              disabled={!promptDirty || saving}
+              className="px-4 py-2 text-xs rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Prompt"}
+            </button>
           </div>
         </div>
       )}

@@ -444,3 +444,10 @@ export async function updateAgentConfig(
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
+
+export async function getDefaultPrompt(agentType: string): Promise<string> {
+  const res = await authFetch(`${API_BASE}/api/v1/agents/${agentType}/default-prompt`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  const data = await res.json();
+  return data.default_prompt;
+}

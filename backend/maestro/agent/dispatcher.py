@@ -215,13 +215,17 @@ async def _execute_agent(
         # Get system prompt from the agent module
         agent_cfg = AGENT_CONFIGS.get(plugin.name, {"tools": ["Read", "Bash"]})
 
-        # Import the system prompt from the agent module
-        system_prompt = ""
-        try:
-            mod = __import__(f"maestro.agent.{plugin.name}", fromlist=["SYSTEM_PROMPT"])
-            system_prompt = getattr(mod, "SYSTEM_PROMPT", "")
-        except (ImportError, AttributeError):
-            system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
+        # Get system prompt: custom from DB first, fall back to agent module default
+        custom_prompt = extra_config.get("custom_prompt", "")
+        if custom_prompt:
+            system_prompt = custom_prompt
+        else:
+            system_prompt = ""
+            try:
+                mod = __import__(f"maestro.agent.{plugin.name}", fromlist=["SYSTEM_PROMPT"])
+                system_prompt = getattr(mod, "SYSTEM_PROMPT", "")
+            except (ImportError, AttributeError):
+                system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
 
         # Count previous iterations for this task (prevent infinite loops)
         from sqlalchemy import select, func as sqlfunc

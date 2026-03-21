@@ -32,6 +32,17 @@ async def list_plugins(user: User = Depends(get_current_user)) -> list[dict]:
     ]
 
 
+@router.get("/agents/{agent_type}/default-prompt")
+async def get_default_prompt(agent_type: str, user: User = Depends(get_current_user)) -> dict:
+    """Get the default system prompt for an agent type."""
+    try:
+        mod = __import__(f"maestro.agent.{agent_type}", fromlist=["SYSTEM_PROMPT"])
+        prompt = getattr(mod, "SYSTEM_PROMPT", "")
+    except (ImportError, AttributeError):
+        prompt = ""
+    return {"agent_type": agent_type, "default_prompt": prompt}
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
