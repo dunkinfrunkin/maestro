@@ -10,8 +10,44 @@ import {
 } from "@/lib/api";
 import { AgentDef } from "@/lib/agents";
 
-// Dynamic import to avoid SSR issues with the markdown editor
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+// Dynamic import for WYSIWYG markdown editor
+const MarkdownEditor = dynamic(
+  () =>
+    import("@mdxeditor/editor").then((mod) => {
+      const { MDXEditor, headingsPlugin, listsPlugin, quotePlugin, markdownShortcutPlugin, thematicBreakPlugin, toolbarPlugin, BoldItalicUnderlineToggles, BlockTypeSelect, ListsToggle, CreateLink, linkPlugin, linkDialogPlugin, codeBlockPlugin, codeMirrorPlugin, InsertCodeBlock } = mod;
+      // eslint-disable-next-line react/display-name
+      return ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+        <MDXEditor
+          markdown={value}
+          onChange={onChange}
+          contentEditableClassName="prose prose-sm max-w-none min-h-[300px] px-4 py-3"
+          plugins={[
+            headingsPlugin(),
+            listsPlugin(),
+            quotePlugin(),
+            linkPlugin(),
+            linkDialogPlugin(),
+            codeBlockPlugin({ defaultCodeBlockLanguage: "bash" }),
+            codeMirrorPlugin({ codeBlockLanguages: { bash: "Bash", js: "JavaScript", python: "Python", json: "JSON", "": "Plain" } }),
+            thematicBreakPlugin(),
+            markdownShortcutPlugin(),
+            toolbarPlugin({
+              toolbarContents: () => (
+                <>
+                  <BoldItalicUnderlineToggles />
+                  <BlockTypeSelect />
+                  <ListsToggle />
+                  <CreateLink />
+                  <InsertCodeBlock />
+                </>
+              ),
+            }),
+          ]}
+        />
+      );
+    }),
+  { ssr: false, loading: () => <div className="text-sm text-muted p-4">Loading editor...</div> }
+);
 
 type Tab = "config" | "prompt";
 
@@ -221,16 +257,13 @@ export function AgentDetailPage({
             </div>
           </div>
 
-          <div data-color-mode="light">
-            <MDEditor
+          <div className="rounded-md border border-border bg-background overflow-hidden">
+            <MarkdownEditor
               value={promptDraft}
-              onChange={(val) => {
-                setPromptDraft(val || "");
+              onChange={(val: string) => {
+                setPromptDraft(val);
                 setPromptDirty(true);
               }}
-              height={400}
-              preview="edit"
-              visibleDragbar={true}
             />
           </div>
 
