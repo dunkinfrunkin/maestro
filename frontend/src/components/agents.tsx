@@ -77,8 +77,6 @@ export function AgentsPage({ workspaceId }: { workspaceId: number }) {
         <AgentCard key={agent.type} agent={agent} workspaceId={workspaceId} isActive={isActive} />
       ))}
 
-      {/* Recent Runs */}
-      <AgentRunsList workspaceId={workspaceId} />
     </div>
   );
 }
