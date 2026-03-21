@@ -102,6 +102,13 @@ gh api graphql -f query='query { repository(owner: "<OWNER>", name: "<REPO>") { 
 
 The `<THREAD_ID>` is the `id` field from the reviewThreads query (starts with `PRRT_`).
 
+The conversation thread on each comment should look like:
+  - Reviewer: "Issue: ..."
+  - Implementer: "Fixed: ..."
+  - Reviewer: "✅ Verified" (then resolve the thread)
+
+Always reply first, THEN resolve. The reply keeps the conversation visible.
+
 ## Verdict rules
 
 - If ALL comments have been verified (you replied "✅ Verified") AND no new issues → REVIEW_VERDICT: APPROVE
