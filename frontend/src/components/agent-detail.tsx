@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   AgentConfigResponse,
   getAgentConfig,
@@ -8,6 +9,9 @@ import {
   updateAgentConfig,
 } from "@/lib/api";
 import { AgentDef } from "@/lib/agents";
+
+// Dynamic import to avoid SSR issues with the markdown editor
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
 type Tab = "config" | "prompt";
 
@@ -198,7 +202,7 @@ export function AgentDetailPage({
       {/* Prompt tab */}
       {tab === "prompt" && (
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-sm font-medium">System Prompt</div>
               <div className="text-xs text-muted">
@@ -217,15 +221,18 @@ export function AgentDetailPage({
             </div>
           </div>
 
-          <textarea
-            value={promptDraft}
-            onChange={(e) => {
-              setPromptDraft(e.target.value);
-              setPromptDirty(true);
-            }}
-            rows={16}
-            className="w-full px-3 py-2 text-xs font-mono rounded-md border border-border bg-background text-foreground leading-relaxed resize-y"
-          />
+          <div data-color-mode="light">
+            <MDEditor
+              value={promptDraft}
+              onChange={(val) => {
+                setPromptDraft(val || "");
+                setPromptDirty(true);
+              }}
+              height={400}
+              preview="edit"
+              visibleDragbar={true}
+            />
+          </div>
 
           <div className="flex items-center justify-between mt-3">
             <div className="text-[10px] text-muted">
