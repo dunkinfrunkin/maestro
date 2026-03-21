@@ -8,6 +8,7 @@ import {
   UnifiedTask,
   AgentRunResponse,
   fetchTasks,
+  fetchTaskDetail,
   fetchTaskRuns,
   updateTaskStatus,
   removeTaskStatus,
@@ -35,12 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; projectId?: number }) {
   const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
-  const [pendingTaskRef, setPendingTaskRef] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const hash = window.location.hash;
-    if (hash.startsWith("#tasks/")) return decodeURIComponent(hash.replace("#tasks/", ""));
-    return null;
-  });
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [search, setSearch] = useState("");
@@ -71,24 +67,24 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
   }, []);
 
   useEffect(() => {
-    loadTasks().then(() => {
-      // Auto-select task from URL hash on load
-      if (pendingTaskRef) {
-        setPendingTaskRef(null);
-      }
-    });
+    loadTasks();
   }, [loadTasks]);
 
-  // Once tasks load, resolve pending task ref
+  // Load task from hash on mount
   useEffect(() => {
-    if (pendingTaskRef && tasks.length > 0) {
-      const found = tasks.find((t) => t.external_ref === pendingTaskRef);
-      if (found) {
-        setSelectedTask(found);
-        setPendingTaskRef(null);
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (hash.startsWith("#tasks/")) {
+      const ref = decodeURIComponent(hash.replace("#tasks/", ""));
+      if (ref) {
+        setLoadingDetail(true);
+        fetchTaskDetail(ref)
+          .then((task) => setSelectedTask(task))
+          .catch(() => {})
+          .finally(() => setLoadingDetail(false));
       }
     }
-  }, [pendingTaskRef, tasks]);
+  }, []);
 
   // Sync selected task to URL hash
   useEffect(() => {
@@ -119,6 +115,10 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
       await loadTasks();
     }
   };
+
+  if (loadingDetail) {
+    return <div className="text-sm text-muted">Loading task...</div>;
+  }
 
   if (selectedTask) {
     return (

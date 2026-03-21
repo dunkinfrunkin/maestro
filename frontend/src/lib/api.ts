@@ -445,6 +445,12 @@ export async function updateAgentConfig(
   return res.json();
 }
 
+export async function fetchTaskDetail(externalRef: string): Promise<UnifiedTask> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/detail`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export async function getDefaultPrompt(agentType: string): Promise<string> {
   const res = await authFetch(`${API_BASE}/api/v1/agents/${agentType}/default-prompt`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);

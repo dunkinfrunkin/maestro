@@ -270,6 +270,83 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> d
     }
 
 
+@router.get("/tasks/{external_ref:path}/detail")
+async def get_task_detail(external_ref: str) -> dict:
+    """Get a single task with its pipeline info, fetched from the tracker."""
+    async with get_session() as session:
+        record = await crud.get_pipeline_record(session, external_ref)
+
+    # Parse external_ref: "kind:conn_id:issue_id"
+    parts = external_ref.split(":")
+    if len(parts) < 3:
+        raise HTTPException(status_code=400, detail="Invalid external_ref")
+
+    kind = parts[0]
+    try:
+        conn_id = int(parts[1])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid connection_id")
+    issue_id = parts[2]
+
+    # Fetch the issue from the tracker
+    async with get_session() as session:
+        conn = await crud.get_connection(session, conn_id)
+
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    token = crud.get_decrypted_token(conn)
+    issue = None
+
+    try:
+        if conn.kind == TrackerKind.GITHUB:
+            from maestro.tracker.github import GitHubClient
+            client = GitHubClient(token=token, repo=conn.project, endpoint=conn.endpoint or "https://api.github.com")
+            try:
+                issues = await client.fetch_candidate_issues()
+                issue = next((i for i in issues if i.id == issue_id), None)
+            finally:
+                await client.close()
+    except Exception:
+        pass
+
+    if not issue:
+        # Return minimal info from pipeline record
+        return {
+            "external_ref": external_ref,
+            "tracker_kind": kind,
+            "connection_id": conn_id,
+            "identifier": f"#{issue_id}",
+            "title": "",
+            "description": None,
+            "state": "",
+            "priority": None,
+            "labels": [],
+            "url": None,
+            "created_at": None,
+            "updated_at": None,
+            "pipeline_status": record.status.value if record else None,
+            "pr_url": record.pr_url if record else None,
+        }
+
+    return {
+        "external_ref": external_ref,
+        "tracker_kind": kind,
+        "connection_id": conn_id,
+        "identifier": issue.identifier,
+        "title": issue.title,
+        "description": issue.description,
+        "state": issue.state,
+        "priority": issue.priority,
+        "labels": issue.labels,
+        "url": issue.url,
+        "created_at": issue.created_at.isoformat() if issue.created_at else None,
+        "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+        "pipeline_status": record.status.value if record else None,
+        "pr_url": record.pr_url if record else None,
+    }
+
+
 @router.delete("/tasks/{external_ref:path}/status")
 async def remove_task_status(external_ref: str) -> dict:
     """Remove a task from the pipeline (delete its record)."""
