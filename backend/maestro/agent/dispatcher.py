@@ -438,7 +438,12 @@ async def _auto_transition(
 
 
 async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
-    """Check if the PR has unresolved inline review comments."""
+    """Check if the PR has unresolved inline review comments.
+
+    A comment is considered resolved if it has at least one reply
+    (the implementation agent replies with 'Fixed: ...' and/or
+    the review agent replies with 'Verified').
+    """
     try:
         async with get_session() as session:
             task = await session.get(TaskPipelineRecord, task_pipeline_id)
@@ -448,6 +453,7 @@ async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
         pr_number = task.pr_url.rstrip("/").split("/")[-1]
         repo = task.repo
 
+        # Get all inline comments with their replies
         proc = await asyncio.create_subprocess_exec(
             "gh", "api", f"repos/{repo}/pulls/{pr_number}/comments",
             stdout=asyncio.subprocess.PIPE,
@@ -459,10 +465,28 @@ async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
 
         import json
         comments = json.loads(stdout.decode())
-        # Any inline comments that exist = unresolved (GitHub doesn't have a resolved state for PR comments via API easily)
-        if len(comments) > 0:
-            print(f"[MAESTRO] Found {len(comments)} inline comments on PR #{pr_number}")
+
+        # Find top-level comments (not replies themselves)
+        # A comment is a reply if it has in_reply_to_id set
+        top_level = [c for c in comments if not c.get("in_reply_to_id")]
+        replies_by_parent = {}
+        for c in comments:
+            parent = c.get("in_reply_to_id")
+            if parent:
+                replies_by_parent.setdefault(parent, []).append(c)
+
+        unresolved = 0
+        for comment in top_level:
+            comment_id = comment["id"]
+            has_replies = len(replies_by_parent.get(comment_id, [])) > 0
+            if not has_replies:
+                unresolved += 1
+
+        if unresolved > 0:
+            print(f"[MAESTRO] Found {unresolved} unresolved inline comments (no replies) on PR #{pr_number}")
             return True
+
+        print(f"[MAESTRO] All {len(top_level)} inline comments have replies — considered resolved")
         return False
     except Exception as exc:
         print(f"[MAESTRO] Error checking comments: {exc}")

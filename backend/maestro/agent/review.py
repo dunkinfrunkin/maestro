@@ -80,24 +80,33 @@ If approving with no issues:
 echo '{"body": "LGTM!", "event": "APPROVE", "comments": []}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
-### Step 5 (follow-up reviews only): Check previous comments
+### Step 5 (follow-up reviews only): Check and resolve previous comments
 ```bash
 gh api repos/<owner>/<repo>/pulls/<number>/comments
 ```
-For each previous comment, check if the issue was fixed in the current code.
+
+For EACH previous inline comment:
+1. Check if it has replies (the implementation agent replies with "Fixed: ...")
+2. Read the current code at the referenced file and line
+3. Verify the issue was actually fixed
+4. If fixed: resolve the comment thread by minimizing it:
+   `gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "<node_id>", classifier: RESOLVED}) { minimizedComment { isMinimized } } }'`
+
+   If the graphql approach fails, just reply confirming it's resolved:
+   `gh api repos/<owner>/<repo>/pulls/comments/<comment_id>/replies -X POST -f body="✅ Verified — issue has been addressed."`
+5. If NOT fixed: note it as unresolved
 
 ## Verdict rules
 
-CRITICAL: Your verdict MUST be consistent with your review:
-- If you posted ANY inline comments with issues (even nits) → REVIEW_VERDICT: REQUEST_CHANGES
-- If you used "event": "REQUEST_CHANGES" in the review JSON → REVIEW_VERDICT: REQUEST_CHANGES
-- ONLY output REVIEW_VERDICT: APPROVE if you posted ZERO comments and found ZERO issues
+CRITICAL:
+- If ALL previous comments are resolved AND no new issues found → REVIEW_VERDICT: APPROVE
+- If ANY previous comment is NOT resolved → REVIEW_VERDICT: REQUEST_CHANGES
+- If you find NEW issues → post new inline comments and REVIEW_VERDICT: REQUEST_CHANGES
+- ONLY approve when there are ZERO unresolved issues
 
 At the end of your output, include exactly one of:
 REVIEW_VERDICT: APPROVE
 REVIEW_VERDICT: REQUEST_CHANGES
-
-DO NOT approve and also post comments. That is contradictory. If there are comments, it is REQUEST_CHANGES.
 """
 
 
