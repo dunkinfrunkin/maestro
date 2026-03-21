@@ -41,7 +41,31 @@ export default function Dashboard() {
 }
 
 function AuthenticatedApp() {
-  const [page, setPage] = useState<Page>("operations");
+  // Persist page in URL hash
+  const getInitialPage = (): Page => {
+    if (typeof window === "undefined") return "operations";
+    const hash = window.location.hash.replace("#", "").split("/")[0];
+    if (["operations", "tasks", "agents", "settings"].includes(hash)) return hash as Page;
+    return "operations";
+  };
+  const [page, setPage] = useState<Page>(getInitialPage);
+
+  // Sync page to URL hash
+  useEffect(() => {
+    window.location.hash = page;
+  }, [page]);
+
+  // Listen for hash changes (browser back/forward)
+  useEffect(() => {
+    const handler = () => {
+      const hash = window.location.hash.replace("#", "").split("/")[0];
+      if (["operations", "tasks", "agents", "settings"].includes(hash)) {
+        setPage(hash as Page);
+      }
+    };
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, []);
 
   // Workspace state
   const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);

@@ -35,6 +35,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; projectId?: number }) {
   const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
+  const [pendingTaskRef, setPendingTaskRef] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const hash = window.location.hash;
+    if (hash.startsWith("#tasks/")) return decodeURIComponent(hash.replace("#tasks/", ""));
+    return null;
+  });
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [search, setSearch] = useState("");
@@ -65,8 +71,33 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
   }, []);
 
   useEffect(() => {
-    loadTasks();
+    loadTasks().then(() => {
+      // Auto-select task from URL hash on load
+      if (pendingTaskRef) {
+        setPendingTaskRef(null);
+      }
+    });
   }, [loadTasks]);
+
+  // Once tasks load, resolve pending task ref
+  useEffect(() => {
+    if (pendingTaskRef && tasks.length > 0) {
+      const found = tasks.find((t) => t.external_ref === pendingTaskRef);
+      if (found) {
+        setSelectedTask(found);
+        setPendingTaskRef(null);
+      }
+    }
+  }, [pendingTaskRef, tasks]);
+
+  // Sync selected task to URL hash
+  useEffect(() => {
+    if (selectedTask) {
+      window.location.hash = `tasks/${encodeURIComponent(selectedTask.external_ref)}`;
+    } else if (window.location.hash.startsWith("#tasks/")) {
+      window.location.hash = "tasks";
+    }
+  }, [selectedTask]);
 
   const handleStatusChange = async (task: UnifiedTask, status: string) => {
     try {

@@ -57,7 +57,15 @@ const AGENTS: AgentDef[] = [
 ];
 
 export function AgentsPage({ workspaceId }: { workspaceId: number }) {
-  const [selectedAgent, setSelectedAgent] = useState<AgentDef | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<AgentDef | null>(() => {
+    if (typeof window === "undefined") return null;
+    const hash = window.location.hash;
+    if (hash.startsWith("#agents/")) {
+      const agentType = hash.replace("#agents/", "");
+      return AGENTS.find((a) => a.type === agentType) || null;
+    }
+    return null;
+  });
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [configs, setConfigs] = useState<Record<string, AgentConfigResponse>>({});
 
@@ -72,6 +80,15 @@ export function AgentsPage({ workspaceId }: { workspaceId: number }) {
   }, [workspaceId]);
 
   const isActive = keyStatus?.has_key ?? false;
+
+  // Sync selected agent to URL hash
+  useEffect(() => {
+    if (selectedAgent) {
+      window.location.hash = `agents/${selectedAgent.type}`;
+    } else if (window.location.hash.startsWith("#agents/")) {
+      window.location.hash = "agents";
+    }
+  }, [selectedAgent]);
 
   if (selectedAgent) {
     return (
