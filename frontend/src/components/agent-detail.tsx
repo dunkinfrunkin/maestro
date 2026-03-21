@@ -7,14 +7,9 @@ import {
   getDefaultPrompt,
   updateAgentConfig,
 } from "@/lib/api";
+import { AgentDef } from "@/lib/agents";
 
 type Tab = "config" | "prompt";
-
-interface AgentDef {
-  type: string;
-  name: string;
-  description: string;
-}
 
 export function AgentDetailPage({
   agent,

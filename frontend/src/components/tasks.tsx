@@ -1,16 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { TaskDetailPage } from "@/components/task-detail";
+import { useRouter } from "next/navigation";
 import {
   PIPELINE_STATUSES,
   PipelineStatus,
   UnifiedTask,
   AgentRunResponse,
   fetchTasks,
-  fetchTaskById,
-  fetchTaskDetail,
-  fetchTaskRuns,
   updateTaskStatus,
   removeTaskStatus,
   TrackerConnection,
@@ -36,8 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; projectId?: number }) {
-  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const router = useRouter();
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [search, setSearch] = useState("");
@@ -71,34 +67,6 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
     loadTasks();
   }, [loadTasks]);
 
-  // Load task from hash on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const hash = window.location.hash;
-    if (hash.startsWith("#tasks/")) {
-      const idStr = hash.replace("#tasks/", "");
-      const id = parseInt(idStr, 10);
-      if (!isNaN(id)) {
-        setLoadingDetail(true);
-        fetchTaskById(id)
-          .then((task) => setSelectedTask(task))
-          .catch(() => {})
-          .finally(() => setLoadingDetail(false));
-      }
-    }
-  }, []);
-
-  // Sync selected task to URL hash (use internal ID)
-  useEffect(() => {
-    if (selectedTask && selectedTask.id) {
-      window.location.hash = `tasks/${selectedTask.id}`;
-    } else if (selectedTask) {
-      window.location.hash = `tasks/${encodeURIComponent(selectedTask.external_ref)}`;
-    } else if (window.location.hash.startsWith("#tasks/")) {
-      window.location.hash = "tasks";
-    }
-  }, [selectedTask]);
-
   const handleStatusChange = async (task: UnifiedTask, status: string) => {
     try {
       if (status === "") {
@@ -119,22 +87,6 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
       await loadTasks();
     }
   };
-
-  if (loadingDetail) {
-    return <div className="text-sm text-muted">Loading task...</div>;
-  }
-
-  if (selectedTask) {
-    return (
-      <TaskDetailPage
-        task={selectedTask}
-        workspaceId={workspaceId}
-        projectId={projectId}
-        onBack={() => { setSelectedTask(null); loadTasks(); }}
-        onTaskUpdated={() => loadTasks()}
-      />
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -206,7 +158,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
               key={task.external_ref}
               task={task}
               onStatusChange={handleStatusChange}
-              onClick={() => setSelectedTask(task)}
+              onClick={() => router.push(`/tasks/${task.id}`)}
             />
           ))}
         </div>
