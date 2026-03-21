@@ -8,6 +8,7 @@ import {
   UnifiedTask,
   AgentRunResponse,
   fetchTasks,
+  fetchTaskById,
   fetchTaskDetail,
   fetchTaskRuns,
   updateTaskStatus,
@@ -75,10 +76,11 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
     if (typeof window === "undefined") return;
     const hash = window.location.hash;
     if (hash.startsWith("#tasks/")) {
-      const ref = decodeURIComponent(hash.replace("#tasks/", ""));
-      if (ref) {
+      const idStr = hash.replace("#tasks/", "");
+      const id = parseInt(idStr, 10);
+      if (!isNaN(id)) {
         setLoadingDetail(true);
-        fetchTaskDetail(ref)
+        fetchTaskById(id)
           .then((task) => setSelectedTask(task))
           .catch(() => {})
           .finally(() => setLoadingDetail(false));
@@ -86,9 +88,11 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
     }
   }, []);
 
-  // Sync selected task to URL hash
+  // Sync selected task to URL hash (use internal ID)
   useEffect(() => {
-    if (selectedTask) {
+    if (selectedTask && selectedTask.id) {
+      window.location.hash = `tasks/${selectedTask.id}`;
+    } else if (selectedTask) {
       window.location.hash = `tasks/${encodeURIComponent(selectedTask.external_ref)}`;
     } else if (window.location.hash.startsWith("#tasks/")) {
       window.location.hash = "tasks";

@@ -254,6 +254,7 @@ export async function deleteConnection(id: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export interface UnifiedTask {
+  id: number | null;
   external_ref: string;
   tracker_kind: string;
   connection_id: number;
@@ -447,6 +448,12 @@ export async function updateAgentConfig(
 
 export async function fetchTaskDetail(externalRef: string): Promise<UnifiedTask> {
   const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/detail`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchTaskById(pipelineId: number): Promise<UnifiedTask> {
+  const res = await authFetch(`${API_BASE}/api/v1/pipeline/${pipelineId}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
