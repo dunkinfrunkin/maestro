@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AgentConfigResponse,
-  AgentRunResponse,
   ApiKeyStatus,
   getAgentConfig,
   getApiKeyStatus,
   updateAgentConfig,
-  fetchAgentRuns,
 } from "@/lib/api";
+import { AgentDetailPage } from "@/components/agent-detail";
 
 interface AgentDef {
   type: string;
@@ -58,13 +57,31 @@ const AGENTS: AgentDef[] = [
 ];
 
 export function AgentsPage({ workspaceId }: { workspaceId: number }) {
+  const [selectedAgent, setSelectedAgent] = useState<AgentDef | null>(null);
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
+  const [configs, setConfigs] = useState<Record<string, AgentConfigResponse>>({});
 
   useEffect(() => {
     getApiKeyStatus(workspaceId, "anthropic").then(setKeyStatus).catch(() => {});
+    // Load all agent configs for the list view
+    AGENTS.forEach((a) => {
+      getAgentConfig(workspaceId, a.type).then((c) => {
+        setConfigs((prev) => ({ ...prev, [a.type]: c }));
+      }).catch(() => {});
+    });
   }, [workspaceId]);
 
   const isActive = keyStatus?.has_key ?? false;
+
+  if (selectedAgent) {
+    return (
+      <AgentDetailPage
+        agent={selectedAgent}
+        workspaceId={workspaceId}
+        onBack={() => setSelectedAgent(null)}
+      />
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -73,202 +90,43 @@ export function AgentsPage({ workspaceId }: { workspaceId: number }) {
           Add your Anthropic API key in <strong>Settings &rarr; API Keys</strong> to activate agents.
         </div>
       )}
-      {AGENTS.map((agent) => (
-        <AgentCard key={agent.type} agent={agent} workspaceId={workspaceId} isActive={isActive} />
-      ))}
+      {AGENTS.map((agent) => {
+        const config = configs[agent.type];
+        const enabled = (config?.extra_config?.enabled ?? true) as boolean;
+        const model = config?.model || "claude-sonnet-4-6";
+        const modelName = config?.available_models?.find((m) => m.id === model)?.name || model;
 
-    </div>
-  );
-}
-
-function AgentRunsList({ workspaceId }: { workspaceId: number }) {
-  const [runs, setRuns] = useState<AgentRunResponse[]>([]);
-
-  useEffect(() => {
-    fetchAgentRuns(workspaceId).then(setRuns).catch(() => {});
-    const interval = setInterval(() => {
-      fetchAgentRuns(workspaceId).then(setRuns).catch(() => {});
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [workspaceId]);
-
-  if (runs.length === 0) return null;
-
-  const statusColors: Record<string, string> = {
-    pending: "bg-gray-100 text-gray-600 border-gray-300",
-    running: "bg-blue-100 text-blue-700 border-blue-300",
-    completed: "bg-green-100 text-green-700 border-green-300",
-    failed: "bg-red-100 text-red-700 border-red-300",
-  };
-
-  return (
-    <>
-      <div className="flex items-center gap-2 text-xs text-muted">
-        <div className="h-px flex-1 bg-border" />
-        <span>Recent Runs</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-      <div className="space-y-2">
-        {runs.map((run) => (
-          <div key={run.id} className="rounded-lg border border-border bg-surface p-3">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium capitalize">{run.agent_type.replace("_", " ")}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${statusColors[run.status] || ""}`}>
-                  {run.status}
-                </span>
-              </div>
-              <span className="text-[10px] text-muted">
-                {run.created_at ? new Date(run.created_at).toLocaleTimeString() : ""}
-              </span>
-            </div>
-            {run.summary && <div className="text-xs text-muted">{run.summary}</div>}
-            {run.error && <div className="text-xs text-red-600 mt-1">{run.error}</div>}
-            {run.cost_usd > 0 && (
-              <div className="text-[10px] text-muted mt-1">${run.cost_usd.toFixed(4)}</div>
-            )}
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function AgentCard({ agent, workspaceId, isActive }: { agent: AgentDef; workspaceId: number; isActive: boolean }) {
-  const [config, setConfig] = useState<AgentConfigResponse | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setConfig(await getAgentConfig(workspaceId, agent.type));
-      setError(null);
-    } catch {
-      setConfig(null);
-    }
-  }, [workspaceId, agent.type]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleModelChange = async (model: string) => {
-    try {
-      const updated = await updateAgentConfig(workspaceId, agent.type, model);
-      setConfig(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
-    }
-  };
-
-  const handleExtraConfigChange = async (key: string, value: unknown) => {
-    try {
-      const extra = { ...(config?.extra_config || {}), [key]: value };
-      const updated = await updateAgentConfig(workspaceId, agent.type, undefined, extra);
-      setConfig(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
-    }
-  };
-
-  const enabled = (config?.extra_config?.enabled ?? true) as boolean;
-
-  const handleToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await handleExtraConfigChange("enabled", !enabled);
-  };
-
-  return (
-    <div className={`rounded-lg border border-border bg-surface overflow-hidden ${!enabled ? "opacity-60" : ""}`}>
-      <div
-        onClick={() => setExpanded(!expanded)}
-        className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors cursor-pointer"
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive && enabled ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d={agent.icon} />
-            </svg>
-          </div>
-          <div>
-            <div className="text-sm font-medium">{agent.name}</div>
-            <div className="text-xs text-muted">{agent.description}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-muted">
-            on {agent.triggerStatus}
-          </span>
-          {/* Toggle */}
-          <button
-            onClick={handleToggle}
-            className={`relative w-9 h-5 rounded-full transition-colors ${enabled ? "bg-green-500" : "bg-gray-300"}`}
-            title={enabled ? "Disable agent" : "Enable agent"}
+        return (
+          <div
+            key={agent.type}
+            onClick={() => setSelectedAgent(agent)}
+            className={`rounded-lg border border-border bg-surface p-4 cursor-pointer hover:bg-surface-hover transition-colors ${!enabled ? "opacity-60" : ""}`}
           >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-4" : ""}`} />
-          </button>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
-            className={`w-4 h-4 text-muted transition-transform ${expanded ? "rotate-90" : ""}`}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-          </svg>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="border-t border-border p-4 space-y-4">
-          {error && (
-            <div className="p-2 rounded-md bg-red-100 border border-red-300 text-red-800 text-xs">{error}</div>
-          )}
-
-          <div>
-            <div className="text-xs font-medium mb-2">Model</div>
-            <div className="space-y-1.5">
-              {(config?.available_models || [
-                { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Best speed/intelligence balance" },
-                { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable, best for complex tasks" },
-                { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", description: "Fastest, good for simple tasks" },
-              ]).map((m) => (
-                <label
-                  key={m.id}
-                  className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${
-                    (config?.model || "claude-sonnet-4-6") === m.id
-                      ? "border-accent bg-accent/5"
-                      : "border-border hover:bg-surface-hover"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`model-${agent.type}`}
-                    checked={(config?.model || "claude-sonnet-4-6") === m.id}
-                    onChange={() => handleModelChange(m.id)}
-                    className="accent-accent"
-                  />
-                  <div>
-                    <div className="text-xs font-medium">{m.name}</div>
-                    <div className="text-[10px] text-muted">{m.description}</div>
-                  </div>
-                </label>
-              ))}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive && enabled ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={agent.icon} />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-medium">{agent.name}</div>
+                  <div className="text-xs text-muted">{agent.description}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-muted">{modelName}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-muted">
+                  on {agent.triggerStatus}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-muted">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
             </div>
           </div>
-
-          {agent.type === "risk_profile" && (
-            <div>
-              <div className="text-xs font-medium mb-2">Auto-approve threshold</div>
-              <div className="text-[10px] text-muted mb-2">
-                PRs at or below this risk level will be auto-approved.
-              </div>
-              <select
-                value={(config?.extra_config?.auto_approve_threshold as string) || "low"}
-                onChange={(e) => handleExtraConfigChange("auto_approve_threshold", e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-md border border-border bg-background text-foreground"
-              >
-                <option value="low">Low — only auto-approve minimal risk</option>
-                <option value="medium">Medium — auto-approve low and medium risk</option>
-                <option value="high">High — auto-approve most PRs (not recommended)</option>
-              </select>
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
