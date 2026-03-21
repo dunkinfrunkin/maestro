@@ -80,32 +80,27 @@ If approving with no issues:
 echo '{"body": "LGTM!", "event": "APPROVE", "comments": []}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
-### Step 5 (follow-up reviews only): Check previous comments and verify fixes
+### Step 5 (follow-up reviews only): Check previous comments, verify fixes, and resolve threads
 
-Get all inline comments:
+#### 5a: Get review threads with their resolved status
 ```bash
-gh api repos/<owner>/<repo>/pulls/<number>/comments --jq '.[] | {id, in_reply_to_id, path, line, body}'
+gh api graphql -f query='query { repository(owner: "<OWNER>", name: "<REPO>") { pullRequest(number: <NUMBER>) { reviewThreads(first: 50) { nodes { id isResolved comments(first: 5) { nodes { body author { login } } } } } } } }'
 ```
 
-Top-level comments have `in_reply_to_id: null`. Replies have the parent's ID.
-
-For EACH top-level comment:
-1. Check if the implementation agent replied (look for replies with "Fixed:" in the body)
-2. Read the CURRENT code at the referenced file and line to verify the fix
-3. If the fix is correct: reply to confirm
+#### 5b: For each UNRESOLVED thread:
+1. Read the comments in the thread — look for "Fixed:" replies from the implementer
+2. Read the CURRENT code to verify the fix
+3. If fixed correctly: reply and RESOLVE the thread
    ```bash
    gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="✅ Verified — fix looks good."
+   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
    ```
-4. If NOT fixed: reply explaining what's still wrong
+4. If NOT fixed: reply explaining what's still wrong (do NOT resolve)
    ```bash
    gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="❌ Still not fixed: <explanation>"
    ```
 
-DO NOT use `minimizeComment` or hide comments. Just reply to the thread.
-The conversation thread on each comment should look like:
-  - Reviewer: "Issue: ..."
-  - Implementer: "Fixed: ..."
-  - Reviewer: "✅ Verified" or "❌ Still not fixed"
+The `<THREAD_ID>` is the `id` field from the reviewThreads query (starts with `PRRT_`).
 
 ## Verdict rules
 
