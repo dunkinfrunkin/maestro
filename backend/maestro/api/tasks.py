@@ -287,9 +287,56 @@ async def get_task_detail(external_ref: str) -> dict:
     """Get a single task with its pipeline info, fetched from the tracker."""
     async with get_session() as session:
         record = await crud.get_pipeline_record(session, external_ref)
-    if not record:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return await _build_task_detail(record)
+    if record:
+        return await _build_task_detail(record)
+    # No pipeline record — still fetch from tracker
+    return await _build_task_from_ref(external_ref)
+
+
+async def _build_task_from_ref(external_ref: str) -> dict:
+    """Build task detail from external_ref without a pipeline record."""
+    parts = external_ref.split(":")
+    kind = parts[0] if len(parts) >= 1 else ""
+    conn_id = int(parts[1]) if len(parts) >= 2 else 0
+    issue_id = parts[2] if len(parts) >= 3 else ""
+
+    issue = None
+    try:
+        async with get_session() as session:
+            conn = await crud.get_connection(session, conn_id)
+        if conn:
+            token = crud.get_decrypted_token(conn)
+            if conn.kind == TrackerKind.GITHUB:
+                from maestro.tracker.github import GitHubClient
+                client = GitHubClient(token=token, repo=conn.project, endpoint=conn.endpoint or "https://api.github.com")
+                try:
+                    issues = await client.fetch_candidate_issues()
+                    issue = next((i for i in issues if i.id == issue_id), None)
+                finally:
+                    await client.close()
+    except Exception:
+        pass
+
+    if issue:
+        return {
+            "id": None,
+            "external_ref": external_ref,
+            "tracker_kind": kind,
+            "connection_id": conn_id,
+            "identifier": issue.identifier,
+            "title": issue.title,
+            "description": issue.description,
+            "state": issue.state,
+            "priority": issue.priority,
+            "labels": issue.labels,
+            "url": issue.url,
+            "created_at": issue.created_at.isoformat() if issue.created_at else None,
+            "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
+            "pipeline_status": None,
+            "pr_url": None,
+        }
+
+    raise HTTPException(status_code=404, detail="Task not found in tracker")
 
 
 async def _build_task_detail(record) -> dict:

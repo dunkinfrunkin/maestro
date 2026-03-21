@@ -25,7 +25,13 @@ export default function Page() {
   };
 
   useEffect(() => {
-    loadTask().catch(() => router.push("/tasks"));
+    loadTask().catch((err) => {
+      console.error("Failed to load task:", err);
+      // Only redirect if it's a 404, not a network error
+      if (err?.message?.includes("404")) {
+        router.push("/tasks");
+      }
+    });
   }, [params.id]);
 
   if (!task) {
