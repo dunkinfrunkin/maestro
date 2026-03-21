@@ -158,7 +158,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
               key={task.external_ref}
               task={task}
               onStatusChange={handleStatusChange}
-              onClick={() => router.push(`/tasks/${task.id}`)}
+              onClick={() => router.push(task.id ? `/tasks/${task.id}` : `/tasks/${encodeURIComponent(task.external_ref)}`)}
             />
           ))}
         </div>

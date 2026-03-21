@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { UnifiedTask, fetchTaskById } from "@/lib/api";
+import { UnifiedTask, fetchTaskById, fetchTaskDetail } from "@/lib/api";
 import { useDashboard } from "@/lib/dashboard-context";
 import { TaskDetailPage } from "@/components/task-detail";
 
@@ -12,14 +12,21 @@ export default function Page() {
   const { activeWorkspace, activeProject } = useDashboard();
   const [task, setTask] = useState<UnifiedTask | null>(null);
 
-  useEffect(() => {
-    const id = Number(params.id);
-    if (!isNaN(id)) {
-      fetchTaskById(id)
-        .then(setTask)
-        .catch(() => router.push("/tasks"));
+  const loadTask = () => {
+    const idStr = params.id as string;
+    const id = Number(idStr);
+    if (!isNaN(id) && id > 0) {
+      // Numeric ID — fetch by pipeline ID
+      return fetchTaskById(id).then(setTask);
+    } else {
+      // External ref (e.g., github:3:15)
+      return fetchTaskDetail(decodeURIComponent(idStr)).then(setTask);
     }
-  }, [params.id, router]);
+  };
+
+  useEffect(() => {
+    loadTask().catch(() => router.push("/tasks"));
+  }, [params.id]);
 
   if (!task) {
     return <div className="text-sm text-muted">Loading task...</div>;
@@ -31,11 +38,7 @@ export default function Page() {
       workspaceId={activeWorkspace?.id}
       projectId={activeProject?.id}
       onBack={() => router.push("/tasks")}
-      onTaskUpdated={() =>
-        fetchTaskById(Number(params.id))
-          .then(setTask)
-          .catch(() => {})
-      }
+      onTaskUpdated={() => loadTask().catch(() => {})}
     />
   );
 }
