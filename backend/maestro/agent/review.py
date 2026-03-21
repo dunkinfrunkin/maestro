@@ -42,12 +42,14 @@ For each issue, note:
 ### Step 4: Post inline comments
 IMPORTANT: The `line` field must be a line that appears in the diff (was added or modified).
 To find the correct line number:
-1. Read the file with the Read tool — it shows line numbers
-2. Use the line number shown by Read (e.g., line 34 in the file = `"line": 34`)
+1. Read the file with the Read tool — it shows line numbers (e.g., `34→  code here`)
+2. Use that line number (34) in the comment
 
-Post your review:
+To post inline review comments, write the review JSON to a file then pass it:
+
 ```bash
-gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input - <<'REVIEW_EOF'
+# Write review JSON to temp file
+cat > /tmp/review.json << 'REVIEWJSON'
 {
   "body": "## Code Review Summary\n\nOverall assessment here.",
   "event": "REQUEST_CHANGES",
@@ -56,18 +58,26 @@ gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input - <<'REVIEW_EOF'
       "path": "src/books.js",
       "line": 34,
       "side": "RIGHT",
-      "body": "Issue: describe the problem.\n\nSuggested fix:\n```js\n// corrected code here\n```"
+      "body": "Describe the issue and suggested fix"
     }
   ]
 }
-REVIEW_EOF
+REVIEWJSON
+
+# Post the review
+gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input /tmp/review.json
 ```
+
+CRITICAL RULES for inline comments:
+- `line` MUST be a line number that was ADDED or CHANGED in the diff (shows with + in the diff)
+- `path` must match exactly what appears in the diff header (e.g., `src/router.js`)
+- `side` must always be `"RIGHT"`
+- If the API returns an error about the line, try a nearby changed line
+- Keep comment `body` simple — no complex markdown or special characters
 
 If approving with no issues:
 ```bash
-gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input - <<'REVIEW_EOF'
-{"body": "LGTM! All looks good.", "event": "APPROVE", "comments": []}
-REVIEW_EOF
+echo '{"body": "LGTM!", "event": "APPROVE", "comments": []}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
 ### Step 5 (follow-up reviews only): Check previous comments
