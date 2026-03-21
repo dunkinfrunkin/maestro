@@ -50,9 +50,12 @@ function AuthenticatedApp() {
   };
   const [page, setPage] = useState<Page>(getInitialPage);
 
-  // Sync page to URL hash
+  // Sync page to URL hash (don't overwrite sub-paths like #agents/implementation)
   useEffect(() => {
-    window.location.hash = page;
+    const currentHash = window.location.hash.replace("#", "");
+    if (!currentHash.startsWith(page)) {
+      window.location.hash = page;
+    }
   }, [page]);
 
   // Listen for hash changes (browser back/forward)
