@@ -11,41 +11,8 @@ import {
 import { AgentDef } from "@/lib/agents";
 
 // Dynamic import for WYSIWYG markdown editor
-const MarkdownEditor = dynamic(
-  () =>
-    import("@mdxeditor/editor").then((mod) => {
-      const { MDXEditor, headingsPlugin, listsPlugin, quotePlugin, markdownShortcutPlugin, thematicBreakPlugin, toolbarPlugin, BoldItalicUnderlineToggles, BlockTypeSelect, ListsToggle, CreateLink, linkPlugin, linkDialogPlugin, codeBlockPlugin, codeMirrorPlugin, InsertCodeBlock } = mod;
-      // eslint-disable-next-line react/display-name
-      return ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-        <MDXEditor
-          markdown={value}
-          onChange={onChange}
-          contentEditableClassName="prose prose-sm max-w-none min-h-[300px] px-4 py-3"
-          plugins={[
-            headingsPlugin(),
-            listsPlugin(),
-            quotePlugin(),
-            linkPlugin(),
-            linkDialogPlugin(),
-            codeBlockPlugin({ defaultCodeBlockLanguage: "bash" }),
-            codeMirrorPlugin({ codeBlockLanguages: { bash: "Bash", js: "JavaScript", python: "Python", json: "JSON", "": "Plain" } }),
-            thematicBreakPlugin(),
-            markdownShortcutPlugin(),
-            toolbarPlugin({
-              toolbarContents: () => (
-                <>
-                  <BoldItalicUnderlineToggles />
-                  <BlockTypeSelect />
-                  <ListsToggle />
-                  <CreateLink />
-                  <InsertCodeBlock />
-                </>
-              ),
-            }),
-          ]}
-        />
-      );
-    }),
+const MDXEditorComponent = dynamic(
+  () => import("@mdxeditor/editor").then((mod) => mod.MDXEditor),
   { ssr: false, loading: () => <div className="text-sm text-muted p-4">Loading editor...</div> }
 );
 
@@ -257,15 +224,13 @@ export function AgentDetailPage({
             </div>
           </div>
 
-          <div className="rounded-md border border-border bg-background overflow-hidden">
-            <MarkdownEditor
-              value={promptDraft}
-              onChange={(val: string) => {
-                setPromptDraft(val);
-                setPromptDirty(true);
-              }}
-            />
-          </div>
+          <PromptEditor
+            value={promptDraft}
+            onChange={(val) => {
+              setPromptDraft(val);
+              setPromptDirty(true);
+            }}
+          />
 
           <div className="flex items-center justify-between mt-3">
             <div className="text-[10px] text-muted">
@@ -281,6 +246,68 @@ export function AgentDetailPage({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PromptEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [plugins, setPlugins] = useState<any[] | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [initialValue, setInitialValue] = useState(value);
+
+  // Load plugins dynamically
+  useEffect(() => {
+    import("@mdxeditor/editor").then((mod) => {
+      setPlugins([
+        mod.headingsPlugin(),
+        mod.listsPlugin(),
+        mod.quotePlugin(),
+        mod.linkPlugin(),
+        mod.linkDialogPlugin(),
+        mod.codeBlockPlugin({ defaultCodeBlockLanguage: "bash" }),
+        mod.codeMirrorPlugin({
+          codeBlockLanguages: { bash: "Bash", js: "JavaScript", python: "Python", json: "JSON", "": "Plain" },
+        }),
+        mod.thematicBreakPlugin(),
+        mod.markdownShortcutPlugin(),
+        mod.toolbarPlugin({
+          toolbarContents: () => {
+            const { BoldItalicUnderlineToggles, BlockTypeSelect, ListsToggle, CreateLink, InsertCodeBlock } = mod;
+            return (
+              <>
+                <BoldItalicUnderlineToggles />
+                <BlockTypeSelect />
+                <ListsToggle />
+                <CreateLink />
+                <InsertCodeBlock />
+              </>
+            );
+          },
+        }),
+      ]);
+    });
+  }, []);
+
+  // Remount editor when value changes externally (initial load, reset)
+  useEffect(() => {
+    if (value !== initialValue) {
+      setInitialValue(value);
+      setEditorKey((k) => k + 1);
+    }
+  }, [value, initialValue]);
+
+  if (!plugins) {
+    return <div className="text-sm text-muted p-4">Loading editor...</div>;
+  }
+
+  return (
+    <div className="rounded-md border border-border overflow-hidden [&_.mdxeditor]:bg-background [&_.mdxeditor-toolbar]:bg-surface [&_.mdxeditor-toolbar]:border-b [&_.mdxeditor-toolbar]:border-border [&_.mdxeditor-toolbar]:px-2 [&_[contenteditable]]:text-foreground [&_[contenteditable]]:text-sm [&_[contenteditable]]:leading-relaxed [&_[contenteditable]]:min-h-[300px] [&_[contenteditable]]:px-4 [&_[contenteditable]]:py-3">
+      <MDXEditorComponent
+        key={editorKey}
+        markdown={initialValue}
+        onChange={onChange}
+        plugins={plugins}
+      />
     </div>
   );
 }
