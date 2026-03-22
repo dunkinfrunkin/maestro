@@ -10,9 +10,8 @@ import {
 } from "@/lib/api";
 import { AgentDef } from "@/lib/agents";
 
-// Dynamic import for WYSIWYG markdown editor
-const MDXEditorComponent = dynamic(
-  () => import("@mdxeditor/editor").then((mod) => mod.MDXEditor),
+const CodeMirrorEditor = dynamic(
+  () => import("@uiw/react-codemirror"),
   { ssr: false, loading: () => <div className="text-sm text-muted p-4">Loading editor...</div> }
 );
 
@@ -251,62 +250,32 @@ export function AgentDetailPage({
 }
 
 function PromptEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [plugins, setPlugins] = useState<any[] | null>(null);
-  const [editorKey, setEditorKey] = useState(0);
-  const [initialValue, setInitialValue] = useState(value);
+  const [extensions, setExtensions] = useState<any[]>([]);
 
-  // Load plugins dynamically
   useEffect(() => {
-    import("@mdxeditor/editor").then((mod) => {
-      setPlugins([
-        mod.headingsPlugin(),
-        mod.listsPlugin(),
-        mod.quotePlugin(),
-        mod.linkPlugin(),
-        mod.linkDialogPlugin(),
-        mod.codeBlockPlugin({ defaultCodeBlockLanguage: "bash" }),
-        mod.codeMirrorPlugin({
-          codeBlockLanguages: { bash: "Bash", js: "JavaScript", python: "Python", json: "JSON", "": "Plain" },
-        }),
-        mod.thematicBreakPlugin(),
-        mod.markdownShortcutPlugin(),
-        mod.toolbarPlugin({
-          toolbarContents: () => {
-            const { BoldItalicUnderlineToggles, BlockTypeSelect, ListsToggle, CreateLink, InsertCodeBlock } = mod;
-            return (
-              <>
-                <BoldItalicUnderlineToggles />
-                <BlockTypeSelect />
-                <ListsToggle />
-                <CreateLink />
-                <InsertCodeBlock />
-              </>
-            );
-          },
-        }),
-      ]);
+    import("@codemirror/lang-markdown").then((mod) => {
+      setExtensions([mod.markdown()]);
     });
   }, []);
 
-  // Remount editor when value changes externally (initial load, reset)
-  useEffect(() => {
-    if (value !== initialValue) {
-      setInitialValue(value);
-      setEditorKey((k) => k + 1);
-    }
-  }, [value, initialValue]);
-
-  if (!plugins) {
-    return <div className="text-sm text-muted p-4">Loading editor...</div>;
-  }
-
   return (
-    <div className="rounded-md border border-border overflow-hidden [&_.mdxeditor]:bg-background [&_.mdxeditor-toolbar]:bg-surface [&_.mdxeditor-toolbar]:border-b [&_.mdxeditor-toolbar]:border-border [&_.mdxeditor-toolbar]:px-2 [&_[contenteditable]]:text-foreground [&_[contenteditable]]:text-sm [&_[contenteditable]]:leading-relaxed [&_[contenteditable]]:min-h-[300px] [&_[contenteditable]]:px-4 [&_[contenteditable]]:py-3">
-      <MDXEditorComponent
-        key={editorKey}
-        markdown={initialValue}
+    <div className="rounded-md border border-border overflow-hidden">
+      <CodeMirrorEditor
+        value={value}
         onChange={onChange}
-        plugins={plugins}
+        extensions={extensions}
+        height="400px"
+        basicSetup={{
+          lineNumbers: true,
+          foldGutter: false,
+          highlightActiveLine: true,
+          bracketMatching: true,
+        }}
+        theme="light"
+        style={{
+          fontSize: "13px",
+          fontFamily: "var(--font-geist-mono), monospace",
+        }}
       />
     </div>
   );
