@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
 /* Maestro — light-only beige paper theme */
 
 :root {
@@ -14,8 +16,9 @@
   --ifm-font-color-secondary: #8a7e6b;
   --ifm-code-font-size: 88%;
   --ifm-heading-font-weight: 600;
-  --ifm-font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --ifm-font-family-monospace: 'SF Mono', 'Menlo', 'Cascadia Code', monospace;
+  --ifm-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+  --ifm-heading-font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --ifm-global-radius: 0.5rem;
 
   --ma-bg: #f5f0e8;
@@ -31,6 +34,11 @@ html, body {
   background: var(--ma-bg);
 }
 
+/* Headings use DM Sans */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--ifm-heading-font-family);
+}
+
 /* Navbar */
 .navbar {
   background: var(--ma-bg);
@@ -40,9 +48,10 @@ html, body {
 }
 
 .navbar__title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: -0.01em;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
 }
 
 .navbar__link {

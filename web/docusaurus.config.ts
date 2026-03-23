@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'Maestro',
   tagline: 'Autonomous coding agent orchestration for enterprise teams',
-  favicon: 'img/favicon.svg',
+  favicon: 'img/favicon.png',
 
   future: {
     v4: true,
@@ -51,9 +51,9 @@ const config: Config = {
       title: 'Maestro',
       logo: {
         alt: 'Maestro',
-        src: 'img/logo.svg',
-        width: 28,
-        height: 28,
+        src: 'img/logo.png',
+        width: 32,
+        height: 32,
       },
       items: [
         {

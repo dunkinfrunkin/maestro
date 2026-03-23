@@ -43,6 +43,7 @@ export default function Home() {
           </span>
           <h1 style={{
             fontSize: '3rem', fontWeight: 700, letterSpacing: '-0.04em',
+            fontFamily: "'DM Sans', sans-serif",
             color: 'var(--ma-fg)', margin: '1.25rem 0 0.75rem',
           }}>
             Maestro

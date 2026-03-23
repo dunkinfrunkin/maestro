@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Maestro Dashboard",
-  description: "Symphony-spec orchestration daemon for coding agents",
+  title: "Maestro",
+  description: "Autonomous coding agent orchestration for enterprise teams",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

@@ -58,9 +58,7 @@ export function Sidebar() {
       {/* Header: Logo + Collapse */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-border">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center flex-shrink-0">
-            <span className="text-background text-xs font-bold">M</span>
-          </div>
+          <img src="/logo.png" alt="Maestro" className="w-7 h-7 rounded-md flex-shrink-0" />
           {!collapsed && (
             <span className="font-semibold text-sm tracking-tight">Maestro</span>
           )}
