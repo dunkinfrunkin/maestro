@@ -43,8 +43,8 @@ const config: Config = {
 
   themeConfig: {
     colorMode: {
-      defaultMode: 'dark',
-      disableSwitch: false,
+      defaultMode: 'light',
+      disableSwitch: true,
       respectPrefersColorScheme: false,
     },
     navbar: {
@@ -75,7 +75,7 @@ const config: Config = {
       ],
     },
     footer: {
-      style: 'dark',
+      style: 'light',
       links: [
         {
           title: 'Source',
@@ -91,7 +91,6 @@ const config: Config = {
             {label: 'Getting Started', to: '/docs/getting-started'},
             {label: 'Pipeline', to: '/docs/pipeline'},
             {label: 'Agents', to: '/docs/agents'},
-            {label: 'Configuration', to: '/docs/configuration'},
             {label: 'Plugins', to: '/docs/plugins'},
           ],
         },
@@ -99,8 +98,7 @@ const config: Config = {
       copyright: `MIT License \u00b7 \u00a9 ${new Date().getFullYear()} Frank Chan`,
     },
     prism: {
-      theme: prismThemes.oneDark,
-      darkTheme: prismThemes.oneDark,
+      theme: prismThemes.github,
       additionalLanguages: ['bash', 'python', 'yaml', 'json'],
     },
   } satisfies Preset.ThemeConfig,
