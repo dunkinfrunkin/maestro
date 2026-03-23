@@ -50,13 +50,56 @@ export default function Home() {
             Under active development
           </span>
 
+          {/* Maestro conducting agents */}
+          <div style={{ position: 'relative', width: 220, height: 220, margin: '0 auto 1.5rem' }}>
+            {/* Orbit ring */}
+            <div style={{
+              position: 'absolute', inset: -10,
+              border: '1px dashed var(--ma-border)', borderRadius: '50%',
+              animation: 'spin 30s linear infinite',
+            }} />
+            {/* Maestro logo */}
+            <img src="/img/logo.png" alt="Maestro" style={{
+              width: 100, height: 100, position: 'absolute',
+              top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+              filter: 'drop-shadow(0 4px 12px rgba(107,91,62,0.2))',
+            }} />
+            {/* Agent labels orbiting */}
+            {[
+              { name: 'Implement', angle: 0, color: '#5c7cba' },
+              { name: 'Review', angle: 60, color: '#8b6bb5' },
+              { name: 'Risk', angle: 120, color: '#b58840' },
+              { name: 'Deploy', angle: 180, color: '#b5a040' },
+              { name: 'Monitor', angle: 240, color: '#5ba870' },
+              { name: 'Queue', angle: 300, color: '#8a7e6b' },
+            ].map((agent) => {
+              const r = 105;
+              const rad = (agent.angle - 90) * (Math.PI / 180);
+              const x = Math.cos(rad) * r;
+              const y = Math.sin(rad) * r;
+              return (
+                <div key={agent.name} style={{
+                  position: 'absolute', top: '50%', left: '50%',
+                  transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                  fontSize: '0.6rem', fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+                  padding: '0.2rem 0.5rem', borderRadius: '0.25rem',
+                  background: 'var(--ma-bg)', border: '1px solid var(--ma-border)',
+                  color: agent.color, whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}>
+                  {agent.name}
+                </div>
+              );
+            })}
+          </div>
+
           <h1 style={{
-            fontSize: '3.5rem', fontWeight: 800, letterSpacing: '-0.05em',
+            fontSize: '3rem', fontWeight: 800, letterSpacing: '-0.05em',
             fontFamily: "'DM Sans', sans-serif",
             background: 'linear-gradient(135deg, var(--ma-fg) 0%, var(--ma-accent) 50%, #8b7355 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            margin: '0 0 1rem',
+            margin: '0 0 0.75rem',
             lineHeight: 1.1,
           }}>
             Your codebase,<br />orchestrated.
