@@ -177,9 +177,13 @@ export default function Home() {
           From issue to production
         </h2>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
           {PHASES.map((phase, i) => (
-            <div key={i} style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
+            <div key={i} style={{
+              display: 'flex', gap: '2.5rem', alignItems: 'flex-start',
+              padding: '2rem 0',
+              borderBottom: i < PHASES.length - 1 ? '1px solid var(--ma-border)' : 'none',
+            }}>
               {/* Left: description */}
               <div style={{ flex: '0 0 300px', paddingTop: '0.5rem' }}>
                 <div style={{
