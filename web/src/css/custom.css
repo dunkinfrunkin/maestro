@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ── Light mode — warm beige/paper palette ── */
+:root {
+  --ifm-color-primary: #a0784c;
+  --ifm-color-primary-dark: #8e6a42;
+  --ifm-color-primary-darker: #855f3a;
+  --ifm-color-primary-darkest: #6e4e30;
+  --ifm-color-primary-light: #b28a5e;
+  --ifm-color-primary-lighter: #bc9568;
+  --ifm-color-primary-lightest: #cfb08a;
+  --ifm-background-color: #f5f0e8;
+  --ifm-background-surface-color: #ece6da;
+  --ifm-code-font-size: 95%;
+  --ifm-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  --ifm-heading-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+
+  --ma-bg: #f5f0e8;
+  --ma-surface: #ece6da;
+  --ma-surface-hover: #e4ddd0;
+  --ma-border: rgba(0, 0, 0, 0.1);
+  --ma-border-strong: rgba(0, 0, 0, 0.18);
+  --ma-text: #2c2416;
+  --ma-text-muted: #7a6e5f;
+  --ma-accent: #c4956a;
+  --ma-accent-soft: rgba(196, 149, 106, 0.12);
+  --ma-green: #3d8b5a;
+  --ma-red: #c0392b;
+  --ma-gold: #b8860b;
+  --ma-blue: #2e7d9c;
+  --ma-purple: #7c5cbf;
+  --ma-glow: rgba(196, 149, 106, 0.08);
+  --ma-glow-strong: rgba(196, 149, 106, 0.15);
+  --ma-card-bg: #fff;
+  --ma-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --ma-hero-gradient: linear-gradient(135deg, #c4956a, #a0784c, #7c5cbf);
+  --ma-pipeline-bg: rgba(0, 0, 0, 0.03);
+  --ma-timeline-line: rgba(0, 0, 0, 0.1);
+}
+
+/* ── Dark mode ── */
+[data-theme='dark'] {
+  --ifm-color-primary: #d4a574;
+  --ifm-color-primary-dark: #cb9560;
+  --ifm-color-primary-darker: #c68d55;
+  --ifm-color-primary-darkest: #a97339;
+  --ifm-color-primary-light: #ddb588;
+  --ifm-color-primary-lighter: #e2be93;
+  --ifm-color-primary-lightest: #f0d8b9;
+  --ifm-background-color: #1a1612;
+  --ifm-background-surface-color: #221d17;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  --ma-bg: #1a1612;
+  --ma-surface: #221d17;
+  --ma-surface-hover: #2c2620;
+  --ma-border: rgba(255, 255, 255, 0.08);
+  --ma-border-strong: rgba(255, 255, 255, 0.14);
+  --ma-text: #e8e0d4;
+  --ma-text-muted: #9a8e7e;
+  --ma-accent: #d4a574;
+  --ma-accent-soft: rgba(212, 165, 116, 0.12);
+  --ma-green: #98c379;
+  --ma-red: #e06c75;
+  --ma-gold: #e5c07b;
+  --ma-blue: #61afef;
+  --ma-purple: #c678dd;
+  --ma-glow: rgba(212, 165, 116, 0.06);
+  --ma-glow-strong: rgba(212, 165, 116, 0.12);
+  --ma-card-bg: #221d17;
+  --ma-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --ma-hero-gradient: linear-gradient(135deg, #d4a574, #c678dd, #61afef);
+  --ma-pipeline-bg: rgba(255, 255, 255, 0.03);
+  --ma-timeline-line: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Global overrides ── */
+body {
+  color: var(--ma-text);
+}
+
+.navbar {
+  box-shadow: none;
+  border-bottom: 1px solid var(--ma-border);
+  backdrop-filter: blur(12px);
+  background: var(--ma-bg) !important;
+}
+
+.navbar__title {
+  font-family: var(--ifm-font-family-monospace);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.theme-code-block {
+  border: 1px solid var(--ma-border) !important;
+}
+
+.footer--dark {
+  background: #0f0d0a;
+}
+
+[data-theme='dark'] .footer--dark {
+  background: #0f0d0a;
+}
+
+/* ── Docs styling ── */
+.markdown h1 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.markdown h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
