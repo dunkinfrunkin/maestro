@@ -90,47 +90,12 @@ export default function Home() {
           </div>
             </div>
 
-            {/* Right: mascot with agents */}
-            <div style={{ flex: '0 0 320px', position: 'relative', height: 360 }}>
-              {/* Maestro */}
+            {/* Right: mascot */}
+            <div style={{ flex: '0 0 280px', display: 'flex', justifyContent: 'center' }}>
               <img src="/img/logo.png" alt="Maestro" style={{
-                width: 200, height: 200, position: 'absolute',
-                top: '50%', left: '40%', transform: 'translate(-50%, -50%)',
-                filter: 'drop-shadow(0 8px 24px rgba(107,91,62,0.15))',
+                width: 260, height: 260,
+                filter: 'drop-shadow(0 12px 32px rgba(107,91,62,0.12))',
               }} />
-              {/* Agent labels flowing from baton tip */}
-              {[
-                { name: 'Implement', x: 200, y: 40, color: '#5c7cba' },
-                { name: 'Review', x: 240, y: 100, color: '#8b6bb5' },
-                { name: 'Risk Profile', x: 220, y: 160, color: '#b58840' },
-                { name: 'Deploy', x: 185, y: 220, color: '#b5a040' },
-                { name: 'Monitor', x: 140, y: 275, color: '#5ba870' },
-              ].map((agent, i) => (
-                <div key={agent.name} style={{
-                  position: 'absolute', left: agent.x, top: agent.y,
-                  fontSize: '0.75rem', fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
-                  padding: '0.3rem 0.65rem', borderRadius: '0.3rem',
-                  background: 'var(--ma-bg)', border: '1px solid var(--ma-border)',
-                  color: agent.color, whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                  animation: `fadeSlideIn 0.5s ease ${i * 0.1}s both`,
-                }}>
-                  {agent.name}
-                </div>
-              ))}
-              {/* Connecting lines from baton area to labels */}
-              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                {[
-                  { x1: 175, y1: 120, x2: 200, y2: 52 },
-                  { x1: 180, y1: 125, x2: 240, y2: 112 },
-                  { x1: 178, y1: 135, x2: 220, y2: 172 },
-                  { x1: 170, y1: 145, x2: 185, y2: 232 },
-                  { x1: 160, y1: 150, x2: 140, y2: 287 },
-                ].map((l, i) => (
-                  <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-                    stroke="var(--ma-border)" strokeWidth="1" strokeDasharray="4,3" opacity="0.6" />
-                ))}
-              </svg>
             </div>
           </div>
         </div>
