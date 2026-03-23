@@ -40,77 +40,40 @@ export default function Home() {
           WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 30%, transparent 70%)',
         }} />
 
-        <div style={{ position: 'relative', maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
-          <span style={{
-            display: 'inline-block', fontSize: '0.7rem', fontWeight: 500,
-            padding: '0.3rem 0.7rem', borderRadius: 9999,
-            background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
-            marginBottom: '1.5rem',
-          }}>
-            Under active development
-          </span>
+        <div style={{ position: 'relative', maxWidth: 900, margin: '0 auto' }}>
 
-          {/* Maestro conducting agents */}
-          <div style={{ position: 'relative', width: 220, height: 220, margin: '0 auto 1.5rem' }}>
-            {/* Orbit ring */}
-            <div style={{
-              position: 'absolute', inset: -10,
-              border: '1px dashed var(--ma-border)', borderRadius: '50%',
-              animation: 'spin 30s linear infinite',
-            }} />
-            {/* Maestro logo */}
-            <img src="/img/logo.png" alt="Maestro" style={{
-              width: 100, height: 100, position: 'absolute',
-              top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-              filter: 'drop-shadow(0 4px 12px rgba(107,91,62,0.2))',
-            }} />
-            {/* Agent labels orbiting */}
-            {[
-              { name: 'Implement', angle: 0, color: '#5c7cba' },
-              { name: 'Review', angle: 60, color: '#8b6bb5' },
-              { name: 'Risk', angle: 120, color: '#b58840' },
-              { name: 'Deploy', angle: 180, color: '#b5a040' },
-              { name: 'Monitor', angle: 240, color: '#5ba870' },
-              { name: 'Queue', angle: 300, color: '#8a7e6b' },
-            ].map((agent) => {
-              const r = 105;
-              const rad = (agent.angle - 90) * (Math.PI / 180);
-              const x = Math.cos(rad) * r;
-              const y = Math.sin(rad) * r;
-              return (
-                <div key={agent.name} style={{
-                  position: 'absolute', top: '50%', left: '50%',
-                  transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-                  fontSize: '0.6rem', fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
-                  padding: '0.2rem 0.5rem', borderRadius: '0.25rem',
-                  background: 'var(--ma-bg)', border: '1px solid var(--ma-border)',
-                  color: agent.color, whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                }}>
-                  {agent.name}
-                </div>
-              );
-            })}
-          </div>
+          {/* Two-column hero: text left, mascot right */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3rem' }}>
 
-          <h1 style={{
-            fontSize: '3rem', fontWeight: 800, letterSpacing: '-0.05em',
-            fontFamily: "'DM Sans', sans-serif",
-            background: 'linear-gradient(135deg, var(--ma-fg) 0%, var(--ma-accent) 50%, #8b7355 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            margin: '0 0 0.75rem',
-            lineHeight: 1.1,
-          }}>
-            Your codebase,<br />orchestrated.
-          </h1>
+            {/* Left: text */}
+            <div style={{ flex: 1 }}>
+              <span style={{
+                display: 'inline-block', fontSize: '0.7rem', fontWeight: 500,
+                padding: '0.3rem 0.7rem', borderRadius: 9999,
+                background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
+                marginBottom: '1.25rem',
+              }}>
+                Under active development
+              </span>
 
-          <p style={{ fontSize: '1.05rem', color: 'var(--ma-muted)', lineHeight: 1.6, maxWidth: 500, margin: '0 auto 2rem' }}>
-            AI agents that implement, review, and deploy your tickets autonomously.
-            From issue to production in minutes.
-          </p>
+              <h1 style={{
+                fontSize: '3.5rem', fontWeight: 800, letterSpacing: '-0.05em',
+                fontFamily: "'DM Sans', sans-serif",
+                background: 'linear-gradient(135deg, var(--ma-fg) 0%, var(--ma-accent) 50%, #8b7355 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                margin: '0 0 1rem',
+                lineHeight: 1.05,
+              }}>
+                Your codebase, orchestrated.
+              </h1>
 
-          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
+              <p style={{ fontSize: '1.1rem', color: 'var(--ma-muted)', lineHeight: 1.6, maxWidth: 440, margin: '0 0 2rem' }}>
+                AI agents that implement, review, and deploy your tickets autonomously.
+                From issue to production in minutes.
+              </p>
+
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
             <Link to="/docs/getting-started" style={{
               padding: '0.6rem 1.4rem', fontSize: '0.8rem', borderRadius: '0.375rem',
               background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 600, textDecoration: 'none',
@@ -124,6 +87,51 @@ export default function Home() {
             }}>
               View source
             </Link>
+          </div>
+            </div>
+
+            {/* Right: mascot with agents */}
+            <div style={{ flex: '0 0 320px', position: 'relative', height: 360 }}>
+              {/* Maestro */}
+              <img src="/img/logo.png" alt="Maestro" style={{
+                width: 200, height: 200, position: 'absolute',
+                top: '50%', left: '40%', transform: 'translate(-50%, -50%)',
+                filter: 'drop-shadow(0 8px 24px rgba(107,91,62,0.15))',
+              }} />
+              {/* Agent labels flowing from baton tip */}
+              {[
+                { name: 'Implement', x: 200, y: 40, color: '#5c7cba' },
+                { name: 'Review', x: 240, y: 100, color: '#8b6bb5' },
+                { name: 'Risk Profile', x: 220, y: 160, color: '#b58840' },
+                { name: 'Deploy', x: 185, y: 220, color: '#b5a040' },
+                { name: 'Monitor', x: 140, y: 275, color: '#5ba870' },
+              ].map((agent, i) => (
+                <div key={agent.name} style={{
+                  position: 'absolute', left: agent.x, top: agent.y,
+                  fontSize: '0.75rem', fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+                  padding: '0.3rem 0.65rem', borderRadius: '0.3rem',
+                  background: 'var(--ma-bg)', border: '1px solid var(--ma-border)',
+                  color: agent.color, whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                  animation: `fadeSlideIn 0.5s ease ${i * 0.1}s both`,
+                }}>
+                  {agent.name}
+                </div>
+              ))}
+              {/* Connecting lines from baton area to labels */}
+              <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                {[
+                  { x1: 175, y1: 120, x2: 200, y2: 52 },
+                  { x1: 180, y1: 125, x2: 240, y2: 112 },
+                  { x1: 178, y1: 135, x2: 220, y2: 172 },
+                  { x1: 170, y1: 145, x2: 185, y2: 232 },
+                  { x1: 160, y1: 150, x2: 140, y2: 287 },
+                ].map((l, i) => (
+                  <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                    stroke="var(--ma-border)" strokeWidth="1" strokeDasharray="4,3" opacity="0.6" />
+                ))}
+              </svg>
+            </div>
           </div>
         </div>
       </section>
