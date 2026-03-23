@@ -40,63 +40,51 @@ export default function Home() {
           WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 30%, transparent 70%)',
         }} />
 
-        <div style={{ position: 'relative', maxWidth: 900, margin: '0 auto' }}>
+        <div style={{ position: 'relative', maxWidth: 680, margin: '0 auto', textAlign: 'center' }}>
 
-          {/* Two-column hero: text left, mascot right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3rem' }}>
+          <img src="/img/logo.png" alt="Maestro" style={{
+            width: 120, height: 120, marginBottom: '1.5rem',
+            filter: 'drop-shadow(0 8px 20px rgba(107,91,62,0.12))',
+          }} />
 
-            {/* Left: text */}
-            <div style={{ flex: 1 }}>
-              <span style={{
-                display: 'inline-block', fontSize: '0.7rem', fontWeight: 500,
-                padding: '0.3rem 0.7rem', borderRadius: 9999,
-                background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
-                marginBottom: '1.25rem',
-              }}>
-                Under active development
-              </span>
+          <h1 style={{
+            fontSize: '3.5rem', fontWeight: 800, letterSpacing: '-0.05em',
+            fontFamily: "'DM Sans', sans-serif",
+            color: 'var(--ma-fg)',
+            margin: '0 0 1rem',
+            lineHeight: 1.05,
+          }}>
+            Your codebase,<br />orchestrated.
+          </h1>
 
-              <h1 style={{
-                fontSize: '3.5rem', fontWeight: 800, letterSpacing: '-0.05em',
-                fontFamily: "'DM Sans', sans-serif",
-                background: 'linear-gradient(135deg, var(--ma-fg) 0%, var(--ma-accent) 50%, #8b7355 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                margin: '0 0 1rem',
-                lineHeight: 1.05,
-              }}>
-                Your codebase, orchestrated.
-              </h1>
+          <p style={{ fontSize: '1.1rem', color: 'var(--ma-muted)', lineHeight: 1.6, maxWidth: 460, margin: '0 auto 1.5rem' }}>
+            AI agents that implement, review, and deploy your tickets.
+            From issue to production in minutes.
+          </p>
 
-              <p style={{ fontSize: '1.1rem', color: 'var(--ma-muted)', lineHeight: 1.6, maxWidth: 440, margin: '0 0 2rem' }}>
-                AI agents that implement, review, and deploy your tickets autonomously.
-                From issue to production in minutes.
-              </p>
+          <span style={{
+            display: 'inline-block', fontSize: '0.7rem', fontWeight: 500,
+            padding: '0.3rem 0.7rem', borderRadius: 9999,
+            background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
+            marginBottom: '2rem',
+          }}>
+            Under active development
+          </span>
 
-              <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
             <Link to="/docs/getting-started" style={{
-              padding: '0.6rem 1.4rem', fontSize: '0.8rem', borderRadius: '0.375rem',
+              padding: '0.65rem 1.5rem', fontSize: '0.85rem', borderRadius: '0.375rem',
               background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 600, textDecoration: 'none',
             }}>
               Get started
             </Link>
             <Link to="https://github.com/dunkinfrunkin/maestro" style={{
-              padding: '0.6rem 1.4rem', fontSize: '0.8rem', borderRadius: '0.375rem',
+              padding: '0.65rem 1.5rem', fontSize: '0.85rem', borderRadius: '0.375rem',
               background: 'transparent', color: 'var(--ma-fg)', fontWeight: 500,
               border: '1px solid var(--ma-border)', textDecoration: 'none',
             }}>
               View source
             </Link>
-          </div>
-            </div>
-
-            {/* Right: mascot */}
-            <div style={{ flex: '0 0 280px', display: 'flex', justifyContent: 'center' }}>
-              <img src="/img/logo.png" alt="Maestro" style={{
-                width: 260, height: 260,
-                filter: 'drop-shadow(0 12px 32px rgba(107,91,62,0.12))',
-              }} />
-            </div>
           </div>
         </div>
       </section>
