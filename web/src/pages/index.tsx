@@ -1,129 +1,159 @@
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 
-const PIPELINE_STEPS = [
-  { name: 'Queued', desc: 'Ticket enters the pipeline' },
-  { name: 'Implement', desc: 'Agent writes code, creates PR' },
-  { name: 'Review', desc: 'Agent reviews PR, posts inline comments' },
-  { name: 'Risk Profile', desc: 'Agent scores deployment risk' },
-  { name: 'Deploy', desc: 'Agent merges PR, monitors CI' },
-  { name: 'Monitor', desc: 'Agent checks post-deploy health' },
-];
+const PIPELINE_STEPS = ['Queued', 'Implement', 'Review', 'Risk Profile', 'Deploy', 'Monitor'];
 
-const EXAMPLE = [
-  { agent: 'Implementation Agent', text: 'Reading src/router.js. Adding GET /books/search route before the /:id handler. Running tests — 6 passed. Pushing branch, creating PR #24.' },
-  { agent: 'Review Agent', text: 'src/books.test.js line 31 — Test named "returns multiple matches" asserts length === 1. Misleading.' },
-  { agent: 'Implementation Agent', text: 'Fixed: Changed query to match 2 books. Updated assertion. Replied to comment thread.' },
-  { agent: 'Review Agent', text: 'Verified — fix looks good. Thread resolved. APPROVE.' },
-  { agent: 'Risk Profile Agent', text: 'Scope 1/5, Blast Radius 1/5, Complexity 1/5. Risk level: LOW. Auto-approved.' },
+const TERMINAL_LINES = [
+  { time: '0:00', text: 'Cloning repository: dunkinfrunkin/test-api', type: 'dim' },
+  { time: '0:02', text: 'Starting Claude Code CLI (model: claude-sonnet-4-6)', type: 'dim' },
+  { time: '0:08', text: 'Reading src/router.js, src/books.js', type: 'tool' },
+  { time: '0:15', text: 'Adding searchBooks() — case-insensitive filter on title and author', type: 'normal' },
+  { time: '0:22', text: 'Running tests — 6 passed', type: 'success' },
+  { time: '0:28', text: 'PR created: dunkinfrunkin/test-api/pull/24', type: 'accent' },
+  { time: '0:30', text: 'Review: src/books.test.js:31 — misleading test name', type: 'tool' },
+  { time: '0:45', text: 'Fixed: query matches 2 books, assertion updated', type: 'normal' },
+  { time: '0:48', text: 'Review: verified — thread resolved. APPROVE', type: 'success' },
+  { time: '0:52', text: 'Risk: LOW (1.1/5) — auto-approved for deployment', type: 'success' },
 ];
 
 const FEATURES = [
   ['Multi-agent pipeline', 'Five agents in sequence — each owns one stage of the development lifecycle.'],
-  ['Inline PR reviews', 'Comments on specific lines. Implementation agent replies with fixes in the same thread.'],
-  ['Configurable per agent', 'Each agent has its own prompt, model, and settings. Edit directly in the dashboard.'],
-  ['GitHub and Linear', 'Pull issues from either tracker. Encrypted token storage per workspace.'],
-  ['Risk scoring', 'Seven-dimension risk assessment. Configurable auto-approve threshold.'],
-  ['Enterprise plugins', 'Extend with custom agents via Python entry points or a plugins directory.'],
+  ['Inline PR reviews', 'Comments on specific lines. Fixes replied in the same thread.'],
+  ['Configurable per agent', 'Each agent has its own prompt, model, and settings.'],
+  ['GitHub and Linear', 'Pull issues from either tracker. Encrypted token storage.'],
+  ['Risk scoring', 'Seven-dimension risk assessment. Configurable auto-approve.'],
+  ['Enterprise plugins', 'Extend with custom agents via Python entry points.'],
 ];
 
 export default function Home() {
   return (
     <Layout title="Maestro" description="Autonomous coding agent orchestration for enterprise teams">
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 1.5rem' }}>
 
-        {/* Hero */}
-        <section style={{ paddingTop: '5rem', paddingBottom: '3rem', textAlign: 'center' }}>
+      {/* Hero */}
+      <section style={{ position: 'relative', overflow: 'hidden', padding: '6rem 1.5rem 4rem' }}>
+        {/* Grid background */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.06,
+          backgroundImage: 'linear-gradient(var(--ma-accent) 1px, transparent 1px), linear-gradient(90deg, var(--ma-accent) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+          maskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 30%, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, black 30%, transparent 70%)',
+        }} />
+
+        <div style={{ position: 'relative', maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
           <span style={{
             display: 'inline-block', fontSize: '0.7rem', fontWeight: 500,
             padding: '0.3rem 0.7rem', borderRadius: 9999,
             background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
+            marginBottom: '1.5rem',
           }}>
             Under active development
           </span>
+
           <h1 style={{
-            fontSize: '3rem', fontWeight: 700, letterSpacing: '-0.04em',
+            fontSize: '3.5rem', fontWeight: 800, letterSpacing: '-0.05em',
             fontFamily: "'DM Sans', sans-serif",
-            color: 'var(--ma-fg)', margin: '1.25rem 0 0.75rem',
+            background: 'linear-gradient(135deg, var(--ma-fg) 0%, var(--ma-accent) 50%, #8b7355 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            margin: '0 0 1rem',
+            lineHeight: 1.1,
           }}>
-            Maestro
+            Your codebase,<br />orchestrated.
           </h1>
-          <p style={{ fontSize: '1.1rem', color: 'var(--ma-muted)', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 2rem' }}>
-            Autonomous coding agents that implement, review, and deploy your tickets.
-            Inspired by{' '}
-            <a href="https://github.com/openai/symphony" style={{ color: 'var(--ma-accent)', textDecoration: 'underline' }}>Symphony</a>.
+
+          <p style={{ fontSize: '1.05rem', color: 'var(--ma-muted)', lineHeight: 1.6, maxWidth: 500, margin: '0 auto 2rem' }}>
+            AI agents that implement, review, and deploy your tickets autonomously.
+            From issue to production in minutes.
           </p>
+
           <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
             <Link to="/docs/getting-started" style={{
-              padding: '0.55rem 1.25rem', fontSize: '0.8rem', borderRadius: '0.375rem',
-              background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 500, textDecoration: 'none',
+              padding: '0.6rem 1.4rem', fontSize: '0.8rem', borderRadius: '0.375rem',
+              background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 600, textDecoration: 'none',
             }}>
-              Documentation
+              Get started
             </Link>
             <Link to="https://github.com/dunkinfrunkin/maestro" style={{
-              padding: '0.55rem 1.25rem', fontSize: '0.8rem', borderRadius: '0.375rem',
+              padding: '0.6rem 1.4rem', fontSize: '0.8rem', borderRadius: '0.375rem',
               background: 'transparent', color: 'var(--ma-fg)', fontWeight: 500,
               border: '1px solid var(--ma-border)', textDecoration: 'none',
             }}>
               View source
             </Link>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <hr style={{ border: 'none', borderTop: '1px solid var(--ma-border)', margin: '0 0 3rem' }} />
-
-        {/* Pipeline */}
-        <section style={{ paddingBottom: '3rem' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.35rem' }}>
-            Pipeline
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--ma-muted)', marginBottom: '1.5rem' }}>
-            Each stage is handled by a dedicated agent. Review loops until all comments are resolved.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
-            {PIPELINE_STEPS.map((s, i) => (
-              <div key={s.name} style={{
-                padding: '0.75rem 0.5rem', textAlign: 'center',
-                background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
-                borderRadius: '0.375rem',
+      {/* Terminal demo */}
+      <section style={{ maxWidth: 680, margin: '0 auto', padding: '0 1.5rem 3rem' }}>
+        <div style={{
+          background: '#1a1612', borderRadius: '0.75rem', overflow: 'hidden',
+          border: '1px solid #2e2720',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)',
+        }}>
+          {/* Title bar */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.4rem',
+            padding: '0.6rem 1rem', borderBottom: '1px solid #2e2720',
+          }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#e85d4a', opacity: 0.8 }} />
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#d4a73a', opacity: 0.8 }} />
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#4ca853', opacity: 0.8 }} />
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.65rem', color: '#a89880', fontFamily: 'var(--ifm-font-family-monospace)' }}>
+              maestro — implementation agent
+            </span>
+          </div>
+          {/* Content */}
+          <div style={{ padding: '0.75rem 1rem', maxHeight: 280, overflow: 'hidden' }}>
+            {TERMINAL_LINES.map((line, i) => (
+              <div key={i} style={{
+                display: 'flex', gap: '0.75rem', padding: '0.15rem 0',
+                fontFamily: 'var(--ifm-font-family-monospace)', fontSize: '0.7rem', lineHeight: 1.6,
               }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.15rem' }}>
-                  {s.name}
-                </div>
-                <div style={{ fontSize: '0.6rem', color: 'var(--ma-muted)', lineHeight: 1.4 }}>{s.desc}</div>
+                <span style={{ color: '#5a4e3a', flexShrink: 0, width: '2rem', textAlign: 'right' }}>{line.time}</span>
+                <span style={{
+                  color: line.type === 'dim' ? '#6b5f4e' :
+                         line.type === 'tool' ? '#8ba4c4' :
+                         line.type === 'success' ? '#7da87e' :
+                         line.type === 'accent' ? '#c4a882' :
+                         '#b8a88e',
+                }}>
+                  {line.text}
+                </span>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <hr style={{ border: 'none', borderTop: '1px solid var(--ma-border)', margin: '0 0 3rem' }} />
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 1.5rem' }}>
 
-        {/* Example */}
+        {/* Pipeline */}
         <section style={{ paddingBottom: '3rem' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.35rem' }}>
-            How it works
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--ma-muted)', marginBottom: '1.5rem' }}>
-            A ticket moves through the pipeline. Agents communicate through PR comment threads.
-          </p>
-          <div style={{ borderLeft: '2px solid var(--ma-border)', paddingLeft: '1.25rem', marginLeft: '0.25rem' }}>
-            {EXAMPLE.map((e, i) => (
-              <div key={i} style={{ marginBottom: '1rem', position: 'relative' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ma-fg)', fontFamily: "'DM Sans', sans-serif", marginBottom: '0.35rem' }}>
+              Harness engineering pipeline
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--ma-muted)' }}>
+              Each stage is handled by a dedicated agent. Review loops until all comments are resolved.
+            </p>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+            {PIPELINE_STEPS.map((s, i) => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{
-                  position: 'absolute', left: '-1.55rem', top: '0.3rem',
-                  width: 7, height: 7, borderRadius: '50%', background: 'var(--ma-accent)',
-                }} />
-                <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.2rem' }}>
-                  {e.agent}
-                </div>
-                <div style={{
-                  fontSize: '0.72rem', color: 'var(--ma-muted)',
+                  padding: '0.5rem 0.9rem', fontSize: '0.72rem', fontWeight: 600,
                   background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
-                  borderRadius: '0.375rem', padding: '0.5rem 0.7rem',
-                  fontFamily: 'var(--ifm-font-family-monospace)', lineHeight: 1.5,
+                  borderRadius: '0.375rem', color: 'var(--ma-fg)',
                 }}>
-                  {e.text}
+                  {s}
                 </div>
+                {i < PIPELINE_STEPS.length - 1 && (
+                  <span style={{ color: 'var(--ma-border)', margin: '0 0.15rem', fontSize: '0.8rem' }}>
+                    {i === 2 ? '\u21C4' : '\u2192'}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -133,16 +163,16 @@ export default function Home() {
 
         {/* Features */}
         <section style={{ paddingBottom: '3rem' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '1.25rem' }}>
-            Features
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ma-fg)', fontFamily: "'DM Sans', sans-serif", marginBottom: '1.25rem', textAlign: 'center' }}>
+            Built for teams that ship
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
             {FEATURES.map(([title, desc]) => (
               <div key={title} style={{
-                padding: '1rem', background: 'var(--ma-surface)',
-                border: '1px solid var(--ma-border)', borderRadius: '0.375rem',
+                padding: '1.1rem', background: 'var(--ma-surface)',
+                border: '1px solid var(--ma-border)', borderRadius: '0.5rem',
               }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.2rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.2rem' }}>
                   {title}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--ma-muted)', lineHeight: 1.5 }}>
