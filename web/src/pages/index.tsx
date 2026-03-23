@@ -1,306 +1,161 @@
-import {type ReactNode} from 'react';
-import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
-import Heading from '@theme/Heading';
 
-import styles from './index.module.css';
-
-/* ── Pipeline steps ── */
-
-const PIPELINE_STEPS = [
-  {icon: '\u{1F4CB}', name: 'Queued',    desc: 'Task created from issue or manual input'},
-  {icon: '\u{1F528}', name: 'Implement', desc: 'Agent writes code and opens a PR'},
-  {icon: '\u{1F50D}', name: 'Review',    desc: 'Inline code review with comments'},
-  {icon: '\u{1F4CA}', name: 'Risk',      desc: 'Score complexity, blast radius, coverage'},
-  {icon: '\u{1F680}', name: 'Deploy',    desc: 'Merge PR and run CI/CD pipeline'},
-  {icon: '\u{1F4E1}', name: 'Monitor',   desc: 'Watch logs and metrics post-deploy'},
+const PIPELINE = [
+  { name: 'Queued', desc: 'Ready for work' },
+  { name: 'Implement', desc: 'Write code' },
+  { name: 'Review', desc: 'Post comments' },
+  { name: 'Risk Profile', desc: 'Score risk' },
+  { name: 'Deploy', desc: 'Merge + CI' },
+  { name: 'Monitor', desc: 'Health check' },
 ];
 
-/* ── Features ── */
+const TIMELINE = [
+  { agent: 'Implementation Agent', content: 'Reading src/books.js, src/router.js. Adding searchBooks function and GET /books/search route. Running tests — 6 passed. Creating PR #24.' },
+  { agent: 'Review Agent', content: 'src/books.test.js:31 — Test named "returns multiple matches" but asserts length === 1. Misleading.' },
+  { agent: 'Implementation Agent', content: 'Fixed: Changed query to "an" which matches 2 books. Assertion updated to length === 2.' },
+  { agent: 'Review Agent', content: 'Verified — fix looks good. All threads resolved. APPROVE.' },
+  { agent: 'Risk Profile Agent', content: 'Change Scope: 1/5. Blast Radius: 1/5. Complexity: 1/5. Overall: LOW. Auto-approved.' },
+  { agent: 'Deployment Agent', content: 'CI checks passing. Merged via squash. Deployment complete.' },
+];
 
 const FEATURES = [
-  {
-    icon: '\u{1F504}',
-    title: 'Multi-agent pipeline',
-    desc: 'Each task flows through implementation, review, risk profiling, deployment, and monitoring stages automatically.',
-  },
-  {
-    icon: '\u{1F4DD}',
-    title: 'Inline PR code reviews',
-    desc: 'Review agent reads diffs and leaves inline comments on specific lines, just like a human reviewer.',
-  },
-  {
-    icon: '\u{1F4AC}',
-    title: 'Comment thread conversations',
-    desc: 'Agents and humans can reply to review comments, creating threaded discussions that drive fixes.',
-  },
-  {
-    icon: '\u{2699}\u{FE0F}',
-    title: 'Configurable prompts & models',
-    desc: 'Customize the system prompt and model for each agent per-project. Swap Claude for GPT or local models.',
-  },
-  {
-    icon: '\u{1F517}',
-    title: 'GitHub & Linear integrations',
-    desc: 'Create tasks from GitHub issues or Linear tickets. PRs sync back automatically.',
-  },
-  {
-    icon: '\u{1F9E9}',
-    title: 'Plugin framework',
-    desc: 'Build custom agents with Python entry points. Drop in linters, security scanners, or notification hooks.',
-  },
+  { title: 'Multi-agent pipeline', desc: 'Five agents work in sequence — implement, review, risk-assess, deploy, and monitor. Each handles one responsibility.' },
+  { title: 'Inline PR code reviews', desc: 'Review agent posts comments on specific lines of code. Implementation agent replies in the thread with fixes.' },
+  { title: 'Comment thread conversations', desc: 'Agents chat back and forth in PR threads, resolving issues just like human developers would.' },
+  { title: 'Configurable prompts and models', desc: 'Each agent has its own system prompt and model selection. Edit prompts directly in the dashboard.' },
+  { title: 'GitHub and Linear integrations', desc: 'Pull tasks from GitHub Issues or Linear. Encrypted token storage. Access all repos or filter to specific ones.' },
+  { title: 'Plugin framework', desc: 'Build custom agents by subclassing AgentPlugin. Register via entry points or a plugins directory.' },
 ];
 
-/* ── Tech stack ── */
-
-const TECH = [
-  {icon: '\u{1F40D}', label: 'Python / FastAPI'},
-  {icon: '\u{269B}\u{FE0F}',  label: 'Next.js'},
-  {icon: '\u{1F418}', label: 'PostgreSQL'},
-  {icon: '\u{1F916}', label: 'Claude Code CLI'},
-];
-
-/* ════════════════════════════════════════
-   PAGE
-   ════════════════════════════════════════ */
-
-export default function Home(): ReactNode {
+export default function Home() {
   return (
-    <Layout
-      title="Maestro - Autonomous coding agent orchestration"
-      description="Autonomous coding agent orchestration for enterprise teams. Multi-agent pipeline for implementation, review, risk profiling, and deployment."
-    >
-    <div className={styles.pageWrap}>
-
-      {/* ── Hero ── */}
-      <section className={styles.hero}>
-        <div className={styles.heroGlow} />
-        <div className={styles.heroInner}>
-          <div className={styles.heroBadge}>
-            <span className={styles.heroBadgeDot} />
-            Currently under active development
-          </div>
-          <Heading as="h1" className={styles.heroTitle}>
-            <span className={styles.heroGradient}>Maestro</span>
-          </Heading>
-          <p className={styles.heroTagline}>
-            Autonomous coding agent orchestration for enterprise teams.
-            <br />
-            From issue to deployed code — reviewed, risk-scored, and monitored.
-          </p>
-          <div className={styles.heroButtons}>
-            <Link className={clsx('button button--primary button--lg', styles.heroPrimary)} to="/docs/getting-started">
-              Get Started
-            </Link>
-            <Link className={clsx('button button--secondary button--lg', styles.heroSecondary)} to="https://github.com/dunkinfrunkin/maestro">
-              GitHub
-            </Link>
-          </div>
+    <Layout title="Maestro" description="Autonomous coding agent orchestration for enterprise teams">
+      {/* Hero */}
+      <section style={{ padding: '6rem 2rem 3rem', textAlign: 'center', maxWidth: 800, margin: '0 auto' }}>
+        <div style={{
+          display: 'inline-block', fontSize: '0.75rem', padding: '0.35rem 0.75rem',
+          borderRadius: 9999, background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
+          color: 'var(--ma-muted)', marginBottom: '1.5rem'
+        }}>
+          <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#b8860b', marginRight: '0.5rem', verticalAlign: 'middle' }} />
+          Under active development
+        </div>
+        <h1 style={{ fontSize: '3.5rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ma-foreground)', marginBottom: '0.5rem' }}>
+          Maestro
+        </h1>
+        <p style={{ fontSize: '1.15rem', color: 'var(--ma-muted)', marginBottom: '2rem', lineHeight: 1.6 }}>
+          Autonomous coding agent orchestration for enterprise teams.
+          <br />
+          Inspired by <a href="https://github.com/openai/symphony" style={{ color: 'var(--ma-accent)' }}>Symphony</a>, built for production.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          <Link to="/docs/getting-started" style={{
+            padding: '0.6rem 1.5rem', fontSize: '0.875rem', borderRadius: '0.375rem',
+            background: 'var(--ma-accent)', color: 'var(--ma-bg)', fontWeight: 500, textDecoration: 'none',
+          }}>
+            Get Started
+          </Link>
+          <Link to="https://github.com/dunkinfrunkin/maestro" style={{
+            padding: '0.6rem 1.5rem', fontSize: '0.875rem', borderRadius: '0.375rem',
+            background: 'var(--ma-surface)', color: 'var(--ma-foreground)', fontWeight: 500,
+            border: '1px solid var(--ma-border)', textDecoration: 'none',
+          }}>
+            GitHub
+          </Link>
         </div>
       </section>
 
-      <div className={styles.divider} />
-
-      {/* ── Pipeline visualization ── */}
-      <section className={styles.pipeline}>
-        <div className="container">
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionLabel}>How it works</span>
-            <Heading as="h2" className={styles.sectionTitle}>The Harness Engineering Pipeline</Heading>
-            <p className={styles.sectionSubtitle}>
-              Every task flows through a deterministic pipeline. Agents handle each stage, with review loops until the code is ready.
-            </p>
-          </div>
-          <div className={styles.pipelineFlow}>
-            {PIPELINE_STEPS.map((step, i) => (
-              <span key={step.name} style={{display: 'contents'}}>
-                <div className={styles.pipelineStep}>
-                  <div className={styles.pipelineIcon}>{step.icon}</div>
-                  <div className={styles.pipelineStepName}>{step.name}</div>
-                  <div className={styles.pipelineStepDesc}>{step.desc}</div>
-                </div>
-                {i === 1 && <div className={styles.pipelineArrow}>{'\u2192'}</div>}
-                {i === 2 && <div className={styles.pipelineLoop}>{'\u21C4'} loop</div>}
-                {i !== 1 && i !== 2 && i < PIPELINE_STEPS.length - 1 && (
-                  <div className={styles.pipelineArrow}>{'\u2192'}</div>
-                )}
-              </span>
-            ))}
-          </div>
+      {/* Pipeline */}
+      <section style={{ padding: '2rem 2rem 3rem', maxWidth: 900, margin: '0 auto' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ma-foreground)', marginBottom: '0.25rem', textAlign: 'center' }}>
+          Harness Engineering Pipeline
+        </h2>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ma-muted)', textAlign: 'center', marginBottom: '1.5rem' }}>
+          Each stage is handled by a dedicated AI agent. Review loops until all comments are resolved.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 0 }}>
+          {PIPELINE.map((step, i) => (
+            <div key={step.name} style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ textAlign: 'center', padding: '0.75rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ma-foreground)' }}>{step.name}</div>
+                <div style={{ fontSize: '0.6rem', color: 'var(--ma-muted)' }}>{step.desc}</div>
+              </div>
+              {i < PIPELINE.length - 1 && (
+                <span style={{ color: 'var(--ma-border)', fontSize: '1rem', margin: '0 0.15rem' }}>
+                  {i === 2 ? '< >' : '>'}
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </section>
 
-      <div className={styles.divider} />
-
-      {/* ── Example task run ── */}
-      <section className={styles.taskRun}>
-        <div className="container">
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionLabel}>Example</span>
-            <Heading as="h2" className={styles.sectionTitle}>A Task in Action</Heading>
-            <p className={styles.sectionSubtitle}>
-              Watch a real task flow through the pipeline from issue to deployment.
-            </p>
-          </div>
-          <div className={styles.timeline}>
-
-            {/* Issue created */}
-            <div className={styles.timelineEntry}>
-              <div className={clsx(styles.timelineDot, styles.timelineDotBlue)} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F4CB}'} Queued</div>
-                <div className={styles.timelineTitle}>Add search endpoint: GET /books/search?q=term</div>
-                <div className={styles.timelineBody}>
-                  Task created from GitHub issue #42. Assigned to workspace <strong>acme-api</strong>.
-                </div>
+      {/* Example run */}
+      <section style={{ padding: '2rem 2rem 3rem', maxWidth: 700, margin: '0 auto' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ma-foreground)', marginBottom: '0.25rem' }}>
+          Example: Adding a search endpoint
+        </h2>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ma-muted)', marginBottom: '1.5rem' }}>
+          A task moves through each pipeline stage automatically.
+        </p>
+        <div style={{ borderLeft: '2px solid var(--ma-border)', paddingLeft: '1.25rem', marginLeft: '0.5rem' }}>
+          {TIMELINE.map((entry, i) => (
+            <div key={i} style={{ marginBottom: '1.25rem', position: 'relative' }}>
+              <div style={{
+                position: 'absolute', left: '-1.6rem', top: '0.35rem',
+                width: 8, height: 8, borderRadius: '50%', background: 'var(--ma-accent)',
+              }} />
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--ma-foreground)', marginBottom: '0.2rem' }}>
+                {entry.agent}
+              </div>
+              <div style={{
+                fontSize: '0.75rem', color: 'var(--ma-muted)', background: 'var(--ma-surface)',
+                border: '1px solid var(--ma-border)', borderRadius: '0.375rem',
+                padding: '0.5rem 0.75rem', fontFamily: 'var(--ifm-font-family-monospace)', lineHeight: 1.5,
+              }}>
+                {entry.content}
               </div>
             </div>
-
-            {/* Implement */}
-            <div className={styles.timelineEntry}>
-              <div className={styles.timelineDot} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F528}'} Implement</div>
-                <div className={styles.timelineTitle}>Agent reads codebase and writes implementation</div>
-                <div className={styles.timelineBody}>
-                  Implementation agent reads existing routes, models, and tests. Creates PR #87.
-                </div>
-                <code className={styles.timelineCode}>
-{`# app/routes/books.py
-@router.get("/books/search")
-async def search_books(q: str, db: Session = Depends(get_db)):
-    results = db.query(Book).filter(
-        Book.title.ilike(f"%{q}%")
-    ).limit(50).all()
-    return {"books": results, "count": len(results)}`}
-                </code>
-              </div>
-            </div>
-
-            {/* Review — issue found */}
-            <div className={styles.timelineEntry}>
-              <div className={clsx(styles.timelineDot, styles.timelineDotGold)} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F50D}'} Review</div>
-                <div className={styles.timelineTitle}>Code review finds missing validation</div>
-                <div className={styles.timelineBody}>
-                  Review agent analyzes the diff and leaves an inline comment.
-                </div>
-                <div className={styles.timelineComment}>
-                  <span className={styles.timelineCommentIcon}>{'\u{1F4AC}'}</span>
-                  <span>
-                    <strong>review-agent</strong> on <code>books.py:3</code>
-                    <br />
-                    Missing input validation for empty query parameter. <code>q=""</code> will return all rows — add a check.
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Implement follow-up */}
-            <div className={styles.timelineEntry}>
-              <div className={styles.timelineDot} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F528}'} Implement (follow-up)</div>
-                <div className={styles.timelineTitle}>Agent applies fix for review feedback</div>
-                <code className={styles.timelineCode}>
-{`+  if not q or not q.strip():
-+      raise HTTPException(400, "Query parameter 'q' must not be empty")`}
-                </code>
-              </div>
-            </div>
-
-            {/* Re-review */}
-            <div className={styles.timelineEntry}>
-              <div className={clsx(styles.timelineDot, styles.timelineDotGreen)} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F50D}'} Review (re-review)</div>
-                <div className={styles.timelineTitle}>Verified — fix looks good</div>
-                <div className={styles.timelineSuccess}>
-                  {'\u2705'} All review comments resolved. Approved.
-                </div>
-              </div>
-            </div>
-
-            {/* Risk profile */}
-            <div className={styles.timelineEntry}>
-              <div className={clsx(styles.timelineDot, styles.timelineDotPurple)} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F4CA}'} Risk Profile</div>
-                <div className={styles.timelineTitle}>Risk assessment: LOW</div>
-                <table className={styles.riskTable}>
-                  <tbody>
-                    <tr><td>Complexity</td><td className={styles.riskLow}>LOW</td></tr>
-                    <tr><td>Blast radius</td><td className={styles.riskLow}>1 route, 0 shared utils</td></tr>
-                    <tr><td>Test coverage</td><td className={styles.riskLow}>3 new tests added</td></tr>
-                    <tr><td>Overall</td><td className={styles.riskLow}>LOW — safe to auto-merge</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Deploy */}
-            <div className={styles.timelineEntry}>
-              <div className={clsx(styles.timelineDot, styles.timelineDotGreen)} />
-              <div className={styles.timelineCard}>
-                <div className={styles.timelinePhase}>{'\u{1F680}'} Deploy</div>
-                <div className={styles.timelineTitle}>PR #87 merged, CI passing</div>
-                <div className={styles.timelineSuccess}>
-                  {'\u2705'} Deployed to production. All checks green.
-                </div>
-              </div>
-            </div>
-
-          </div>
+          ))}
         </div>
       </section>
 
-      <div className={styles.divider} />
-
-      {/* ── Features grid ── */}
-      <section className={styles.features}>
-        <div className="container">
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionLabel}>Features</span>
-            <Heading as="h2" className={styles.sectionTitle}>Built for Real Engineering</Heading>
-            <p className={styles.sectionSubtitle}>
-              Not a toy demo. Maestro runs the full software development lifecycle with configurable agents.
-            </p>
-          </div>
-          <div className={styles.featuresGrid}>
-            {FEATURES.map(f => (
-              <div key={f.title} className={styles.featureCard}>
-                <div className={styles.featureIcon}>{f.icon}</div>
-                <div className={styles.featureTitle}>{f.title}</div>
-                <p className={styles.featureDesc}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
+      {/* Features */}
+      <section style={{ padding: '2rem 2rem 3rem', maxWidth: 900, margin: '0 auto' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ma-foreground)', marginBottom: '1.5rem', textAlign: 'center' }}>
+          Features
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          {FEATURES.map((f) => (
+            <div key={f.title} style={{
+              padding: '1.25rem', background: 'var(--ma-surface)',
+              border: '1px solid var(--ma-border)', borderRadius: '0.5rem',
+            }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--ma-foreground)', marginBottom: '0.25rem' }}>
+                {f.title}
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--ma-muted)', margin: 0, lineHeight: 1.5 }}>
+                {f.desc}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      <div className={styles.divider} />
-
-      {/* ── Tech stack ── */}
-      <section className={styles.techStack}>
-        <div className="container">
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionLabel}>Stack</span>
-            <Heading as="h2" className={styles.sectionTitle}>Built With</Heading>
-          </div>
-          <div className={styles.techList}>
-            {TECH.map(t => (
-              <div key={t.label} className={styles.techItem}>
-                <span className={styles.techIcon}>{t.icon}</span>
-                {t.label}
-              </div>
-            ))}
-          </div>
+      {/* Stack */}
+      <section style={{ padding: '1rem 2rem 4rem', maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {['Python / FastAPI', 'Next.js', 'PostgreSQL', 'Claude Code CLI', 'GitHub Issues', 'Linear'].map((s) => (
+            <span key={s} style={{
+              fontSize: '0.7rem', padding: '0.25rem 0.6rem', borderRadius: 9999,
+              background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
+            }}>
+              {s}
+            </span>
+          ))}
         </div>
       </section>
-
-    </div>
     </Layout>
   );
 }
