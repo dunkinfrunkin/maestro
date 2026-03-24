@@ -31,12 +31,8 @@ const HERO_STEPS = [
   {
     agent: 'Risk Profile Agent',
     color: '#7c3aed',
-    lines: [
-      { text: 'Scoring across 7 dimensions...', style: 'muted' },
-      { text: 'Scope 2/5  |  Blast radius 2/5  |  Complexity 1/5', style: 'default' },
-      { text: 'Coverage 1/5  |  Security 2/5', style: 'default' },
-      { text: 'Risk: Low — auto-approved', style: 'success' },
-    ],
+    custom: 'risk',
+    lines: [],
   },
   {
     agent: 'Deployment Agent',
@@ -67,6 +63,61 @@ const LINE_COLORS: Record<string, string> = {
   default: 'var(--ma-fg)',
 };
 
+const RISK_DIMS = [
+  { label: 'Scope', score: 2 },
+  { label: 'Blast Radius', score: 2 },
+  { label: 'Complexity', score: 1 },
+  { label: 'Test Coverage', score: 1 },
+  { label: 'Security', score: 2 },
+  { label: 'Reversibility', score: 1 },
+  { label: 'Dependencies', score: 1 },
+];
+
+function RiskScoreCard() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', animation: 'fadeSlideIn 0.4s ease-out' }}>
+      {/* Overall verdict */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0.6rem 0.85rem', borderRadius: '0.5rem',
+        background: '#dcfce7', border: '1px solid #bbf7d0',
+      }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#15803d' }}>Overall Risk</span>
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803d' }}>LOW</span>
+      </div>
+
+      {/* Dimension scores */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {RISK_DIMS.map((d) => (
+          <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--ma-muted)', width: 90, flexShrink: 0 }}>{d.label}</span>
+            <div style={{ flex: 1, display: 'flex', gap: '0.2rem' }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n} style={{
+                  flex: 1, height: 6, borderRadius: 2,
+                  background: n <= d.score
+                    ? d.score <= 2 ? '#22c55e' : d.score <= 3 ? '#eab308' : '#ef4444'
+                    : 'var(--ma-border)',
+                  opacity: n <= d.score ? 1 : 0.3,
+                }} />
+              ))}
+            </div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--ma-muted)', width: 24, textAlign: 'right' }}>{d.score}/5</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Auto-approve note */}
+      <div style={{
+        fontSize: '0.7rem', color: 'var(--ma-muted)', fontStyle: 'italic',
+        paddingTop: '0.25rem', borderTop: '1px solid var(--ma-border)',
+      }}>
+        Below threshold — auto-approved for merge
+      </div>
+    </div>
+  );
+}
+
 function HeroPipelineCard() {
   const [step, setStep] = useState(0);
   const [lineIndex, setLineIndex] = useState(0);
@@ -79,8 +130,12 @@ function HeroPipelineCard() {
   useEffect(() => {
     if (transitioning) return;
 
+    const isCustom = !!(current as any).custom;
+    const doneWithLines = !isCustom && lineIndex >= current.lines.length - 1;
+    const shouldAdvance = isCustom || doneWithLines;
+
     timerRef.current = setTimeout(() => {
-      if (lineIndex < current.lines.length - 1) {
+      if (!shouldAdvance) {
         setLineIndex(lineIndex + 1);
       } else {
         // Transition to next step
@@ -93,7 +148,7 @@ function HeroPipelineCard() {
           setTimeout(() => setSparkles(false), 600);
         }, 1200);
       }
-    }, lineIndex === 0 ? 1400 : 1000);
+    }, isCustom ? 3500 : lineIndex === 0 ? 1400 : 1000);
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [step, lineIndex, transitioning]);
@@ -172,21 +227,25 @@ function HeroPipelineCard() {
           transition: 'opacity 0.3s ease',
           opacity: transitioning ? 0 : 1,
         }}>
-          {current.lines.slice(0, lineIndex + 1).map((line, j) => (
-            <div key={`${step}-${j}`} style={{
-              padding: '0.2rem 0',
-              fontSize: '0.95rem',
-              lineHeight: 1.7,
-              color: LINE_COLORS[line.style] || 'var(--ma-fg)',
-              fontWeight: line.style === 'success' ? 500 : 400,
-              animation: j === lineIndex ? 'fadeSlideIn 0.3s ease-out' : undefined,
-            }}>
-              {line.style === 'tool' && (
-                <span style={{ color: 'var(--ma-muted)', marginRight: '0.35rem', fontSize: '0.65rem' }}>&#9656;</span>
-              )}
-              {line.text}
-            </div>
-          ))}
+          {(current as any).custom === 'risk' ? (
+            <RiskScoreCard />
+          ) : (
+            current.lines.slice(0, lineIndex + 1).map((line, j) => (
+              <div key={`${step}-${j}`} style={{
+                padding: '0.2rem 0',
+                fontSize: '0.95rem',
+                lineHeight: 1.7,
+                color: LINE_COLORS[line.style] || 'var(--ma-fg)',
+                fontWeight: line.style === 'success' ? 500 : 400,
+                animation: j === lineIndex ? 'fadeSlideIn 0.3s ease-out' : undefined,
+              }}>
+                {line.style === 'tool' && (
+                  <span style={{ color: 'var(--ma-muted)', marginRight: '0.35rem', fontSize: '0.65rem' }}>&#9656;</span>
+                )}
+                {line.text}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Step progress bar + labels — clickable */}
