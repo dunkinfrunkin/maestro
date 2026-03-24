@@ -404,7 +404,7 @@ export default function Home() {
         </div>
 
         <div style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--ma-border)' }}>
-          <Link to="/docs/philosophy" style={{
+          <Link to="/philosophy" style={{
             fontSize: '0.85rem', color: 'var(--ma-accent)', fontWeight: 500, textDecoration: 'none',
           }}>Read the full philosophy &rarr;</Link>
         </div>

@@ -63,6 +63,11 @@ const config: Config = {
           label: 'Docs',
         },
         {
+          to: '/philosophy',
+          label: 'Philosophy',
+          position: 'left',
+        },
+        {
           to: '/changelog',
           label: 'Changelog',
           position: 'right',
