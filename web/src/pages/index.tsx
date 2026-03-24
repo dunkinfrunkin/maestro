@@ -470,56 +470,53 @@ export default function Home() {
         ))}
       </section>
 
-      {/* ── Pipeline visualization (dark) ── */}
-      <section style={{ background: '#1a1612', padding: '4rem 3rem' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
-          <div style={{
-            fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.1em', color: '#706555', marginBottom: '0.5rem',
-          }}>How it works</div>
-          <h2 style={{
-            fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
-            fontFamily: "'DM Sans', sans-serif", color: '#e8e0d4',
-            margin: '0 0 0.5rem', lineHeight: 1.15,
-          }}>
-            Five agents. One continuous flow.
-          </h2>
-          <p style={{ fontSize: '0.85rem', color: '#a89880', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 2.5rem' }}>
-            Every ticket moves through the same pipeline. Each agent hands off to the next. Humans intervene only when risk demands it.
-          </p>
+      {/* ── Pipeline visualization ── */}
+      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 3rem 4rem', textAlign: 'center' }}>
+        <div style={{
+          fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '0.5rem',
+        }}>How it works</div>
+        <h2 style={{
+          fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
+          fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
+          margin: '0 0 0.5rem', lineHeight: 1.15,
+        }}>
+          Five agents. One continuous flow.
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: 'var(--ma-muted)', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 2.5rem' }}>
+          Every ticket moves through the same pipeline. Each agent hands off to the next. Humans intervene only when risk demands it.
+        </p>
 
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0',
-          }}>
-            {PIPELINE_STAGES.map((stage, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0',
+        }}>
+          {PIPELINE_STAGES.map((stage, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{
+                padding: '1.25rem 1.5rem', borderRadius: '0.65rem',
+                background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
+                textAlign: 'center', minWidth: 140,
+              }}>
                 <div style={{
-                  padding: '1.25rem 1.5rem', borderRadius: '0.65rem',
-                  background: '#242018', border: `1px solid ${stage.color}25`,
-                  textAlign: 'center', minWidth: 140,
-                }}>
-                  <div style={{
-                    width: 10, height: 10, borderRadius: '50%',
-                    background: stage.color, margin: '0 auto 0.5rem',
-                    boxShadow: `0 0 12px ${stage.color}40`,
-                  }} />
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e8e0d4', marginBottom: '0.2rem' }}>{stage.name}</div>
-                  <div style={{ fontSize: '0.65rem', color: '#706555', lineHeight: 1.5 }}>{stage.desc}</div>
-                </div>
-                {i < PIPELINE_STAGES.length - 1 && (
-                  <div style={{ width: 32, display: 'flex', justifyContent: 'center' }}>
-                    <span style={{ color: '#706555', fontSize: '0.65rem' }}>&rarr;</span>
-                  </div>
-                )}
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: stage.color, margin: '0 auto 0.5rem',
+                }} />
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.2rem' }}>{stage.name}</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--ma-muted)', lineHeight: 1.5 }}>{stage.desc}</div>
               </div>
-            ))}
-          </div>
+              {i < PIPELINE_STAGES.length - 1 && (
+                <div style={{ width: 32, display: 'flex', justifyContent: 'center' }}>
+                  <span style={{ color: 'var(--ma-muted)', fontSize: '0.65rem' }}>&rarr;</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
 
-          <div style={{ marginTop: '2rem' }}>
-            <code style={{ fontSize: '0.7rem', color: '#504535', fontFamily: 'var(--ifm-font-family-monospace)' }}>
-              $ claude -p "..." --model claude-sonnet-4-6 --output-format stream-json
-            </code>
-          </div>
+        <div style={{ marginTop: '2rem' }}>
+          <code style={{ fontSize: '0.7rem', color: 'var(--ma-muted)', fontFamily: 'var(--ifm-font-family-monospace)' }}>
+            $ claude -p "..." --model claude-sonnet-4-6 --output-format stream-json
+          </code>
         </div>
       </section>
 
