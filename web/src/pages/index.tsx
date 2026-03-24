@@ -139,32 +139,88 @@ export default function Home() {
   return (
     <Layout title="Maestro" description="Autonomous coding agent orchestration for enterprise teams">
 
-      {/* Hero */}
-      <section style={{ padding: '6rem 1.5rem 4rem', textAlign: 'center' }}>
-        <div style={{ maxWidth: 640, margin: '0 auto' }}>
-          <img src="/img/logo.png" alt="" style={{ width: 100, height: 100, marginBottom: '1.5rem' }} />
+      {/* Hero — full-width split: text left, visual right */}
+      <section style={{
+        display: 'flex', alignItems: 'center', minHeight: 'calc(100vh - 60px)',
+        padding: '3rem 4rem', gap: '4rem',
+      }}>
+        {/* Left: copy */}
+        <div style={{ flex: '1 1 50%', maxWidth: 620 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+            padding: '0.3rem 0.75rem', borderRadius: 9999, marginBottom: '1.5rem',
+            background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a' }} />
+            <span style={{ fontSize: '0.7rem', color: 'var(--ma-muted)', fontWeight: 500 }}>Under active development</span>
+          </div>
           <h1 style={{
-            fontSize: 'clamp(2.5rem, 5vw, 3.5rem)', fontWeight: 800, letterSpacing: '-0.05em',
+            fontSize: 'clamp(2.8rem, 5vw, 4rem)', fontWeight: 800, letterSpacing: '-0.04em',
             fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
-            margin: '0 0 1rem', lineHeight: 1.05,
+            margin: '0 0 1.25rem', lineHeight: 1.05,
           }}>
             Your codebase,<br />orchestrated.
           </h1>
-          <p style={{ fontSize: '1.1rem', color: 'var(--ma-muted)', lineHeight: 1.6, margin: '0 0 2rem' }}>
-            AI agents that implement, review, and deploy your tickets.
+          <p style={{ fontSize: '1.15rem', color: 'var(--ma-muted)', lineHeight: 1.7, margin: '0 0 2rem', maxWidth: 480 }}>
+            AI agents that implement, review, and deploy your tickets — from issue to production, autonomously.
           </p>
-          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
             <Link to="/docs/getting-started" style={{
-              padding: '0.65rem 1.5rem', fontSize: '0.85rem', borderRadius: '0.375rem',
+              padding: '0.75rem 1.75rem', fontSize: '0.9rem', borderRadius: '0.5rem',
               background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 600, textDecoration: 'none',
             }}>Get started</Link>
             <Link to="https://github.com/dunkinfrunkin/maestro" style={{
-              padding: '0.65rem 1.5rem', fontSize: '0.85rem', borderRadius: '0.375rem',
+              padding: '0.75rem 1.75rem', fontSize: '0.9rem', borderRadius: '0.5rem',
               background: 'transparent', color: 'var(--ma-fg)', fontWeight: 500,
               border: '1px solid var(--ma-border)', textDecoration: 'none',
             }}>View source</Link>
           </div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--ma-muted)' }}>Under active development</span>
+        </div>
+
+        {/* Right: agent card preview — shows a real pipeline step */}
+        <div style={{ flex: '1 1 50%', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 560 }}>
+            {/* Fake terminal chrome */}
+            <div style={{
+              background: '#1a1612', borderRadius: '0.75rem', overflow: 'hidden',
+              border: '1px solid #2c2416', boxShadow: '0 25px 60px rgba(0,0,0,0.15)',
+            }}>
+              {/* Title bar */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.75rem 1rem', borderBottom: '1px solid #2c2416',
+              }}>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e5534b' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#d29922' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#57ab5a' }} />
+                </div>
+                <span style={{ fontSize: '0.65rem', color: '#706555', fontFamily: 'var(--ifm-font-family-monospace)', marginLeft: '0.5rem' }}>
+                  maestro — implementation-agent
+                </span>
+              </div>
+              {/* Terminal content */}
+              <div style={{ padding: '1rem 1.25rem', fontFamily: 'var(--ifm-font-family-monospace)', fontSize: '0.72rem', lineHeight: 1.8 }}>
+                <div style={{ color: '#706555' }}>$ claude -p "Implement POST /payments/refund" --model claude-sonnet-4-6</div>
+                <div style={{ color: '#706555', marginTop: '0.75rem' }}>Cloning acme/payments-api...</div>
+                <div style={{ color: '#5c7cba' }}>Using tool: Read — src/services/stripe.ts</div>
+                <div style={{ color: '#5c7cba' }}>Using tool: Edit — src/routes/payments.ts</div>
+                <div style={{ color: '#5c7cba' }}>Using tool: Bash — npm test</div>
+                <div style={{ color: '#c4a882', marginTop: '0.25rem' }}>Tests: 8 passed, 0 failed</div>
+                <div style={{ color: '#57ab5a' }}>PR #142 created: acme/payments-api</div>
+                <div style={{ color: '#706555', marginTop: '0.75rem' }}>Handing off to review-agent...</div>
+                <div style={{ color: '#5c7cba' }}>Using tool: Read — src/services/stripe.ts</div>
+                <div style={{ color: '#d29922' }}>stripe.ts:47 — missing idempotency key</div>
+                <div style={{ color: '#d29922' }}>REVIEW_VERDICT: REQUEST_CHANGES</div>
+                <div style={{ color: '#706555', marginTop: '0.75rem' }}>Back to implementation-agent...</div>
+                <div style={{ color: '#5c7cba' }}>Using tool: Edit — src/services/stripe.ts</div>
+                <div style={{ color: '#c4a882' }}>Fixed: added idempotency_key parameter</div>
+                <div style={{ color: '#57ab5a' }}>REVIEW_VERDICT: APPROVE</div>
+                <div style={{ color: '#57ab5a' }}>RISK_LEVEL: LOW — auto-approved</div>
+                <div style={{ color: '#57ab5a', fontWeight: 600 }}>Merged and deployed. MONITOR: HEALTHY</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
