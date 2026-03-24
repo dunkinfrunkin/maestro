@@ -1,5 +1,223 @@
+import { useState, useEffect, useRef } from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
+
+/* ── Hero animation: pipeline steps that auto-cycle ── */
+
+const HERO_STEPS = [
+  {
+    agent: 'Implementation Agent',
+    color: '#2563eb',
+    lines: [
+      { text: 'Cloning acme/payments-api...', style: 'muted' },
+      { text: 'Reading src/services/stripe.ts', style: 'tool' },
+      { text: 'Editing src/routes/payments.ts', style: 'tool' },
+      { text: 'Running npm test', style: 'tool' },
+      { text: 'Tests: 8 passed', style: 'success' },
+      { text: 'PR #142 created', style: 'success' },
+    ],
+  },
+  {
+    agent: 'Review Agent',
+    color: '#d97706',
+    lines: [
+      { text: 'Checking out PR #142...', style: 'muted' },
+      { text: 'Reading src/services/stripe.ts', style: 'tool' },
+      { text: 'stripe.ts:47 — missing idempotency key', style: 'warn' },
+      { text: 'Posted inline comment on PR', style: 'muted' },
+      { text: 'Verdict: Request Changes', style: 'warn' },
+    ],
+  },
+  {
+    agent: 'Implementation Agent',
+    color: '#2563eb',
+    lines: [
+      { text: 'Reading review comment...', style: 'muted' },
+      { text: 'Editing src/services/stripe.ts', style: 'tool' },
+      { text: 'Added idempotency_key parameter', style: 'success' },
+      { text: 'Pushed fix, replied in thread', style: 'success' },
+    ],
+  },
+  {
+    agent: 'Review Agent',
+    color: '#d97706',
+    lines: [
+      { text: 'Verifying fix in code...', style: 'muted' },
+      { text: 'Fix confirmed', style: 'success' },
+      { text: 'Thread resolved', style: 'success' },
+      { text: 'Verdict: Approved', style: 'success' },
+    ],
+  },
+  {
+    agent: 'Risk Profile Agent',
+    color: '#7c3aed',
+    lines: [
+      { text: 'Scoring across 7 dimensions...', style: 'muted' },
+      { text: 'Scope 2/5  |  Blast radius 2/5  |  Complexity 1/5', style: 'default' },
+      { text: 'Coverage 1/5  |  Security 2/5', style: 'default' },
+      { text: 'Risk: Low — auto-approved', style: 'success' },
+    ],
+  },
+  {
+    agent: 'Deployment Agent',
+    color: '#059669',
+    lines: [
+      { text: 'CI: 4/4 checks passing', style: 'success' },
+      { text: 'Merging via squash...', style: 'muted' },
+      { text: 'Merged to main', style: 'success' },
+      { text: 'Monitor: Healthy', style: 'success' },
+    ],
+  },
+];
+
+const LINE_COLORS: Record<string, string> = {
+  muted: 'var(--ma-muted)',
+  tool: '#5c7cba',
+  success: '#16a34a',
+  warn: '#d97706',
+  default: 'var(--ma-fg)',
+};
+
+function HeroPipelineCard() {
+  const [step, setStep] = useState(0);
+  const [lineIndex, setLineIndex] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
+  const [sparkles, setSparkles] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const current = HERO_STEPS[step];
+
+  useEffect(() => {
+    if (transitioning) return;
+
+    timerRef.current = setTimeout(() => {
+      if (lineIndex < current.lines.length - 1) {
+        setLineIndex(lineIndex + 1);
+      } else {
+        // Transition to next step
+        setTransitioning(true);
+        setSparkles(true);
+        setTimeout(() => {
+          setStep((step + 1) % HERO_STEPS.length);
+          setLineIndex(0);
+          setTransitioning(false);
+          setTimeout(() => setSparkles(false), 600);
+        }, 900);
+      }
+    }, lineIndex === 0 ? 800 : 500);
+
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [step, lineIndex, transitioning]);
+
+  return (
+    <div style={{
+      position: 'relative', width: '100%', maxWidth: 520,
+    }}>
+      {/* Maestro mascot — top right, flipped */}
+      <div style={{
+        position: 'absolute', top: -36, right: -24, zIndex: 2,
+        transition: 'transform 0.4s ease',
+        transform: sparkles ? 'scale(1.1)' : 'scale(1)',
+      }}>
+        <img
+          src="/img/logo.png" alt=""
+          style={{ width: 64, height: 64, transform: 'scaleX(-1)' }}
+        />
+        {/* Sparkle particles */}
+        {sparkles && (
+          <div style={{ position: 'absolute', top: -8, left: -8, right: -8, bottom: -8, pointerEvents: 'none' }}>
+            {[...Array(6)].map((_, i) => (
+              <span key={i} style={{
+                position: 'absolute',
+                top: `${20 + Math.sin(i * 1.2) * 30}%`,
+                left: `${20 + Math.cos(i * 1.5) * 30}%`,
+                width: 4, height: 4, borderRadius: '50%',
+                background: i % 2 === 0 ? '#d97706' : '#7c3aed',
+                animation: 'sparkle 0.8s ease-out forwards',
+                animationDelay: `${i * 0.08}s`,
+                opacity: 0,
+              }} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Card */}
+      <div style={{
+        background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
+        borderRadius: '0.75rem', overflow: 'hidden',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.08)',
+        transition: 'border-color 0.4s ease',
+        borderColor: transitioning ? current.color : 'var(--ma-border)',
+      }}>
+        {/* Agent header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.6rem',
+          padding: '0.75rem 1rem', borderBottom: '1px solid var(--ma-border)',
+          transition: 'opacity 0.3s ease',
+          opacity: transitioning ? 0 : 1,
+        }}>
+          <div style={{
+            width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+            background: current.color,
+            boxShadow: `0 0 8px ${current.color}40`,
+          }} />
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ma-fg)' }}>
+            {current.agent}
+          </span>
+          <span style={{
+            fontSize: '0.6rem', padding: '0.15rem 0.5rem', borderRadius: 9999,
+            background: transitioning ? '#dcfce7' : `${current.color}15`,
+            color: transitioning ? '#16a34a' : current.color,
+            border: `1px solid ${transitioning ? '#bbf7d0' : current.color + '30'}`,
+            fontWeight: 500, marginLeft: 'auto',
+          }}>
+            {transitioning ? 'completed' : 'running'}
+          </span>
+        </div>
+
+        {/* Log lines — animated in one by one */}
+        <div style={{
+          padding: '0.75rem 1rem', minHeight: 160,
+          background: 'var(--ma-bg)',
+          transition: 'opacity 0.3s ease',
+          opacity: transitioning ? 0 : 1,
+        }}>
+          {current.lines.slice(0, lineIndex + 1).map((line, j) => (
+            <div key={`${step}-${j}`} style={{
+              padding: '0.2rem 0',
+              fontSize: '0.75rem',
+              lineHeight: 1.7,
+              color: LINE_COLORS[line.style] || 'var(--ma-fg)',
+              fontWeight: line.style === 'success' ? 500 : 400,
+              animation: j === lineIndex ? 'fadeSlideIn 0.3s ease-out' : undefined,
+            }}>
+              {line.style === 'tool' && (
+                <span style={{ color: 'var(--ma-muted)', marginRight: '0.35rem', fontSize: '0.65rem' }}>&#9656;</span>
+              )}
+              {line.text}
+            </div>
+          ))}
+        </div>
+
+        {/* Step progress bar */}
+        <div style={{
+          display: 'flex', gap: '0.25rem', padding: '0.5rem 1rem',
+          borderTop: '1px solid var(--ma-border)',
+        }}>
+          {HERO_STEPS.map((s, i) => (
+            <div key={i} style={{
+              flex: 1, height: 3, borderRadius: 2,
+              background: i < step ? '#16a34a' : i === step ? current.color : 'var(--ma-border)',
+              opacity: i <= step ? 1 : 0.4,
+              transition: 'background 0.4s ease, opacity 0.4s ease',
+            }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PHASES = [
   {
@@ -177,50 +395,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Right: agent card preview — shows a real pipeline step */}
+        {/* Right: animated pipeline simulation card */}
         <div style={{ flex: '1 1 50%', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: 560 }}>
-            {/* Fake terminal chrome */}
-            <div style={{
-              background: '#1a1612', borderRadius: '0.75rem', overflow: 'hidden',
-              border: '1px solid #2c2416', boxShadow: '0 25px 60px rgba(0,0,0,0.15)',
-            }}>
-              {/* Title bar */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                padding: '0.75rem 1rem', borderBottom: '1px solid #2c2416',
-              }}>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e5534b' }} />
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#d29922' }} />
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#57ab5a' }} />
-                </div>
-                <span style={{ fontSize: '0.65rem', color: '#706555', fontFamily: 'var(--ifm-font-family-monospace)', marginLeft: '0.5rem' }}>
-                  maestro — implementation-agent
-                </span>
-              </div>
-              {/* Terminal content */}
-              <div style={{ padding: '1rem 1.25rem', fontFamily: 'var(--ifm-font-family-monospace)', fontSize: '0.72rem', lineHeight: 1.8 }}>
-                <div style={{ color: '#706555' }}>$ claude -p "Implement POST /payments/refund" --model claude-sonnet-4-6</div>
-                <div style={{ color: '#706555', marginTop: '0.75rem' }}>Cloning acme/payments-api...</div>
-                <div style={{ color: '#5c7cba' }}>Using tool: Read — src/services/stripe.ts</div>
-                <div style={{ color: '#5c7cba' }}>Using tool: Edit — src/routes/payments.ts</div>
-                <div style={{ color: '#5c7cba' }}>Using tool: Bash — npm test</div>
-                <div style={{ color: '#c4a882', marginTop: '0.25rem' }}>Tests: 8 passed, 0 failed</div>
-                <div style={{ color: '#57ab5a' }}>PR #142 created: acme/payments-api</div>
-                <div style={{ color: '#706555', marginTop: '0.75rem' }}>Handing off to review-agent...</div>
-                <div style={{ color: '#5c7cba' }}>Using tool: Read — src/services/stripe.ts</div>
-                <div style={{ color: '#d29922' }}>stripe.ts:47 — missing idempotency key</div>
-                <div style={{ color: '#d29922' }}>REVIEW_VERDICT: REQUEST_CHANGES</div>
-                <div style={{ color: '#706555', marginTop: '0.75rem' }}>Back to implementation-agent...</div>
-                <div style={{ color: '#5c7cba' }}>Using tool: Edit — src/services/stripe.ts</div>
-                <div style={{ color: '#c4a882' }}>Fixed: added idempotency_key parameter</div>
-                <div style={{ color: '#57ab5a' }}>REVIEW_VERDICT: APPROVE</div>
-                <div style={{ color: '#57ab5a' }}>RISK_LEVEL: LOW — auto-approved</div>
-                <div style={{ color: '#57ab5a', fontWeight: 600 }}>Merged and deployed. MONITOR: HEALTHY</div>
-              </div>
-            </div>
-          </div>
+          <HeroPipelineCard />
         </div>
       </section>
 
