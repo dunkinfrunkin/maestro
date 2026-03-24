@@ -189,18 +189,35 @@ function HeroPipelineCard() {
           ))}
         </div>
 
-        {/* Step progress bar */}
+        {/* Step progress bar + labels — clickable */}
         <div style={{
-          display: 'flex', gap: '0.35rem', padding: '0.85rem 1.5rem',
+          display: 'flex', gap: '0.35rem', padding: '0.75rem 1.5rem 0.85rem',
           borderTop: '1px solid var(--ma-border)',
         }}>
           {HERO_STEPS.map((s, i) => (
-            <div key={i} style={{
-              flex: 1, height: 5, borderRadius: 3,
-              background: i < step ? '#16a34a' : i === step ? current.color : 'var(--ma-border)',
-              opacity: i <= step ? 1 : 0.4,
-              transition: 'background 0.4s ease, opacity 0.4s ease',
-            }} />
+            <button
+              key={i}
+              onClick={() => { setStep(i); setLineIndex(0); setTransitioning(false); setSparkles(false); }}
+              style={{
+                flex: 1, border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
+              }}
+            >
+              <div style={{
+                width: '100%', height: 5, borderRadius: 3,
+                background: i < step ? '#16a34a' : i === step ? current.color : 'var(--ma-border)',
+                opacity: i <= step ? 1 : 0.4,
+                transition: 'background 0.4s ease, opacity 0.4s ease',
+              }} />
+              <span style={{
+                fontSize: '0.55rem', fontWeight: i === step ? 600 : 400,
+                color: i === step ? 'var(--ma-fg)' : 'var(--ma-muted)',
+                transition: 'color 0.3s ease',
+                whiteSpace: 'nowrap',
+              }}>
+                {s.agent.replace(' Agent', '')}
+              </span>
+            </button>
           ))}
         </div>
       </div>
