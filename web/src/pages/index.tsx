@@ -102,9 +102,9 @@ function HeroPipelineCard() {
           setLineIndex(0);
           setTransitioning(false);
           setTimeout(() => setSparkles(false), 600);
-        }, 900);
+        }, 1200);
       }
-    }, lineIndex === 0 ? 800 : 500);
+    }, lineIndex === 0 ? 1400 : 1000);
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [step, lineIndex, transitioning]);
