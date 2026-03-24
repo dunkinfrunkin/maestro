@@ -9,10 +9,12 @@ Get Maestro running locally in under 5 minutes.
 
 ## Prerequisites
 
-- **Docker** and **Docker Compose** (for PostgreSQL)
-- **Python 3.11+** and **uv** (for the backend)
-- **Node.js 20+** and **npm** (for the frontend)
-- A **Claude API key** or **Claude Code CLI** installed
+| Requirement | Purpose |
+|---|---|
+| Docker + Docker Compose | PostgreSQL database |
+| Python 3.11+ and [uv](https://docs.astral.sh/uv/) | Backend API |
+| Node.js 20+ and npm | Frontend dashboard |
+| Claude API key or [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) | Agent execution |
 
 ## 1. Clone the repository
 
@@ -27,22 +29,28 @@ cd maestro
 docker compose up -d
 ```
 
-This starts a PostgreSQL instance on port `5432`. The default credentials are in `docker-compose.yml`.
+Starts PostgreSQL on port 5432. Default credentials are in `docker-compose.yml`.
 
 ## 3. Start the backend
 
 ```bash
 cd backend
-cp .env.example .env    # edit with your API keys
+cp .env.example .env
+```
+
+Edit `.env` with your API keys (see [Configuration](/docs/configuration) for all options), then:
+
+```bash
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-The API server starts at `http://localhost:8000`. You can verify with:
+Verify:
 
 ```bash
 curl http://localhost:8000/health
+# → {"status": "ok"}
 ```
 
 ## 4. Start the frontend
@@ -53,25 +61,27 @@ npm install
 npm run dev
 ```
 
-The dashboard opens at `http://localhost:3000`.
+Dashboard opens at [localhost:3000](http://localhost:3000).
 
 ## 5. Create your first task
 
-1. Open the dashboard and navigate to a project
+1. Open the dashboard and select a project
 2. Click **New Task**
 3. Enter a title and description — for example:
-   - Title: `Add health check endpoint`
-   - Description: `Create a GET /health route that returns {"status": "ok"}`
+   - **Title:** `Add health check endpoint`
+   - **Description:** `Create a GET /health route that returns {"status": "ok"}`
 4. Click **Queue Task**
 
-The task enters the pipeline and flows through implementation, review, risk profiling, and deployment stages automatically.
+The task enters the pipeline and flows through each stage automatically. You can watch it happen in real time from the task detail page.
 
 ## What happens next
 
-- The **implementation agent** reads your codebase, writes code, and opens a pull request
-- The **review agent** reads the diff and leaves inline comments
-- If changes are needed, the implementation agent applies fixes and the review agent re-reviews
-- The **risk profile agent** scores the change for complexity, blast radius, and test coverage
-- The **deployment agent** merges the PR once everything looks good
+Once queued, five agents take over in sequence:
 
-See [Pipeline](/docs/pipeline) for a detailed breakdown of each stage.
+1. **Implementation** — reads your codebase, writes code, runs tests, opens a PR
+2. **Review** — posts inline comments on specific lines, requests changes or approves
+3. **Risk Profile** — scores the PR across seven dimensions, auto-approves if low risk
+4. **Deployment** — verifies CI checks, merges via squash
+5. **Monitor** — watches Datadog and Splunk for 15 minutes post-deploy
+
+See [Pipeline](/docs/pipeline) for how each stage works, or [Agents](/docs/agents) for agent-specific configuration.

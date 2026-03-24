@@ -3,86 +3,98 @@ sidebar_position: 2
 title: Pipeline
 ---
 
-# The Harness Engineering Pipeline
+# Pipeline
 
-Every task in Maestro flows through a deterministic pipeline. Each stage is handled by a specialized agent, and the pipeline enforces quality gates between stages.
+Every task in Maestro flows through a deterministic pipeline. Each stage is handled by a specialized agent, and the pipeline enforces quality gates between them.
 
-## Pipeline stages
+```
+Queued → Implement → Review ↔ Implement → Risk Profile → Deploy → Monitor → Done
+```
 
-### Queued
+## Queued
 
-A task enters the queue when it's created — either manually from the dashboard, via the API, or synced from a GitHub issue or Linear ticket.
+A task enters the queue when created from the dashboard, via the API, or synced from GitHub/Linear.
 
-**What happens:**
 - Task is validated and assigned to a workspace
-- The task receives a unique internal ID
-- Status is set to `queued`
+- Receives a unique internal ID
+- Status set to `queued`
 
-### Implement
+## Implement
 
-The implementation agent picks up the task and writes code.
+The Implementation Agent picks up the task and writes code.
 
-**What happens:**
-- Agent reads the project codebase to understand context
+- Reads the project codebase to understand context and conventions
 - Writes the implementation based on the task description
+- Runs the test suite to verify correctness
 - Creates a Git branch and opens a pull request
 - Attaches the PR link to the task
 
-### Review
+## Review
 
-The review agent reads the pull request diff and performs an inline code review.
+The Review Agent reads the pull request and performs inline code review.
 
-**What happens:**
-- Agent reads the full diff of the PR
-- Leaves inline comments on specific lines where it finds issues
-- Comments cover: bugs, missing validation, style, performance, security
-- If no issues are found, the review is approved immediately
+- Checks out the PR and reads every changed file
+- Posts inline comments on specific lines where issues are found
+- Comments cover bugs, missing validation, style, performance, and security
+- If no issues are found, approves immediately
 
-### Review loop
+## Review loop
 
-If the review agent leaves comments, the task cycles back to the implementation agent:
+If the Review Agent requests changes, the task cycles back to the Implementation Agent:
 
-1. Implementation agent reads the review comments
+1. Implementation Agent reads the review comments
 2. Applies fixes and pushes new commits
-3. Task returns to the review agent for re-review
-4. This loop continues until all comments are resolved
+3. Replies directly in the PR comment thread
+4. Review Agent re-reviews and verifies each fix
+5. Resolves threads and approves once everything is addressed
 
 The loop has a configurable maximum iteration count (default: 5) to prevent infinite cycles.
 
-### Risk Profile
+## Risk Profile
 
-After the review is approved, the risk profile agent analyzes the change.
+After review approval, the Risk Profile Agent scores the change.
 
-**What happens:**
-- Scores the change across multiple dimensions:
-  - **Complexity** — how many files, lines, and logical branches are affected
-  - **Blast radius** — how many other modules depend on the changed code
-  - **Test coverage** — whether tests exist for the new/changed code
-- Produces an overall risk score: `LOW`, `MEDIUM`, or `HIGH`
-- `LOW` tasks can be auto-merged; `HIGH` tasks require human approval
+| Dimension | What it measures |
+|---|---|
+| Scope | Files and lines changed |
+| Blast radius | Systems and users affected |
+| Complexity | Cyclomatic complexity, new abstractions |
+| Test coverage | Whether tests exist for changed paths |
+| Security | Auth, crypto, PII, secrets handling |
+| Reversibility | Can this be rolled back cleanly? |
+| Dependencies | New or updated external packages |
 
-### Deploy
+Each dimension is scored 1-5. The overall risk level is `LOW`, `MEDIUM`, or `HIGH`.
 
-The deployment agent handles merging and CI.
+- **LOW** — auto-approved for merge
+- **MEDIUM** — requires one human approval
+- **HIGH** — requires explicit human sign-off
 
-**What happens:**
-- Merges the PR into the target branch
-- Monitors CI pipeline status
+The auto-approve threshold is configurable per workspace.
+
+## Deploy
+
+The Deployment Agent handles merging and CI verification.
+
+- Checks all GitHub Actions pipelines (build, lint, test, deploy-preview)
+- Waits for all checks to pass
+- Merges the PR via squash into the target branch
 - Reports success or failure back to the task
 
-### Monitor
+## Monitor
 
-Post-deployment monitoring (when configured).
+The Monitor Agent watches for post-deploy regressions.
 
-**What happens:**
-- Watches application logs and metrics for anomalies
-- If errors spike after deployment, the task is flagged for rollback review
-- Reports monitoring status back to the task
+- Checks Datadog dashboards for latency and error rate changes
+- Queries Splunk logs for new exceptions
+- Monitors for 15 minutes after deploy
+- Flags the change if anomalies are detected
 
 ## Status transitions
 
-```
-queued → implement → review ↔ implement (loop) → risk_profile → deploy → monitor → done
-```
+At any point, a task can transition to:
 
-At any point, a task can transition to `failed` if an unrecoverable error occurs, or `blocked` if human intervention is required.
+- **failed** — unrecoverable error during any stage
+- **blocked** — human intervention required (high-risk PR, CI failure, etc.)
+
+All transitions are logged in the task activity feed and visible in the dashboard.
