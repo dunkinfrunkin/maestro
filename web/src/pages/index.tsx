@@ -269,50 +269,53 @@ function HeroPipelineCard() {
   );
 }
 
-/* ── Philosophy sections data ── */
+/* ── Landing page data ── */
 
-const PRINCIPLES = [
+const STATS = [
+  { value: '5', label: 'Dedicated agents' },
+  { value: '7', label: 'Risk dimensions' },
+  { value: '15m', label: 'Post-deploy monitoring' },
+  { value: '0', label: 'Lines of code you write' },
+];
+
+const VALUE_PROPS = [
   {
-    title: 'Humans steer. Agents execute.',
-    desc: 'Engineers define intent, set constraints, and review outcomes. Agents handle the implementation, review, testing, and deployment. The bottleneck shifts from writing code to designing environments where agents can do reliable work.',
+    label: 'From ticket to PR',
+    title: 'Your backlog, on autopilot',
+    desc: 'Point Maestro at your GitHub or Linear issues. The Implementation Agent clones the repo, reads the codebase, writes the code, runs tests, and opens a pull request. You review the output, not the process.',
   },
   {
-    title: 'Every agent gets its own role.',
-    desc: 'A single monolithic agent can\'t hold the full context of implementation, review, risk assessment, and deployment. Maestro decomposes the pipeline into dedicated agents, each with a focused system prompt, clear inputs, and a single responsibility.',
+    label: 'Agent-to-agent review',
+    title: 'Code review that never sleeps',
+    desc: 'The Review Agent checks out every PR, reads every changed file, and posts inline comments on specific lines — just like a human reviewer. When fixes land, it verifies, resolves threads, and approves. No context switching required.',
   },
   {
-    title: 'Agents talk through the same tools humans use.',
-    desc: 'Review comments, PR threads, CI checks, GitHub API calls. Agents don\'t use special channels. They post inline comments on specific lines of code, reply in threads, resolve conversations, and approve pull requests — the same workflow as human developers.',
+    label: 'Risk scoring',
+    title: 'Ship fast without the fear',
+    desc: 'Every PR is scored across seven dimensions before it can merge: scope, blast radius, complexity, test coverage, security, reversibility, and dependencies. Low-risk changes auto-approve. High-risk changes escalate to a human.',
   },
   {
-    title: 'Corrections are cheap. Waiting is expensive.',
-    desc: 'In high-throughput agent systems, the cost of a follow-up fix is almost always lower than the cost of blocking progress. Maestro favors fast iteration over gated perfection — review agents catch issues, implementation agents fix them, and the loop continues.',
-  },
-  {
-    title: 'Risk is scored, not assumed.',
-    desc: 'Not every change needs a human in the loop. Maestro scores each PR across seven dimensions — scope, blast radius, complexity, test coverage, security, reversibility, and dependencies. Low-risk changes auto-approve. High-risk changes escalate.',
-  },
-  {
-    title: 'Observability is not optional.',
-    desc: 'After merge, a monitor agent checks Datadog dashboards and Splunk logs for 15 minutes. If latency spikes or error rates climb, it flags the change. Deploy confidence comes from automated post-deploy verification, not hope.',
+    label: 'Post-deploy observability',
+    title: 'Confidence after the merge',
+    desc: 'The Monitor Agent checks Datadog and Splunk for 15 minutes after every deploy. Latency spikes, error rate changes, new exceptions — all caught automatically. Deploy confidence from verification, not hope.',
   },
 ];
 
 const PIPELINE_STAGES = [
   { name: 'Implement', color: '#2563eb', desc: 'Clone, read, edit, test, open PR' },
   { name: 'Review', color: '#d97706', desc: 'Inline comments, thread conversations' },
-  { name: 'Risk', color: '#7c3aed', desc: '7-dimension scoring, auto-approve threshold' },
-  { name: 'Deploy', color: '#059669', desc: 'CI verification, squash merge' },
-  { name: 'Monitor', color: '#0891b2', desc: 'Datadog, Splunk, 15-minute health check' },
+  { name: 'Risk', color: '#7c3aed', desc: '7-dimension scoring, auto-approve' },
+  { name: 'Deploy', color: '#059669', desc: 'CI checks, squash merge' },
+  { name: 'Monitor', color: '#0891b2', desc: 'Datadog, Splunk, 15-min watch' },
 ];
 
 const CAPABILITIES = [
-  { title: 'Configurable agents', desc: 'Each agent has its own system prompt, model, and settings. Edit prompts directly in the dashboard. Swap models per agent.' },
-  { title: 'GitHub and Linear', desc: 'Pull issues from either tracker. Connections stored with encrypted tokens. Filter by repo, label, or project.' },
-  { title: 'Plugin framework', desc: 'Build custom agents by subclassing AgentPlugin. Register via Python entry points or drop files in a plugins directory.' },
-  { title: 'Live activity streaming', desc: 'Watch agents work in real time. Every tool call, every edit, every decision — streamed to the dashboard as it happens.' },
-  { title: 'Workspace isolation', desc: 'Each project gets its own workspace with isolated credentials, agent configs, and pipeline settings. Teams don\'t collide.' },
-  { title: 'Powered by Claude Code', desc: 'Each agent runs as a Claude Code CLI subprocess with full access to Read, Write, Edit, Bash, Glob, and Grep.' },
+  { title: 'Configurable agents', desc: 'Own system prompt, model, and settings per agent. Edit prompts directly in the dashboard.' },
+  { title: 'GitHub and Linear', desc: 'Pull issues from either tracker. Encrypted tokens. Filter by repo, label, or project.' },
+  { title: 'Plugin framework', desc: 'Build custom agents by subclassing AgentPlugin. Python entry points or drop-in files.' },
+  { title: 'Live activity streaming', desc: 'Watch agents work in real time. Every tool call, every edit, streamed as it happens.' },
+  { title: 'Workspace isolation', desc: 'Isolated credentials, agent configs, and pipeline settings per project. Teams don\'t collide.' },
+  { title: 'Powered by Claude Code', desc: 'Each agent runs as a Claude Code CLI subprocess with full tool access.' },
 ];
 
 export default function Home() {
@@ -363,138 +366,199 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Section: Philosophy ── */}
-      <section style={{ maxWidth: 900, margin: '0 auto', padding: '5rem 3rem 1rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-          <div style={{
-            fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '0.75rem',
-          }}>
-            Philosophy
-          </div>
-          <h2 style={{
-            fontSize: 'clamp(1.8rem, 3.5vw, 2.4rem)', fontWeight: 800, letterSpacing: '-0.03em',
-            fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
-            margin: '0 0 1rem', lineHeight: 1.15,
-          }}>
-            Harness engineering for the<br />agent-first world
-          </h2>
-          <p style={{ fontSize: '1rem', color: 'var(--ma-muted)', lineHeight: 1.7, maxWidth: 600, margin: '0 auto' }}>
-            When agents handle the software lifecycle, the engineer's job shifts from writing code to designing systems where agents can do reliable work. Maestro encodes that philosophy into a pipeline.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-          {PRINCIPLES.map((p, i) => (
-            <div key={i} style={{
-              padding: '1.75rem 0',
-              borderTop: '1px solid var(--ma-border)',
-            }}>
+      {/* ── Stats bar ── */}
+      <section style={{ borderTop: '1px solid var(--ma-border)', borderBottom: '1px solid var(--ma-border)' }}>
+        <div style={{
+          maxWidth: 1100, margin: '0 auto', padding: '2rem 3rem',
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem',
+        }}>
+          {STATS.map((s) => (
+            <div key={s.label} style={{ textAlign: 'center' }}>
               <div style={{
-                fontSize: '1.05rem', fontWeight: 700, color: 'var(--ma-fg)',
-                marginBottom: '0.5rem', lineHeight: 1.3,
-              }}>
-                {p.title}
-              </div>
-              <div style={{ fontSize: '0.88rem', color: 'var(--ma-muted)', lineHeight: 1.7 }}>
-                {p.desc}
-              </div>
+                fontSize: '2rem', fontWeight: 800, color: 'var(--ma-fg)',
+                fontFamily: "'DM Sans', sans-serif", letterSpacing: '-0.03em',
+              }}>{s.value}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--ma-muted)', marginTop: '0.15rem' }}>{s.label}</div>
             </div>
           ))}
         </div>
-
-        <div style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--ma-border)' }}>
-          <Link to="/philosophy" style={{
-            fontSize: '0.85rem', color: 'var(--ma-accent)', fontWeight: 500, textDecoration: 'none',
-          }}>Read the full philosophy &rarr;</Link>
-        </div>
       </section>
 
-      {/* ── Section: The Pipeline (visual) ── */}
-      <section style={{ padding: '4rem 3rem', background: '#1a1612' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{
-              fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '0.1em', color: '#706555', marginBottom: '0.75rem',
-            }}>
-              The Pipeline
+      {/* ── Value props — alternating left/right ── */}
+      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '5rem 3rem' }}>
+        {VALUE_PROPS.map((v, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'flex-start', gap: '4rem',
+            marginBottom: i < VALUE_PROPS.length - 1 ? '4.5rem' : 0,
+            flexDirection: i % 2 === 0 ? 'row' : 'row-reverse',
+          }}>
+            {/* Text side */}
+            <div style={{ flex: '1 1 55%' }}>
+              <div style={{
+                fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '0.5rem',
+              }}>{v.label}</div>
+              <h2 style={{
+                fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
+                fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
+                margin: '0 0 0.75rem', lineHeight: 1.15,
+              }}>{v.title}</h2>
+              <p style={{ fontSize: '0.95rem', color: 'var(--ma-muted)', lineHeight: 1.75, margin: 0 }}>{v.desc}</p>
             </div>
-            <h2 style={{
-              fontSize: 'clamp(1.6rem, 3vw, 2rem)', fontWeight: 800, letterSpacing: '-0.03em',
-              fontFamily: "'DM Sans', sans-serif", color: '#e8e0d4',
-              margin: '0 0 0.75rem', lineHeight: 1.15,
+            {/* Visual side — pipeline stage card */}
+            <div style={{
+              flex: '0 0 280px', padding: '1.5rem', borderRadius: '0.75rem',
+              background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
             }}>
-              Five agents. One continuous flow.
-            </h2>
-            <p style={{ fontSize: '0.9rem', color: '#a89880', lineHeight: 1.7, maxWidth: 520, margin: '0 auto' }}>
-              Every ticket moves through the same pipeline. Each agent hands off to the next. Humans intervene only when risk demands it.
-            </p>
+              {i === 0 && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--ma-fg)', lineHeight: 1.8, fontFamily: 'var(--ifm-font-family-monospace)' }}>
+                  <div style={{ color: 'var(--ma-muted)' }}>Cloning repo...</div>
+                  <div style={{ color: '#5c7cba' }}>Reading stripe.ts</div>
+                  <div style={{ color: '#5c7cba' }}>Editing payments.ts</div>
+                  <div style={{ color: '#5c7cba' }}>Running npm test</div>
+                  <div style={{ color: '#16a34a', fontWeight: 500, marginTop: '0.25rem' }}>8 passed. PR #142 created.</div>
+                </div>
+              )}
+              {i === 1 && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--ma-fg)', lineHeight: 1.8, fontFamily: 'var(--ifm-font-family-monospace)' }}>
+                  <div style={{ color: '#5c7cba' }}>Reading changed files...</div>
+                  <div style={{ color: '#d97706' }}>stripe.ts:47 — missing key</div>
+                  <div style={{ color: 'var(--ma-muted)', marginTop: '0.5rem' }}>--- after fix ---</div>
+                  <div style={{ color: '#16a34a' }}>Verified. Thread resolved.</div>
+                  <div style={{ color: '#16a34a', fontWeight: 500 }}>Approved.</div>
+                </div>
+              )}
+              {i === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {[
+                    ['Scope', 2], ['Blast radius', 2], ['Complexity', 1],
+                    ['Coverage', 1], ['Security', 2],
+                  ].map(([label, score]) => (
+                    <div key={label as string} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--ma-muted)', width: 80, flexShrink: 0 }}>{label}</span>
+                      <div style={{ flex: 1, display: 'flex', gap: '0.15rem' }}>
+                        {[1,2,3,4,5].map((n) => (
+                          <div key={n} style={{
+                            flex: 1, height: 5, borderRadius: 2,
+                            background: n <= (score as number) ? '#22c55e' : 'var(--ma-border)',
+                            opacity: n <= (score as number) ? 1 : 0.3,
+                          }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: '0.6rem', color: 'var(--ma-muted)', width: 20, textAlign: 'right' }}>{score}/5</span>
+                    </div>
+                  ))}
+                  <div style={{
+                    marginTop: '0.5rem', padding: '0.4rem 0.6rem', borderRadius: '0.35rem',
+                    background: '#dcfce7', textAlign: 'center',
+                    fontSize: '0.72rem', fontWeight: 600, color: '#15803d',
+                  }}>LOW — auto-approved</div>
+                </div>
+              )}
+              {i === 3 && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--ma-fg)', lineHeight: 1.8, fontFamily: 'var(--ifm-font-family-monospace)' }}>
+                  <div style={{ color: 'var(--ma-muted)' }}>Monitoring for 15m...</div>
+                  <div style={{ color: '#5c7cba' }}>Checking Datadog...</div>
+                  <div style={{ color: 'var(--ma-fg)' }}>Latency: 42ms p99</div>
+                  <div style={{ color: '#16a34a' }}>Error rate: 0.00%</div>
+                  <div style={{ color: '#5c7cba' }}>Checking Splunk...</div>
+                  <div style={{ color: '#16a34a', fontWeight: 500 }}>All systems healthy.</div>
+                </div>
+              )}
+            </div>
           </div>
+        ))}
+      </section>
 
-          {/* Pipeline flow visualization */}
+      {/* ── Pipeline visualization (dark) ── */}
+      <section style={{ background: '#1a1612', padding: '4rem 3rem' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0', flexWrap: 'nowrap',
+            fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
+            letterSpacing: '0.1em', color: '#706555', marginBottom: '0.5rem',
+          }}>How it works</div>
+          <h2 style={{
+            fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
+            fontFamily: "'DM Sans', sans-serif", color: '#e8e0d4',
+            margin: '0 0 0.5rem', lineHeight: 1.15,
+          }}>
+            Five agents. One continuous flow.
+          </h2>
+          <p style={{ fontSize: '0.85rem', color: '#a89880', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 2.5rem' }}>
+            Every ticket moves through the same pipeline. Each agent hands off to the next. Humans intervene only when risk demands it.
+          </p>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0',
           }}>
             {PIPELINE_STAGES.map((stage, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{
                   padding: '1.25rem 1.5rem', borderRadius: '0.65rem',
-                  background: '#242018', border: `1px solid ${stage.color}30`,
-                  textAlign: 'center', minWidth: 150,
+                  background: '#242018', border: `1px solid ${stage.color}25`,
+                  textAlign: 'center', minWidth: 140,
                 }}>
                   <div style={{
                     width: 10, height: 10, borderRadius: '50%',
-                    background: stage.color, margin: '0 auto 0.6rem',
-                    boxShadow: `0 0 12px ${stage.color}50`,
+                    background: stage.color, margin: '0 auto 0.5rem',
+                    boxShadow: `0 0 12px ${stage.color}40`,
                   }} />
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#e8e0d4', marginBottom: '0.3rem' }}>
-                    {stage.name}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#706555', lineHeight: 1.5 }}>
-                    {stage.desc}
-                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#e8e0d4', marginBottom: '0.2rem' }}>{stage.name}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#706555', lineHeight: 1.5 }}>{stage.desc}</div>
                 </div>
                 {i < PIPELINE_STAGES.length - 1 && (
-                  <div style={{
-                    width: 40, height: 1, background: '#3d3428', position: 'relative',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span style={{ color: '#706555', fontSize: '0.7rem' }}>&rarr;</span>
+                  <div style={{ width: 32, display: 'flex', justifyContent: 'center' }}>
+                    <span style={{ color: '#706555', fontSize: '0.65rem' }}>&rarr;</span>
                   </div>
                 )}
               </div>
             ))}
           </div>
 
-          {/* CLI line */}
-          <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
-            <code style={{ fontSize: '0.72rem', color: '#706555', fontFamily: 'var(--ifm-font-family-monospace)' }}>
+          <div style={{ marginTop: '2rem' }}>
+            <code style={{ fontSize: '0.7rem', color: '#504535', fontFamily: 'var(--ifm-font-family-monospace)' }}>
               $ claude -p "..." --model claude-sonnet-4-6 --output-format stream-json
             </code>
           </div>
         </div>
       </section>
 
-      {/* ── Section: Capabilities ── */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '4rem 3rem 3rem' }}>
+      {/* ── Philosophy callout ── */}
+      <section style={{ maxWidth: 680, margin: '0 auto', padding: '4rem 2rem', textAlign: 'center' }}>
+        <h2 style={{
+          fontSize: 'clamp(1.4rem, 3vw, 1.8rem)', fontWeight: 800, letterSpacing: '-0.03em',
+          fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
+          margin: '0 0 0.75rem', lineHeight: 1.2,
+        }}>
+          "Humans steer. Agents execute."
+        </h2>
+        <p style={{ fontSize: '0.92rem', color: 'var(--ma-muted)', lineHeight: 1.7, margin: '0 0 1.25rem' }}>
+          When agents handle the software lifecycle, the engineer's job shifts from writing code to designing systems where agents can do reliable work.
+        </p>
+        <Link to="/philosophy" style={{
+          fontSize: '0.85rem', color: 'var(--ma-accent)', fontWeight: 500, textDecoration: 'none',
+        }}>Read the full philosophy &rarr;</Link>
+      </section>
+
+      {/* ── Capabilities grid ── */}
+      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 3rem 4rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
           <div style={{
-            fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '0.75rem',
-          }}>
-            Capabilities
-          </div>
+            fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase',
+            letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '0.5rem',
+          }}>Platform</div>
           <h2 style={{
-            fontSize: 'clamp(1.6rem, 3vw, 2rem)', fontWeight: 800, letterSpacing: '-0.03em',
+            fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
             fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
             margin: 0, lineHeight: 1.15,
           }}>
-            Built for teams that ship
+            Everything you need to ship
           </h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--ma-border)', borderRadius: '0.75rem', overflow: 'hidden' }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '1px', background: 'var(--ma-border)', borderRadius: '0.75rem', overflow: 'hidden',
+        }}>
           {CAPABILITIES.map((c) => (
             <div key={c.title} style={{ padding: '1.75rem', background: 'var(--ma-bg)' }}>
               <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.4rem' }}>{c.title}</div>
@@ -505,19 +569,38 @@ export default function Home() {
       </section>
 
       {/* ── Bottom CTA ── */}
-      <section style={{ maxWidth: 640, margin: '0 auto', padding: '2rem 1.5rem 5rem', textAlign: 'center' }}>
-        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+      <section style={{
+        maxWidth: 800, margin: '0 auto', padding: '3rem 2rem 5rem', textAlign: 'center',
+      }}>
+        <h2 style={{
+          fontSize: 'clamp(1.6rem, 3.5vw, 2.2rem)', fontWeight: 800, letterSpacing: '-0.03em',
+          fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
+          margin: '0 0 0.75rem', lineHeight: 1.15,
+        }}>
+          Stop writing code.<br />Start orchestrating it.
+        </h2>
+        <p style={{ fontSize: '0.95rem', color: 'var(--ma-muted)', lineHeight: 1.7, margin: '0 0 2rem' }}>
+          Open source. Self-hosted. Deploy in minutes.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <Link to="/docs/getting-started" style={{
+            padding: '0.85rem 2rem', fontSize: '0.95rem', borderRadius: '0.5rem',
+            background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 600, textDecoration: 'none',
+          }}>Get started</Link>
+          <Link to="https://github.com/dunkinfrunkin/maestro" style={{
+            padding: '0.85rem 2rem', fontSize: '0.95rem', borderRadius: '0.5rem',
+            background: 'transparent', color: 'var(--ma-fg)', fontWeight: 500,
+            border: '1px solid var(--ma-border)', textDecoration: 'none',
+          }}>View on GitHub</Link>
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           {['Python / FastAPI', 'Next.js', 'PostgreSQL', 'Claude Code CLI', 'GitHub', 'Linear'].map((s) => (
             <span key={s} style={{
-              fontSize: '0.65rem', padding: '0.2rem 0.55rem', borderRadius: 9999,
+              fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: 9999,
               background: 'var(--ma-surface)', border: '1px solid var(--ma-border)', color: 'var(--ma-muted)',
             }}>{s}</span>
           ))}
         </div>
-        <Link to="/docs/getting-started" style={{
-          padding: '0.75rem 1.75rem', fontSize: '0.9rem', borderRadius: '0.5rem',
-          background: 'var(--ma-accent)', color: '#f5f0e8', fontWeight: 600, textDecoration: 'none',
-        }}>Get started</Link>
       </section>
     </Layout>
   );
