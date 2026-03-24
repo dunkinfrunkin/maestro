@@ -111,7 +111,7 @@ function HeroPipelineCard() {
 
   return (
     <div style={{
-      position: 'relative', width: '100%', maxWidth: 520,
+      position: 'relative', width: 580, flexShrink: 0,
     }}>
       {/* Maestro mascot — top right, flipped */}
       <div style={{
@@ -121,7 +121,7 @@ function HeroPipelineCard() {
       }}>
         <img
           src="/img/logo.png" alt=""
-          style={{ width: 64, height: 64, transform: 'scaleX(-1)' }}
+          style={{ width: 80, height: 80, transform: 'scaleX(-1)' }}
         />
         {/* Sparkle particles */}
         {sparkles && (
@@ -153,7 +153,7 @@ function HeroPipelineCard() {
         {/* Agent header */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.6rem',
-          padding: '0.75rem 1rem', borderBottom: '1px solid var(--ma-border)',
+          padding: '1rem 1.25rem', borderBottom: '1px solid var(--ma-border)',
           transition: 'opacity 0.3s ease',
           opacity: transitioning ? 0 : 1,
         }}>
@@ -162,7 +162,7 @@ function HeroPipelineCard() {
             background: current.color,
             boxShadow: `0 0 8px ${current.color}40`,
           }} />
-          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ma-fg)' }}>
+          <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--ma-fg)' }}>
             {current.agent}
           </span>
           <span style={{
@@ -178,7 +178,7 @@ function HeroPipelineCard() {
 
         {/* Log lines — animated in one by one */}
         <div style={{
-          padding: '0.75rem 1rem', minHeight: 160,
+          padding: '1rem 1.25rem', height: 240, overflow: 'hidden',
           background: 'var(--ma-bg)',
           transition: 'opacity 0.3s ease',
           opacity: transitioning ? 0 : 1,
@@ -186,7 +186,7 @@ function HeroPipelineCard() {
           {current.lines.slice(0, lineIndex + 1).map((line, j) => (
             <div key={`${step}-${j}`} style={{
               padding: '0.2rem 0',
-              fontSize: '0.75rem',
+              fontSize: '0.85rem',
               lineHeight: 1.7,
               color: LINE_COLORS[line.style] || 'var(--ma-fg)',
               fontWeight: line.style === 'success' ? 500 : 400,
@@ -202,12 +202,12 @@ function HeroPipelineCard() {
 
         {/* Step progress bar */}
         <div style={{
-          display: 'flex', gap: '0.25rem', padding: '0.5rem 1rem',
+          display: 'flex', gap: '0.3rem', padding: '0.75rem 1.25rem',
           borderTop: '1px solid var(--ma-border)',
         }}>
           {HERO_STEPS.map((s, i) => (
             <div key={i} style={{
-              flex: 1, height: 3, borderRadius: 2,
+              flex: 1, height: 4, borderRadius: 2,
               background: i < step ? '#16a34a' : i === step ? current.color : 'var(--ma-border)',
               opacity: i <= step ? 1 : 0.4,
               transition: 'background 0.4s ease, opacity 0.4s ease',
