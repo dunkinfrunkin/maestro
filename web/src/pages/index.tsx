@@ -302,11 +302,11 @@ const VALUE_PROPS = [
 ];
 
 const PIPELINE_STAGES = [
-  { name: 'Implement', color: '#2563eb', desc: 'Clone, read, edit, test, open PR' },
-  { name: 'Review', color: '#d97706', desc: 'Inline comments, thread conversations' },
-  { name: 'Risk', color: '#7c3aed', desc: '7-dimension scoring, auto-approve' },
-  { name: 'Deploy', color: '#059669', desc: 'CI checks, squash merge' },
-  { name: 'Monitor', color: '#0891b2', desc: 'Datadog, Splunk, 15-min watch' },
+  { name: 'Implement', color: '#2563eb', desc: 'Clone, read, edit, test, open PR', icon: 'M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5' },
+  { name: 'Review', color: '#d97706', desc: 'Inline comments, thread conversations', icon: 'M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z' },
+  { name: 'Risk', color: '#7c3aed', desc: '7-dimension scoring, auto-approve', icon: 'M12 9v3.75m0-10.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z' },
+  { name: 'Deploy', color: '#059669', desc: 'CI checks, squash merge', icon: 'M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5' },
+  { name: 'Monitor', color: '#0891b2', desc: 'Datadog, Splunk, 15-min watch', icon: 'M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6' },
 ];
 
 const CAPABILITIES = [
@@ -497,10 +497,9 @@ export default function Home() {
                 background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
                 textAlign: 'center', minWidth: 140,
               }}>
-                <div style={{
-                  width: 10, height: 10, borderRadius: '50%',
-                  background: stage.color, margin: '0 auto 0.5rem',
-                }} />
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={stage.color} style={{ width: 28, height: 28, margin: '0 auto 0.5rem', display: 'block' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={stage.icon} />
+                </svg>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.2rem' }}>{stage.name}</div>
                 <div style={{ fontSize: '0.65rem', color: 'var(--ma-muted)', lineHeight: 1.5 }}>{stage.desc}</div>
               </div>
@@ -513,11 +512,6 @@ export default function Home() {
           ))}
         </div>
 
-        <div style={{ marginTop: '2rem' }}>
-          <code style={{ fontSize: '0.7rem', color: 'var(--ma-muted)', fontFamily: 'var(--ifm-font-family-monospace)' }}>
-            $ claude -p "..." --model claude-sonnet-4-6 --output-format stream-json
-          </code>
-        </div>
       </section>
 
       {/* ── Philosophy callout ── */}
