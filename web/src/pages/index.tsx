@@ -129,7 +129,6 @@ function HeroPipelineCard() {
   const [step, setStep] = useState(0);
   const [lineIndex, setLineIndex] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
-  const [sparkles, setSparkles] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const current = HERO_STEPS[step];
@@ -147,12 +146,10 @@ function HeroPipelineCard() {
       } else {
         // Transition to next step
         setTransitioning(true);
-        setSparkles(true);
         setTimeout(() => {
           setStep((step + 1) % HERO_STEPS.length);
           setLineIndex(0);
           setTransitioning(false);
-          setTimeout(() => setSparkles(false), 600);
         }, 1200);
       }
     }, isCustom ? 5000 : lineIndex === 0 ? 2000 : 1500);
@@ -167,30 +164,11 @@ function HeroPipelineCard() {
       {/* Maestro mascot — top right, flipped */}
       <div style={{
         position: 'absolute', top: -36, right: -24, zIndex: 2,
-        transition: 'transform 0.4s ease',
-        transform: sparkles ? 'scale(1.1)' : 'scale(1)',
       }}>
         <img
           src="/img/logo.png" alt=""
           style={{ width: 80, height: 80, transform: 'scaleX(-1)' }}
         />
-        {/* Sparkle particles */}
-        {sparkles && (
-          <div style={{ position: 'absolute', top: -8, left: -8, right: -8, bottom: -8, pointerEvents: 'none' }}>
-            {[...Array(6)].map((_, i) => (
-              <span key={i} style={{
-                position: 'absolute',
-                top: `${20 + Math.sin(i * 1.2) * 30}%`,
-                left: `${20 + Math.cos(i * 1.5) * 30}%`,
-                width: 4, height: 4, borderRadius: '50%',
-                background: i % 2 === 0 ? '#d97706' : '#7c3aed',
-                animation: 'sparkle 0.8s ease-out forwards',
-                animationDelay: `${i * 0.08}s`,
-                opacity: 0,
-              }} />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Card */}
@@ -263,7 +241,7 @@ function HeroPipelineCard() {
           {HERO_STEPS.map((s, i) => (
             <button
               key={i}
-              onClick={() => { setStep(i); setLineIndex(0); setTransitioning(false); setSparkles(false); }}
+              onClick={() => { setStep(i); setLineIndex(0); setTransitioning(false);}}
               style={{
                 flex: 1, border: 'none', background: 'none', padding: 0, cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem',
