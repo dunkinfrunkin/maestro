@@ -169,7 +169,7 @@ export default function Home() {
       </section>
 
       {/* Pipeline walkthrough — left description, right agent card */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 2rem 4rem' }}>
+      <section style={{ maxWidth: 1400, margin: '0 auto', padding: '0 3rem 4rem' }}>
         <h2 style={{
           fontSize: '1.5rem', fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
           color: 'var(--ma-fg)', textAlign: 'center', marginBottom: '3rem',
@@ -185,7 +185,7 @@ export default function Home() {
               borderBottom: i < PHASES.length - 1 ? '1px solid var(--ma-border)' : 'none',
             }}>
               {/* Left: description */}
-              <div style={{ flex: '0 0 380px', paddingTop: '0.5rem' }}>
+              <div style={{ flex: '0 0 40%', paddingTop: '0.5rem' }}>
                 <div style={{
                   fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
                   letterSpacing: '0.06em', color: 'var(--ma-muted)', marginBottom: '0.4rem',
@@ -225,7 +225,7 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '4rem 2rem 3rem' }}>
+      <section style={{ maxWidth: 1400, margin: '0 auto', padding: '4rem 3rem 3rem' }}>
         <h2 style={{
           fontSize: '1.5rem', fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
           color: 'var(--ma-fg)', textAlign: 'center', marginBottom: '2rem',
