@@ -1,140 +1,216 @@
 import Layout from '@theme/Layout';
 
-export default function Philosophy() {
-  const section = (title: string, body: string[]) => (
-    <div style={{ padding: '2rem 0', borderTop: '1px solid var(--ma-border)' }}>
-      <h3 style={{
-        fontSize: '1.15rem', fontWeight: 700, color: 'var(--ma-fg)',
-        fontFamily: "'DM Sans', sans-serif", margin: '0 0 0.75rem', lineHeight: 1.3,
-      }}>
-        {title}
-      </h3>
-      {body.map((p, i) => (
-        <p key={i} style={{ fontSize: '0.92rem', color: 'var(--ma-muted)', lineHeight: 1.8, margin: '0 0 0.75rem' }}>
-          {p}
-        </p>
-      ))}
-    </div>
-  );
+/* Shared text style to avoid repetition */
+const prose = {
+  fontSize: '1.05rem', color: 'var(--ma-muted)', lineHeight: 1.85, margin: '0 0 1.25rem',
+} as const;
 
+const heading = (text: string) => (
+  <h2 style={{
+    fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
+    fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
+    margin: '0 0 1rem', lineHeight: 1.15,
+  }}>
+    {text}
+  </h2>
+);
+
+export default function Philosophy() {
   return (
     <Layout title="Philosophy" description="Design principles behind Maestro">
-      <article style={{ maxWidth: 720, margin: '0 auto', padding: '4rem 2rem 5rem' }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: '2.5rem' }}>
-          <div style={{
-            fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '0.75rem',
-          }}>
-            Philosophy
-          </div>
-          <h1 style={{
-            fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.04em',
-            fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
-            margin: '0 0 1rem', lineHeight: 1.1,
-          }}>
-            Harness engineering for the agent-first world
-          </h1>
-          <p style={{ fontSize: '1.05rem', color: 'var(--ma-muted)', lineHeight: 1.75, margin: 0 }}>
-            When agents handle the software lifecycle, the engineer's job shifts from writing code to designing systems where agents can do reliable work. Maestro encodes that shift into a pipeline.
+      {/* Hero */}
+      <section style={{ maxWidth: 740, margin: '0 auto', padding: '5rem 2rem 3rem' }}>
+        <div style={{
+          fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '0.1em', color: 'var(--ma-muted)', marginBottom: '1rem',
+        }}>
+          Philosophy
+        </div>
+        <h1 style={{
+          fontSize: 'clamp(2.2rem, 5vw, 3.2rem)', fontWeight: 800, letterSpacing: '-0.04em',
+          fontFamily: "'DM Sans', sans-serif", color: 'var(--ma-fg)',
+          margin: '0 0 1.5rem', lineHeight: 1.08,
+        }}>
+          Harness engineering for the agent-first world
+        </h1>
+        <p style={{ fontSize: '1.15rem', color: 'var(--ma-muted)', lineHeight: 1.8, margin: 0, maxWidth: 600 }}>
+          Over the past year, something fundamental changed in how software gets built. The bottleneck is no longer writing code. It's designing environments where agents can do reliable work.
+        </p>
+      </section>
+
+      {/* ── Narrative sections ── */}
+
+      {/* 1 — The shift */}
+      <section style={{ maxWidth: 740, margin: '0 auto', padding: '0 2rem 3.5rem' }}>
+        {heading('The role of the engineer is changing')}
+        <p style={prose}>
+          For decades, software engineering meant writing code. Reading requirements, thinking through edge cases, typing out implementations, running tests, fixing what broke. The craft was in the keystrokes.
+        </p>
+        <p style={prose}>
+          That's shifting. When a coding agent can clone a repo, read the codebase, write an implementation, run the test suite, and open a pull request — all in minutes — the engineer's value moves upstream. You stop being the person who writes the code. You become the person who designs the system that makes agents effective.
+        </p>
+        <p style={prose}>
+          Maestro is built around this idea. Humans steer. Agents execute.
+        </p>
+      </section>
+
+      {/* 2 — Separation */}
+      <section style={{ background: 'var(--ma-surface)', padding: '3.5rem 2rem' }}>
+        <div style={{ maxWidth: 740, margin: '0 auto' }}>
+          {heading('One agent per job')}
+          <p style={prose}>
+            A single monolithic agent that tries to implement, review, assess risk, deploy, and monitor will fail. Context windows are finite. Attention is scarce. The same reasons you wouldn't ask one engineer to do everything apply to agents.
+          </p>
+          <p style={prose}>
+            Maestro decomposes the pipeline into five dedicated agents. Each has a focused system prompt, clear inputs, and a single responsibility. The Implementation Agent writes code. The Review Agent reads it. The Risk Profile Agent scores it. The Deployment Agent ships it. The Monitor Agent watches what happens after.
+          </p>
+          <p style={{ ...prose, margin: 0 }}>
+            Separation of concerns isn't just a code principle. It's an agent principle.
           </p>
         </div>
+      </section>
 
-        {/* Principles */}
-        {section('Humans steer. Agents execute.', [
-          'Engineers define intent, set constraints, and review outcomes. Agents handle the implementation, review, testing, and deployment. The bottleneck shifts from writing code to designing environments where agents can do reliable work.',
-          'When something fails, the fix is almost never "try harder." The right question is always: what capability is missing, and how do we make it legible and enforceable for the agent?',
-        ])}
+      {/* 3 — Same tools */}
+      <section style={{ maxWidth: 740, margin: '0 auto', padding: '3.5rem 2rem' }}>
+        {heading('No special channels')}
+        <p style={prose}>
+          When a human reviewer posts an inline comment on a pull request, they use the GitHub API. When Maestro's Review Agent does the same thing, it uses the same API. It checks out the PR, reads every changed file, and posts comments on specific lines of code — the exact same workflow.
+        </p>
+        <p style={prose}>
+          When the Implementation Agent fixes the issue, it replies directly in the PR thread. When the Review Agent verifies the fix, it resolves the conversation via GitHub's GraphQL API and approves the PR.
+        </p>
+        <p style={{ ...prose, margin: 0 }}>
+          There is no separate agent log you need to consult. The pull request <em>is</em> the record. You can read the history and understand what happened, whether the author was a person or an agent.
+        </p>
+      </section>
 
-        {section('Every agent gets its own role', [
-          "A single monolithic agent can't hold the full context of implementation, review, risk assessment, and deployment. Maestro decomposes the pipeline into dedicated agents — Implementation, Review, Risk Profile, Deployment, and Monitor — each with a focused system prompt, clear inputs, and a single responsibility.",
-          "This mirrors how effective engineering organizations work. You don't ask one person to write the code, review it, assess the risk, and monitor the deploy. Separation of concerns applies to agents just as well as it applies to code.",
-        ])}
-
-        {section('Agents talk through the same tools humans use', [
-          "Review comments, PR threads, CI checks, GitHub API calls. Agents don't use special channels. They post inline comments on specific lines of code, reply in threads, resolve conversations, and approve pull requests — the same workflow as human developers.",
-          "This has a practical consequence: you can read the PR history and understand what happened, whether the author was a person or an agent. There is no separate agent log you need to consult. The pull request is the record.",
-        ])}
-
-        {section('Corrections are cheap. Waiting is expensive.', [
-          'In high-throughput agent systems, the cost of a follow-up fix is almost always lower than the cost of blocking progress. Maestro favors fast iteration over gated perfection.',
-          'Review agents catch issues. Implementation agents fix them. The loop continues. This would be irresponsible in a low-throughput environment. In a system where agent throughput far exceeds human attention, it is often the right tradeoff.',
-        ])}
-
-        {section('Risk is scored, not assumed', [
-          'Not every change needs a human in the loop. And not every change should be auto-approved.',
-          'Maestro scores each PR across seven dimensions: scope, blast radius, complexity, test coverage, security, reversibility, and dependencies. Low-risk changes auto-approve. Medium and above escalate to a human reviewer. The threshold is configurable per workspace.',
-        ])}
-
-        {/* Risk table */}
-        <div style={{
-          margin: '-0.5rem 0 1.5rem', borderRadius: '0.5rem', overflow: 'hidden',
-          border: '1px solid var(--ma-border)',
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
-            <thead>
-              <tr style={{ background: 'var(--ma-surface)' }}>
-                <th style={{ padding: '0.6rem 1rem', fontSize: '0.75rem', fontWeight: 600, textAlign: 'left', color: 'var(--ma-fg)' }}>Dimension</th>
-                <th style={{ padding: '0.6rem 1rem', fontSize: '0.75rem', fontWeight: 600, textAlign: 'left', color: 'var(--ma-fg)' }}>What it measures</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['Scope', 'Number of files and lines changed'],
-                ['Blast radius', 'How many systems or users are affected'],
-                ['Complexity', 'Cyclomatic complexity, new abstractions'],
-                ['Test coverage', 'Whether tests exist for changed paths'],
-                ['Security', 'Auth, crypto, PII, secrets handling'],
-                ['Reversibility', 'Can this be rolled back cleanly?'],
-                ['Dependencies', 'New or updated external dependencies'],
-              ].map(([dim, desc], i) => (
-                <tr key={i} style={{ borderTop: '1px solid var(--ma-border)' }}>
-                  <td style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 500, color: 'var(--ma-fg)' }}>{dim}</td>
-                  <td style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', color: 'var(--ma-muted)' }}>{desc}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* 4 — Speed */}
+      <section style={{ background: '#1a1612', padding: '3.5rem 2rem' }}>
+        <div style={{ maxWidth: 740, margin: '0 auto' }}>
+          <h2 style={{
+            fontSize: 'clamp(1.5rem, 3vw, 1.9rem)', fontWeight: 800, letterSpacing: '-0.03em',
+            fontFamily: "'DM Sans', sans-serif", color: '#e8e0d4',
+            margin: '0 0 1rem', lineHeight: 1.15,
+          }}>
+            Corrections are cheap. Waiting is expensive.
+          </h2>
+          <p style={{ ...prose, color: '#a89880' }}>
+            In traditional engineering, you block merges until everything is perfect. Code review is a gate. CI is a gate. QA is a gate. Every gate adds latency.
+          </p>
+          <p style={{ ...prose, color: '#a89880' }}>
+            In high-throughput agent systems, the math changes. The cost of a follow-up fix is almost always lower than the cost of blocking progress. Review agents catch issues. Implementation agents fix them. The loop continues — often in minutes, not days.
+          </p>
+          <p style={{ ...prose, color: '#a89880', margin: 0 }}>
+            This would be irresponsible in a low-throughput environment. When agent throughput exceeds human attention by an order of magnitude, it's the right tradeoff.
+          </p>
         </div>
+      </section>
 
-        {section('Observability is not optional', [
-          "Deploying code is not the finish line. Maestro's Monitor agent checks Datadog dashboards and Splunk logs for 15 minutes after every deploy. If latency spikes or error rates climb, it flags the change.",
-          'Deploy confidence comes from automated post-deploy verification, not hope.',
-        ])}
+      {/* 5 — Risk */}
+      <section style={{ maxWidth: 740, margin: '0 auto', padding: '3.5rem 2rem' }}>
+        {heading('Risk is scored, not assumed')}
+        <p style={prose}>
+          Not every change needs a human in the loop. A one-line copy fix and a database migration rewrite are not the same thing. Treating them the same — either blocking everything or auto-approving everything — is wrong.
+        </p>
+        <p style={prose}>
+          Maestro's Risk Profile Agent scores every pull request across seven dimensions before it can be merged:
+        </p>
 
-        {section('The pipeline is the product', [
-          'These principles are not abstract. They are encoded directly into the pipeline.',
-        ])}
-
-        {/* Pipeline diagram */}
+        {/* Risk cards */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '0.5rem', flexWrap: 'wrap', margin: '0 0 1.5rem',
-          padding: '1.25rem', borderRadius: '0.5rem',
-          background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '0.75rem', margin: '0 0 1.5rem',
         }}>
-          {['Issue', 'Implement', 'Review', 'Risk Profile', 'Deploy', 'Monitor'].map((stage, i, arr) => (
-            <span key={stage} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{
-                fontSize: '0.78rem', fontWeight: 600, color: 'var(--ma-fg)',
-                padding: '0.3rem 0.65rem', borderRadius: '0.35rem',
-                background: 'var(--ma-bg)', border: '1px solid var(--ma-border)',
-              }}>
-                {stage}
-              </span>
-              {i < arr.length - 1 && (
-                <span style={{ color: 'var(--ma-muted)', fontSize: '0.75rem' }}>&rarr;</span>
-              )}
-            </span>
+          {[
+            ['Scope', 'Files and lines changed'],
+            ['Blast radius', 'Systems and users affected'],
+            ['Complexity', 'New abstractions introduced'],
+            ['Test coverage', 'Tests for changed paths'],
+            ['Security', 'Auth, crypto, PII, secrets'],
+            ['Reversibility', 'Can it be rolled back?'],
+            ['Dependencies', 'External packages changed'],
+          ].map(([dim, desc]) => (
+            <div key={dim} style={{
+              padding: '0.85rem 1rem', borderRadius: '0.5rem',
+              background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
+            }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ma-fg)', marginBottom: '0.2rem' }}>{dim}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--ma-muted)', lineHeight: 1.5 }}>{desc}</div>
+            </div>
           ))}
         </div>
 
-        <p style={{ fontSize: '0.92rem', color: 'var(--ma-muted)', lineHeight: 1.8, margin: 0 }}>
-          Each transition is an explicit handoff from one agent to the next. Each agent has its own system prompt, model selection, and configuration. The pipeline is visible, auditable, and configurable — not a black box. This is what we mean by harness engineering: building the scaffolding that makes agents effective, rather than writing the code yourself.
+        <p style={{ ...prose, margin: 0 }}>
+          Low-risk changes auto-approve. Medium and above escalate to a human reviewer. The threshold is configurable per workspace. Risk becomes a number, not a feeling.
+        </p>
+      </section>
+
+      {/* 6 — Observability */}
+      <section style={{ background: 'var(--ma-surface)', padding: '3.5rem 2rem' }}>
+        <div style={{ maxWidth: 740, margin: '0 auto' }}>
+          {heading('Observability is not optional')}
+          <p style={prose}>
+            Deploying code is not the finish line. It's the beginning of a new question: did it work?
+          </p>
+          <p style={prose}>
+            After every merge, Maestro's Monitor Agent watches. It checks Datadog dashboards for latency spikes and error rate changes. It queries Splunk logs for new exceptions. It does this for 15 minutes — long enough to catch slow-burn regressions that don't show up in the first few seconds.
+          </p>
+          <p style={{ ...prose, margin: 0 }}>
+            Deploy confidence comes from automated post-deploy verification, not hope.
+          </p>
+        </div>
+      </section>
+
+      {/* 7 — Closing */}
+      <section style={{ maxWidth: 740, margin: '0 auto', padding: '3.5rem 2rem 5rem' }}>
+        {heading('The pipeline is the product')}
+        <p style={prose}>
+          These ideas are not abstract principles pinned to a wall. They are encoded directly into the system.
         </p>
 
-      </article>
+        {/* Pipeline visual */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '0', flexWrap: 'nowrap', margin: '1.5rem 0 2rem',
+          padding: '1.5rem', borderRadius: '0.75rem',
+          background: '#1a1612',
+        }}>
+          {[
+            { name: 'Implement', color: '#2563eb' },
+            { name: 'Review', color: '#d97706' },
+            { name: 'Risk', color: '#7c3aed' },
+            { name: 'Deploy', color: '#059669' },
+            { name: 'Monitor', color: '#0891b2' },
+          ].map((s, i, arr) => (
+            <div key={s.name} style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{
+                padding: '0.5rem 1rem', borderRadius: '0.4rem',
+                background: '#242018', border: `1px solid ${s.color}30`,
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: s.color, margin: '0 auto 0.35rem',
+                  boxShadow: `0 0 10px ${s.color}40`,
+                }} />
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#e8e0d4' }}>{s.name}</div>
+              </div>
+              {i < arr.length - 1 && (
+                <span style={{ color: '#706555', fontSize: '0.65rem', padding: '0 0.4rem' }}>&rarr;</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <p style={prose}>
+          Each transition is an explicit handoff. Each agent has its own system prompt, model, and configuration. The pipeline is visible, auditable, and configurable — not a black box.
+        </p>
+        <p style={{ ...prose, margin: 0 }}>
+          This is what we mean by harness engineering: building the scaffolding that makes agents effective, rather than writing the code yourself. The discipline shows up in the system design, not the syntax.
+        </p>
+      </section>
+
     </Layout>
   );
 }
