@@ -23,28 +23,8 @@ const HERO_STEPS = [
     lines: [
       { text: 'Checking out PR #142...', style: 'muted' },
       { text: 'Reading src/services/stripe.ts', style: 'tool' },
-      { text: 'stripe.ts:47 — missing idempotency key', style: 'warn' },
-      { text: 'Posted inline comment on PR', style: 'muted' },
-      { text: 'Verdict: Request Changes', style: 'warn' },
-    ],
-  },
-  {
-    agent: 'Implementation Agent',
-    color: '#2563eb',
-    lines: [
-      { text: 'Reading review comment...', style: 'muted' },
-      { text: 'Editing src/services/stripe.ts', style: 'tool' },
-      { text: 'Added idempotency_key parameter', style: 'success' },
-      { text: 'Pushed fix, replied in thread', style: 'success' },
-    ],
-  },
-  {
-    agent: 'Review Agent',
-    color: '#d97706',
-    lines: [
-      { text: 'Verifying fix in code...', style: 'muted' },
-      { text: 'Fix confirmed', style: 'success' },
-      { text: 'Thread resolved', style: 'success' },
+      { text: 'Reading src/routes/payments.ts', style: 'tool' },
+      { text: 'No issues found', style: 'success' },
       { text: 'Verdict: Approved', style: 'success' },
     ],
   },
@@ -65,7 +45,16 @@ const HERO_STEPS = [
       { text: 'CI: 4/4 checks passing', style: 'success' },
       { text: 'Merging via squash...', style: 'muted' },
       { text: 'Merged to main', style: 'success' },
-      { text: 'Monitor: Healthy', style: 'success' },
+    ],
+  },
+  {
+    agent: 'Monitor Agent',
+    color: '#0891b2',
+    lines: [
+      { text: 'Checking post-deploy health...', style: 'muted' },
+      { text: 'API latency: 42ms p99', style: 'default' },
+      { text: 'Error rate: 0.00%', style: 'default' },
+      { text: 'Status: Healthy', style: 'success' },
     ],
   },
 ];
