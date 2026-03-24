@@ -155,7 +155,7 @@ function HeroPipelineCard() {
           setTimeout(() => setSparkles(false), 600);
         }, 1200);
       }
-    }, isCustom ? 3500 : lineIndex === 0 ? 1400 : 1000);
+    }, isCustom ? 5000 : lineIndex === 0 ? 2000 : 1500);
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [step, lineIndex, transitioning]);
