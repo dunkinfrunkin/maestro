@@ -51,10 +51,13 @@ const HERO_STEPS = [
     agent: 'Monitor Agent',
     color: '#0891b2',
     lines: [
-      { text: 'Checking post-deploy health...', style: 'muted' },
+      { text: 'Monitoring for 15 minutes...', style: 'muted' },
+      { text: 'Checking Datadog dashboards...', style: 'tool' },
       { text: 'API latency: 42ms p99', style: 'default' },
-      { text: 'Error rate: 0.00%', style: 'default' },
-      { text: 'Status: Healthy', style: 'success' },
+      { text: 'Error rate: 0.00%', style: 'success' },
+      { text: 'Checking Splunk logs...', style: 'tool' },
+      { text: 'No new exceptions detected', style: 'success' },
+      { text: '15m elapsed — all systems healthy', style: 'success' },
     ],
   },
 ];
