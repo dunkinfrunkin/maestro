@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from maestro.auth import create_token, get_current_user, get_oidc, is_auth_disabled
 from maestro.db.models import User
 
+_FRONTEND_URL = os.environ.get("MAESTRO_FRONTEND_URL", "http://localhost:3000")
+
 router = APIRouter(prefix="/api/v1/auth")
 
 
@@ -160,19 +162,13 @@ async def sso_callback(request: Request):
     # Create session JWT
     session_token = create_token(email, name)
 
-    # Return HTML that stores token and redirects to dashboard
-    # (Same pattern as Kit)
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Maestro</title></head>
-<body style="background:#f5f0e8;color:#2c2416;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-<div style="text-align:center">
-<h2 style="color:#16a34a;margin-bottom:8px">Signed in as {email}</h2>
-<p style="color:#8a7e6b">Redirecting to dashboard...</p>
-</div>
-<script>
-localStorage.setItem('maestro-token','{session_token}');
-setTimeout(function(){{window.location.href='/'}},800);
-</script></body></html>"""
+    # Redirect to frontend with token in URL fragment
+    # Frontend reads the token from the hash and stores it in localStorage
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(
+        url=f"{_FRONTEND_URL}/auth/callback#token={session_token}",
+        status_code=302,
+    )
 
 
 # ---------------------------------------------------------------------------
