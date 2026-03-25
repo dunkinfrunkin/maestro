@@ -5,21 +5,22 @@ title: Configuration
 
 # Configuration
 
-Maestro is configured through the dashboard UI and environment variables.
+Maestro is configured through environment variables and the dashboard UI.
 
 ## Environment variables
 
-Set these in your `.env` file in the backend directory:
+Create a `.env` file in the backend directory:
 
 ```bash
 # Database
 DATABASE_URL=postgresql://maestro:maestro@localhost:5432/maestro
 
-# API Keys
+# LLM provider (required — at least one)
 ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...          # optional, for GPT-based agents
-GITHUB_TOKEN=ghp_...           # for PR creation and reviews
-LINEAR_API_KEY=lin_api_...     # optional, for Linear integration
+
+# Tracker integrations (optional)
+GITHUB_TOKEN=ghp_...
+LINEAR_API_KEY=lin_api_...
 
 # Server
 HOST=0.0.0.0
@@ -27,87 +28,71 @@ PORT=8000
 LOG_LEVEL=info
 ```
 
+All tokens are encrypted at rest using Fernet symmetric encryption before being stored in the database.
+
 ## Workspaces
 
-A workspace represents a local or remote codebase that agents operate on.
+A workspace represents a codebase that agents operate on.
 
-**Fields:**
-- **Name** — display name (e.g., "acme-api")
-- **Path** — local filesystem path to the repo
-- **Remote URL** — GitHub repository URL
-- **Default branch** — branch to base work off (default: `main`)
+| Field | Description |
+|---|---|
+| Name | Display name (e.g., `acme-api`) |
+| Path | Local filesystem path to the repo |
+| Remote URL | GitHub repository URL |
+| Default branch | Branch to base work off (default: `main`) |
 
-Create workspaces via the dashboard under **Settings > Workspaces**.
+Create and manage workspaces via **Settings > Workspaces** in the dashboard.
 
 ## Projects
 
-A project groups tasks and configuration together.
+A project groups tasks, agent configurations, and pipeline settings together.
 
-**Fields:**
-- **Name** — project name
-- **Workspace** — which workspace to use
-- **Description** — project context for agents
+| Field | Description |
+|---|---|
+| Name | Project display name |
+| Workspace | Which workspace to use |
+| Description | Context for agents (helps them understand the codebase) |
+
+Each project has its own agent prompts, risk thresholds, and connection settings.
 
 ## Connections
 
-Connections configure external service integrations.
-
 ### GitHub
 
-- **Token** — personal access token or GitHub App token
-- **Owner** — repository owner (org or user)
-- **Repo** — repository name
+| Field | Description |
+|---|---|
+| Token | Personal access token or GitHub App token |
+| Owner | Repository owner (org or user) |
+| Repo | Repository name (or `*` for all repos) |
 
 ### Linear
 
-- **API key** — Linear API key
-- **Team ID** — Linear team identifier
-- **Project ID** — optional Linear project to sync with
+| Field | Description |
+|---|---|
+| API key | Linear API key |
+| Team ID | Linear team identifier |
+| Project ID | Optional — sync a specific Linear project |
 
 ## Agent prompts
 
-Each agent's system prompt can be customized per-project. Navigate to **Project > Settings > Agent Prompts** in the dashboard.
+Each agent's system prompt can be customized per-project from the dashboard under **Agents**.
 
-### Implementation agent prompt
+The prompt editor uses CodeMirror with markdown syntax highlighting. Changes are saved immediately and apply to the next agent run.
 
-The default prompt instructs the agent to:
-- Follow existing code conventions
-- Write tests for new functionality
-- Keep changes focused and minimal
+**What you can customize:**
+- Code style and conventions for the Implementation Agent
+- Review criteria and severity rules for the Review Agent
+- Risk dimension weights for the Risk Profile Agent
+- Monitoring thresholds for the Monitor Agent
 
-You can add project-specific instructions, such as:
-- Preferred frameworks or libraries
-- Code style requirements
-- File organization patterns
+## Model selection
 
-### Review agent prompt
+Each agent can use a different model. Configure per-agent in the dashboard or via the API:
 
-The default prompt instructs the agent to:
-- Check for bugs and logic errors
-- Verify input validation and error handling
-- Flag performance concerns
-- Suggest improvements
-
-### Risk profile agent prompt
-
-The default prompt instructs the agent to:
-- Evaluate complexity based on diff size and logical changes
-- Assess blast radius by checking dependencies
-- Verify test coverage exists
-
-## API keys
-
-API keys for LLM providers are set as environment variables. Each agent can be configured to use a different model:
-
-```yaml
-# Example agent model configuration
-agents:
-  implementation:
-    model: claude-sonnet-4-20250514
-  review:
-    model: claude-sonnet-4-20250514
-  risk_profile:
-    model: claude-haiku-4-20250514
-  deployment:
-    model: null  # no LLM needed
-```
+| Agent | Default model | Notes |
+|---|---|---|
+| Implementation | `claude-sonnet-4-6` | Needs strong coding ability |
+| Review | `claude-sonnet-4-6` | Needs to reason about code quality |
+| Risk Profile | `claude-haiku-4-5` | Lighter task, faster model works well |
+| Deployment | None | No LLM needed — uses `gh` CLI directly |
+| Monitor | `claude-haiku-4-5` | Reads logs and metrics |

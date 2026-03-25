@@ -39,6 +39,19 @@ html, body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes sparkle {
+  0% { opacity: 0; transform: scale(0) translate(0, 0); }
+  40% { opacity: 1; transform: scale(1.5) translate(var(--sx, 8px), var(--sy, -8px)); }
+  100% { opacity: 0; transform: scale(0) translate(var(--sx, 16px), var(--sy, -16px)); }
+}
+
+/* Landing page: let content go full width */
+main[class*="docMainContainer"] .container,
+main .container {
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
 /* Headings use DM Sans */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--ifm-heading-font-family);

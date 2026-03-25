@@ -5,87 +5,114 @@ title: Agents
 
 # Agents
 
-Maestro uses specialized agents for each stage of the pipeline. Each agent has its own system prompt, model configuration, and execution logic.
+Maestro uses five specialized agents, each responsible for one stage of the pipeline. Every agent runs as a Claude Code CLI subprocess with access to Read, Write, Edit, Bash, Glob, and Grep tools.
 
 ## Implementation Agent
 
-**Purpose:** Write code to fulfill the task requirements.
+Writes code to fulfill task requirements.
 
-**How it works:**
-1. Reads the task description and any linked issues
-2. Explores the project codebase to understand structure, conventions, and patterns
-3. Writes the implementation — new files, modified files, tests
-4. Creates a Git branch and opens a pull request
-5. Attaches code snippets and file paths to the task activity log
+**What it does:**
+1. Reads the task description and linked issues
+2. Explores the project codebase — structure, conventions, patterns
+3. Writes the implementation (new files, modified files, tests)
+4. Runs the test suite
+5. Creates a branch and opens a pull request
+
+**On follow-up runs** (after review comments):
+1. Reads each review comment via `gh api`
+2. Applies the fix in code
+3. Replies directly in the PR comment thread
+4. Pushes the commit
 
 **Configuration:**
-- `model` — which LLM to use (default: Claude)
-- `system_prompt` — custom instructions for the agent
-- `max_file_reads` — limit on how many files the agent can read per run
-- `branch_prefix` — prefix for created branches (default: `maestro/`)
+
+| Setting | Default | Description |
+|---|---|---|
+| `model` | `claude-sonnet-4-6` | LLM model |
+| `system_prompt` | Built-in | Custom instructions |
+| `branch_prefix` | `maestro/` | Branch naming prefix |
 
 ## Review Agent
 
-**Purpose:** Perform inline code review on pull requests.
+Performs inline code review on pull requests.
 
-**How it works:**
-1. Fetches the PR diff from GitHub
-2. Reads each changed file in context
-3. Leaves inline comments on specific lines where issues are found
-4. Comments are categorized: `bug`, `style`, `performance`, `security`, `suggestion`
-5. If no issues found, approves the review
+**What it does:**
+1. Checks out the PR branch
+2. Reads each changed file in full context
+3. Posts inline comments on specific lines via GitHub API
+4. Categorizes comments: `bug`, `style`, `performance`, `security`, `suggestion`
+5. Issues a verdict: `APPROVE` or `REQUEST_CHANGES`
+
+**On verification runs** (after fixes are pushed):
+1. Re-reads the code at each commented location
+2. Verifies the fix addresses the comment
+3. Replies with confirmation in the thread
+4. Resolves the conversation via GitHub GraphQL API
+5. Approves once all threads are resolved
 
 **Configuration:**
-- `model` — which LLM to use
-- `system_prompt` — review criteria and style guidelines
-- `severity_threshold` — minimum severity to flag (default: `suggestion`)
-- `max_comments` — cap on number of comments per review
+
+| Setting | Default | Description |
+|---|---|---|
+| `model` | `claude-sonnet-4-6` | LLM model |
+| `system_prompt` | Built-in | Review criteria and style |
+| `severity_threshold` | `suggestion` | Minimum severity to flag |
+| `max_comments` | `20` | Cap per review |
 
 ## Risk Profile Agent
 
-**Purpose:** Assess the risk of merging a change.
+Assesses the risk of merging a change across seven dimensions.
 
-**How it works:**
+**What it does:**
 1. Analyzes the PR diff for complexity metrics
-2. Checks which modules and dependencies are affected (blast radius)
+2. Checks which modules and dependencies are affected
 3. Verifies test coverage for changed code
-4. Produces a risk score: `LOW`, `MEDIUM`, or `HIGH`
-5. `LOW` risk tasks proceed automatically; `MEDIUM` and `HIGH` require human approval
+4. Produces a score for each dimension (1-5)
+5. Outputs an overall risk level: `LOW`, `MEDIUM`, or `HIGH`
 
 **Configuration:**
-- `model` — which LLM to use
-- `system_prompt` — risk assessment criteria
-- `auto_merge_threshold` — risk level that can auto-merge (default: `LOW`)
+
+| Setting | Default | Description |
+|---|---|---|
+| `model` | `claude-sonnet-4-6` | LLM model |
+| `system_prompt` | Built-in | Risk criteria |
+| `auto_merge_threshold` | `LOW` | Max risk that auto-approves |
 
 ## Deployment Agent
 
-**Purpose:** Merge pull requests and monitor CI.
+Merges pull requests after verifying CI.
 
-**How it works:**
-1. Merges the approved PR into the target branch
-2. Monitors CI pipeline status (GitHub Actions, etc.)
-3. Reports success or failure
-4. On failure, attaches CI logs to the task
+**What it does:**
+1. Checks all GitHub Actions pipeline statuses
+2. Waits for all checks to pass (build, lint, test, deploy-preview)
+3. Merges the PR into the target branch
+4. Reports success or failure to the task
 
 **Configuration:**
-- `merge_strategy` — `squash`, `merge`, or `rebase` (default: `squash`)
-- `require_ci_pass` — wait for CI before marking as deployed (default: `true`)
-- `target_branch` — branch to merge into (default: `main`)
+
+| Setting | Default | Description |
+|---|---|---|
+| `merge_strategy` | `squash` | `squash`, `merge`, or `rebase` |
+| `require_ci_pass` | `true` | Block merge on CI failure |
+| `target_branch` | `main` | Branch to merge into |
 
 ## Monitor Agent
 
-**Purpose:** Post-deployment health monitoring.
+Watches for regressions after deployment.
 
-**How it works:**
-1. Watches application logs and error rates after deployment
-2. Compares error rates to pre-deployment baseline
-3. Flags anomalies if error rates spike
-4. Can trigger rollback alerts
+**What it does:**
+1. Queries Datadog for latency (p99) and error rate changes
+2. Queries Splunk logs for new exceptions
+3. Monitors for 15 minutes after deploy
+4. Flags the task if anomalies are detected
 
 **Configuration:**
-- `monitoring_window` — how long to watch after deploy (default: `30m`)
-- `error_threshold` — percentage increase that triggers an alert (default: `50%`)
-- `log_sources` — which log streams to watch
+
+| Setting | Default | Description |
+|---|---|---|
+| `monitoring_window` | `15m` | Duration to watch after deploy |
+| `error_threshold` | `50%` | Error rate increase that triggers alert |
+| `log_sources` | `datadog,splunk` | Which systems to query |
 
 ## Custom agents
 
