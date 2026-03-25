@@ -16,7 +16,7 @@ def create_tracker(provider: str, **kwargs: Any) -> IssueTracker:
     """Create an IssueTracker instance for the given provider.
 
     Args:
-        provider: "github", "linear", or "jira"
+        provider: "github", "linear", "jira", or "gitlab"
         **kwargs: Provider-specific arguments (token, repo, api_key, etc.)
     """
     provider = provider.lower()
@@ -50,6 +50,14 @@ def create_tracker(provider: str, **kwargs: Any) -> IssueTracker:
             terminal_statuses=kwargs.get("terminal_statuses"),
         )
 
+    if provider == "gitlab":
+        from maestro.external.gitlab.tracker import GitLabIssueTracker
+        return GitLabIssueTracker(
+            token=kwargs["token"],
+            project_id=kwargs["project_id"],
+            endpoint=kwargs.get("endpoint", "https://gitlab.com"),
+        )
+
     raise ValueError(f"Unknown tracker provider: {provider}")
 
 
@@ -57,7 +65,7 @@ def create_codehost(provider: str, **kwargs: Any) -> CodeHost:
     """Create a CodeHost instance for the given provider.
 
     Args:
-        provider: "github" (gitlab, bitbucket in future)
+        provider: "github" or "gitlab"
         **kwargs: Provider-specific arguments (token, endpoint, etc.)
     """
     provider = provider.lower()
@@ -67,6 +75,13 @@ def create_codehost(provider: str, **kwargs: Any) -> CodeHost:
         return GitHubCodeHost(
             token=kwargs["token"],
             endpoint=kwargs.get("endpoint", "https://api.github.com"),
+        )
+
+    if provider == "gitlab":
+        from maestro.external.gitlab.codehost import GitLabCodeHost
+        return GitLabCodeHost(
+            token=kwargs["token"],
+            endpoint=kwargs.get("endpoint", "https://gitlab.com"),
         )
 
     raise ValueError(f"Unknown code host provider: {provider}")
