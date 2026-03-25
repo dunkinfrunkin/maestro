@@ -10,12 +10,19 @@ interface AuthUser {
   name: string;
 }
 
+interface AuthConfig {
+  sso_enabled: boolean;
+  issuer?: string;
+  client_id?: string;
+}
+
 interface AuthCtx {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, name: string, password: string) => Promise<void>;
+  authConfig: AuthConfig | null;
+  loginWithEmail: (email: string) => Promise<void>;
+  loginWithSSO: () => void;
   logout: () => void;
 }
 
@@ -23,8 +30,9 @@ const AuthContext = createContext<AuthCtx>({
   user: null,
   token: null,
   loading: true,
-  login: async () => {},
-  register: async () => {},
+  authConfig: null,
+  loginWithEmail: async () => {},
+  loginWithSSO: () => {},
   logout: () => {},
 });
 
@@ -32,7 +40,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
 
+  // Fetch auth config (SSO enabled?)
+  useEffect(() => {
+    fetch(`${API_BASE}/api/v1/auth/config`)
+      .then((r) => r.json())
+      .then(setAuthConfig)
+      .catch(() => setAuthConfig({ sso_enabled: false }));
+  }, []);
+
+  // Check for existing token
   useEffect(() => {
     const stored = localStorage.getItem("maestro-token");
     if (stored) {
@@ -49,11 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const loginWithEmail = useCallback(async (email: string) => {
     const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -65,24 +83,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }, []);
 
-  const register = useCallback(
-    async (email: string, name: string, password: string) => {
-      const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, password }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Registration failed");
-      }
-      const data = await res.json();
-      localStorage.setItem("maestro-token", data.token);
-      setToken(data.token);
-      setUser(data.user);
-    },
-    []
-  );
+  const loginWithSSO = useCallback(() => {
+    // Redirect to backend SSO endpoint — it handles the OIDC redirect
+    window.location.href = `${API_BASE}/api/v1/auth/sso`;
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("maestro-token");
@@ -91,7 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, token, loading, authConfig, loginWithEmail, loginWithSSO, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
