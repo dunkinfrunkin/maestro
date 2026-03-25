@@ -16,7 +16,7 @@ def create_tracker(provider: str, **kwargs: Any) -> IssueTracker:
     """Create an IssueTracker instance for the given provider.
 
     Args:
-        provider: "github" or "linear"
+        provider: "github", "linear", or "jira"
         **kwargs: Provider-specific arguments (token, repo, api_key, etc.)
     """
     provider = provider.lower()
@@ -37,6 +37,17 @@ def create_tracker(provider: str, **kwargs: Any) -> IssueTracker:
             active_states=kwargs.get("active_states", []),
             terminal_states=kwargs.get("terminal_states", []),
             endpoint=kwargs.get("endpoint", "https://api.linear.app/graphql"),
+        )
+
+    if provider == "jira":
+        from maestro.external.jira.tracker import JiraIssueTracker
+        return JiraIssueTracker(
+            base_url=kwargs["base_url"],
+            api_token=kwargs["api_token"],
+            project_key=kwargs["project_key"],
+            email=kwargs.get("email", ""),
+            active_statuses=kwargs.get("active_statuses"),
+            terminal_statuses=kwargs.get("terminal_statuses"),
         )
 
     raise ValueError(f"Unknown tracker provider: {provider}")
