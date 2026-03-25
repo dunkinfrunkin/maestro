@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from maestro.auth import create_token, get_current_user, get_oidc
+from maestro.auth import create_token, get_current_user, get_oidc, is_auth_disabled
 from maestro.db.models import User
 
 router = APIRouter(prefix="/api/v1/auth")
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/api/v1/auth")
 
 
 class AuthConfigResponse(BaseModel):
-    sso_enabled: bool
+    auth_disabled: bool = False
+    sso_enabled: bool = False
     issuer: str | None = None
     client_id: str | None = None
 
@@ -50,6 +51,8 @@ class UserResponse(BaseModel):
 
 @router.get("/config")
 async def auth_config() -> AuthConfigResponse:
+    if is_auth_disabled():
+        return AuthConfigResponse(auth_disabled=True)
     oidc = get_oidc()
     if oidc:
         return AuthConfigResponse(
