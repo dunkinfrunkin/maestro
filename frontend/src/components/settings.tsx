@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { GitHubLogo, LinearLogo, JiraLogo, GitLabLogo } from "@/components/icons";
-import { ConnectionModal } from "@/components/connection-modal";
 import {
   WorkspaceResponse,
   ProjectResponse,
@@ -17,6 +16,7 @@ import {
   updateProject,
   deleteProject,
   fetchConnections,
+  createConnection,
   deleteConnection,
   fetchMembers,
   addMember,
@@ -165,10 +165,17 @@ function WorkspaceTab({
 // Connections tab
 // ---------------------------------------------------------------------------
 
+const PROVIDER_CARDS: { kind: string; name: string; desc: string; Logo: React.FC<{ className?: string }> }[] = [
+  { kind: "github", name: "GitHub", desc: "Issues and pull requests", Logo: GitHubLogo },
+  { kind: "gitlab", name: "GitLab", desc: "Issues and merge requests", Logo: GitLabLogo },
+  { kind: "linear", name: "Linear", desc: "Project issues", Logo: LinearLogo },
+  { kind: "jira", name: "Jira", desc: "Cloud or Server projects", Logo: JiraLogo },
+];
+
 function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [connectingKind, setConnectingKind] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setConnections(await fetchConnections()); setError(null); }
@@ -176,58 +183,146 @@ function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const logoFor = (kind: string) => {
-    if (kind === "github") return <GitHubLogo className="w-5 h-5 flex-shrink-0" />;
-    if (kind === "gitlab") return <GitLabLogo className="w-5 h-5 flex-shrink-0" />;
-    if (kind === "linear") return <LinearLogo className="w-5 h-5 flex-shrink-0" />;
-    if (kind === "jira") return <JiraLogo className="w-5 h-5 flex-shrink-0" />;
-    return null;
-  };
+  // Group connections by kind
+  const connByKind = new Map<string, TrackerConnection[]>();
+  for (const conn of connections) {
+    const list = connByKind.get(conn.kind) || [];
+    list.push(conn);
+    connByKind.set(conn.kind, list);
+  }
 
   return (
     <div>
       {error && <ErrorBanner message={error} />}
 
       <Section title="Connections" description="Connect issue trackers and code hosts to pull tasks into the pipeline.">
-        {connections.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-8 text-center">
-            <p className="text-sm text-muted mb-3">No connections yet</p>
-            <button onClick={() => setShowModal(true)}
-              className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity">
-              Add connection
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {connections.map((conn) => (
-              <div key={conn.id} className="flex items-center justify-between rounded-lg border border-border bg-surface p-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  {logoFor(conn.kind)}
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">{conn.name}</div>
-                    <div className="text-xs text-muted truncate">{conn.project || "All repositories"}</div>
-                  </div>
-                </div>
-                <button onClick={async () => { await deleteConnection(conn.id); load(); }}
-                  className="text-sm text-red-600 hover:text-red-800 transition-colors flex-shrink-0">Remove</button>
-              </div>
-            ))}
-            <button onClick={() => setShowModal(true)}
-              className="px-4 py-2 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors">
-              Add connection
-            </button>
-          </div>
-        )}
-      </Section>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {PROVIDER_CARDS.map(({ kind, name, desc, Logo }) => {
+            const conns = connByKind.get(kind) || [];
+            const isConnected = conns.length > 0;
+            const isExpanded = connectingKind === kind;
 
-      {showModal && (
-        <ConnectionModal
-          workspaceId={workspaceId}
-          onCreated={() => { setShowModal(false); load(); }}
-          onClose={() => setShowModal(false)}
-        />
-      )}
+            return (
+              <div key={kind} className={`rounded-lg border p-5 transition-colors ${
+                isConnected ? "border-green-300 bg-surface" : "border-border bg-surface"
+              }`}>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <Logo className="w-8 h-8" />
+                    <div>
+                      <div className="text-sm font-semibold">{name}</div>
+                      <div className="text-xs text-muted">{desc}</div>
+                    </div>
+                  </div>
+                  {isConnected && (
+                    <span className="text-xs font-medium text-green-700 bg-green-100 px-2.5 py-1 rounded-full">Connected</span>
+                  )}
+                </div>
+
+                {/* Connected instances */}
+                {conns.map((conn) => (
+                  <div key={conn.id} className="flex items-center justify-between py-2 px-3 rounded-md bg-background mb-2">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium truncate">{conn.name}</div>
+                      <div className="text-[10px] text-muted truncate">{conn.project || "All repositories"}</div>
+                    </div>
+                    <button onClick={async () => { await deleteConnection(conn.id); load(); }}
+                      className="text-xs text-red-600 hover:text-red-800 transition-colors flex-shrink-0 ml-2">Remove</button>
+                  </div>
+                ))}
+
+                {/* Connect / Add another button */}
+                {!isExpanded ? (
+                  <button
+                    onClick={() => setConnectingKind(kind)}
+                    className={`w-full mt-1 px-3 py-2 text-xs rounded-md transition-colors ${
+                      isConnected
+                        ? "border border-border text-muted hover:bg-surface-hover hover:text-foreground"
+                        : "bg-accent text-background hover:opacity-90"
+                    }`}
+                  >
+                    {isConnected ? "Add another" : "Connect"}
+                  </button>
+                ) : (
+                  <InlineConnectionForm
+                    kind={kind}
+                    workspaceId={workspaceId}
+                    onCreated={() => { setConnectingKind(null); load(); }}
+                    onCancel={() => setConnectingKind(null)}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
     </div>
+  );
+}
+
+function InlineConnectionForm({
+  kind,
+  workspaceId,
+  onCreated,
+  onCancel,
+}: {
+  kind: string;
+  workspaceId: number;
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [token, setToken] = useState("");
+  const [project, setProject] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const config: Record<string, { tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean; endpointPh: string }> = {
+    github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false, endpointPh: "https://api.github.com" },
+    gitlab: { tokenPh: "glpat-...", projectLabel: "Project ID", projectPh: "group/project", projectReq: true, endpointPh: "https://gitlab.com" },
+    linear: { tokenPh: "lin_api_...", projectLabel: "Project slug", projectPh: "my-project", projectReq: true, endpointPh: "https://api.linear.app/graphql" },
+    jira: { tokenPh: "ATATT...", projectLabel: "Project key", projectPh: "ENG", projectReq: true, endpointPh: "https://company.atlassian.net" },
+  };
+  const c = config[kind] || config.github;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !token) { setError("Name and token required"); return; }
+    if (c.projectReq && !project) { setError(`${c.projectLabel} is required`); return; }
+    if (kind === "jira" && !email) { setError("Email is required for Jira"); return; }
+    setSaving(true); setError(null);
+    try {
+      await createConnection({ kind, name, project, token, endpoint: endpoint || undefined, workspace_id: workspaceId });
+      onCreated();
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 pt-3 border-t border-border space-y-2">
+      {error && <div className="text-xs text-red-600">{error}</div>}
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Connection name"
+        className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted" />
+      <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={c.tokenPh}
+        className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+      {kind === "jira" && (
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
+          className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted" />
+      )}
+      <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={`${c.projectLabel}${c.projectReq ? "" : " (optional)"}: ${c.projectPh}`}
+        className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving}
+          className="flex-1 px-3 py-1.5 text-xs rounded-md bg-accent text-background hover:opacity-90 disabled:opacity-50">
+          {saving ? "..." : "Connect"}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-3 py-1.5 text-xs rounded-md text-muted hover:text-foreground transition-colors">Cancel</button>
+      </div>
+    </form>
   );
 }
 
