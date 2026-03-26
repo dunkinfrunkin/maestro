@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 _SECRET = os.environ.get("MAESTRO_SECRET", "dev-secret-change-me")
 _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRY_DAYS = 30
+_AUTH_DISABLED = os.environ.get("MAESTRO_AUTH_DISABLED", "").lower() in ("true", "1", "yes")
 
 _bearer = HTTPBearer()
 
@@ -200,14 +201,25 @@ def init_oidc() -> OIDCVerifier | None:
 # ---------------------------------------------------------------------------
 
 
+def is_auth_disabled() -> bool:
+    return _AUTH_DISABLED
+
+
 async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=not _AUTH_DISABLED))],
 ) -> User:
     """Authenticate a request and return the User.
 
-    Tries: self-signed JWT → API token lookup.
+    If MAESTRO_AUTH_DISABLED=true, returns a default dev user.
+    Otherwise tries: self-signed JWT → API token lookup.
     Creates user on first login (no signup needed).
     """
+    if _AUTH_DISABLED:
+        return await _get_or_create_dev_user()
+
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
     token = credentials.credentials
 
     email: str | None = None
@@ -255,4 +267,17 @@ async def get_current_user(
             await session.commit()
             await session.refresh(user)
 
+    return user
+
+
+async def _get_or_create_dev_user() -> User:
+    """Return a default dev user when auth is disabled."""
+    async with get_session() as session:
+        result = await session.execute(select(User).where(User.email == "dev@maestro.local"))
+        user = result.scalar_one_or_none()
+        if not user:
+            user = User(email="dev@maestro.local", name="Dev User", hashed_password="")
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
     return user

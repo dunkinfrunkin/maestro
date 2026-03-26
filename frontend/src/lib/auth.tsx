@@ -11,6 +11,7 @@ interface AuthUser {
 }
 
 interface AuthConfig {
+  auth_disabled?: boolean;
   sso_enabled: boolean;
   issuer?: string;
   client_id?: string;
@@ -50,8 +51,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => setAuthConfig({ sso_enabled: false }));
   }, []);
 
-  // Check for existing token
+  // Check for existing token or auth-disabled mode
   useEffect(() => {
+    if (authConfig?.auth_disabled) {
+      // Auth disabled — fetch /me without token, backend returns dev user
+      fetchMe("disabled")
+        .then((u) => { setUser(u); setToken("disabled"); })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+      return;
+    }
+    if (authConfig === null) return; // Still loading config
+
     const stored = localStorage.getItem("maestro-token");
     if (stored) {
       setToken(stored);
@@ -65,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [authConfig]);
 
   const loginWithEmail = useCallback(async (email: string) => {
     const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
