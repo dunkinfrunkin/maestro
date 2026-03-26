@@ -121,11 +121,31 @@ export function Sidebar() {
         {/* Dropdown menu (opens upward) */}
         {userMenuOpen && !collapsed && (
           <div className="absolute bottom-full left-0 right-0 mx-2 mb-1 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
-            {/* Current workspace display */}
-            <div className="px-3 py-2 border-b border-border">
-              <div className="text-[10px] text-muted">Workspace</div>
-              <div className="text-xs font-medium">{activeWorkspace?.name}</div>
-            </div>
+            {/* Workspace switcher */}
+            {workspaces.length > 0 && (
+              <div className="border-b border-border">
+                <div className="px-3 pt-2 pb-1">
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Workspace</div>
+                </div>
+                {workspaces.map((ws) => (
+                  <button
+                    key={ws.id}
+                    onClick={() => {
+                      if (ws.id !== activeWorkspace?.id) setActiveWorkspace(ws);
+                      setUserMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-xs transition-colors ${
+                      ws.id === activeWorkspace?.id
+                        ? "text-foreground font-medium bg-surface-hover"
+                        : "text-muted hover:bg-surface-hover hover:text-foreground"
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ws.id === activeWorkspace?.id ? "bg-green-500" : "bg-transparent"}`} />
+                    {ws.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="py-1">

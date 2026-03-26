@@ -27,13 +27,13 @@ import {
   removeMember,
 } from "@/lib/api";
 
-type SettingsTab = "general" | "connections" | "api-keys" | "members";
+type SettingsTab = "connections" | "api-keys" | "members" | "workspace";
 
 const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "general", label: "General" },
   { id: "connections", label: "Connections" },
   { id: "api-keys", label: "API Keys" },
   { id: "members", label: "Members" },
+  { id: "workspace", label: "Workspace" },
 ];
 
 export function SettingsPage({
@@ -45,7 +45,7 @@ export function SettingsPage({
   onWorkspacesChanged?: () => void;
   onWorkspaceSwitch?: (ws: WorkspaceResponse) => void;
 }) {
-  const [tab, setTab] = useState<SettingsTab>("general");
+  const [tab, setTab] = useState<SettingsTab>("connections");
   const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,19 +80,12 @@ export function SettingsPage({
       </div>
 
       {/* Tab content */}
-      {tab === "general" && ws && (
-        <GeneralTab
-          workspace={ws}
-          workspaces={workspaces}
-          isOwner={isOwner}
-          onReload={() => { load(); onWorkspacesChanged?.(); }}
-          onWorkspaceSwitch={onWorkspaceSwitch}
-          onWorkspacesChanged={onWorkspacesChanged}
-        />
-      )}
       {tab === "connections" && ws && <ConnectionsTab workspaceId={ws.id} />}
       {tab === "api-keys" && ws && <ApiKeysTab workspaceId={ws.id} />}
       {tab === "members" && ws && <MembersTab workspaceId={ws.id} isOwner={isOwner} />}
+      {tab === "workspace" && ws && (
+        <WorkspaceTab workspace={ws} isOwner={isOwner} onReload={() => { load(); onWorkspacesChanged?.(); }} onWorkspacesChanged={onWorkspacesChanged} />
+      )}
     </div>
   );
 }
@@ -101,32 +94,20 @@ export function SettingsPage({
 // General — workspace + projects management
 // ---------------------------------------------------------------------------
 
-function GeneralTab({
+function WorkspaceTab({
   workspace,
-  workspaces,
   isOwner,
   onReload,
-  onWorkspaceSwitch,
   onWorkspacesChanged,
 }: {
   workspace: WorkspaceResponse;
-  workspaces: WorkspaceResponse[];
   isOwner: boolean;
   onReload: () => void;
-  onWorkspaceSwitch?: (ws: WorkspaceResponse) => void;
   onWorkspacesChanged?: () => void;
 }) {
-  const [newWsName, setNewWsName] = useState("");
   const [editingWs, setEditingWs] = useState(false);
   const [editName, setEditName] = useState(workspace.name);
   const [error, setError] = useState<string | null>(null);
-
-  const handleCreateWorkspace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newWsName.trim()) return;
-    try { await createWorkspace(newWsName.trim()); setNewWsName(""); onReload(); }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
-  };
 
   const handleRename = async () => {
     if (!editName.trim()) return;
@@ -144,10 +125,9 @@ function GeneralTab({
     <div className="space-y-8">
       {error && <ErrorBanner message={error} />}
 
-      {/* Workspace info */}
-      <Section title="Workspace" description="Manage your current workspace settings.">
+      <Section title="Workspace" description="Manage workspace name and settings. Switch workspaces from the sidebar menu.">
         <div className="rounded-lg border border-border bg-surface p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             {editingWs ? (
               <div className="flex items-center gap-3 flex-1">
                 <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
@@ -174,41 +154,6 @@ function GeneralTab({
         </div>
       </Section>
 
-      {/* Switch workspace */}
-      {workspaces.length > 1 && (
-        <Section title="Switch workspace" description="You have access to multiple workspaces.">
-          <div className="space-y-2">
-            {workspaces.map((ws) => (
-              <div key={ws.id} className={`flex items-center justify-between rounded-lg border p-4 ${
-                ws.id === workspace.id ? "border-accent bg-surface" : "border-border hover:bg-surface-hover"
-              } transition-colors`}>
-                <div>
-                  <span className="text-sm font-medium">{ws.name}</span>
-                  <span className="text-xs text-muted ml-2">{ws.role}</span>
-                </div>
-                {ws.id === workspace.id ? (
-                  <span className="text-xs text-accent font-medium">Current</span>
-                ) : (
-                  <button onClick={() => onWorkspaceSwitch?.(ws)}
-                    className="text-sm text-accent hover:underline">Switch</button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Create new workspace */}
-      <Section title="Create workspace" description="Create a new workspace for a different team or project.">
-        <form onSubmit={handleCreateWorkspace} className="flex gap-3">
-          <input type="text" value={newWsName} onChange={(e) => setNewWsName(e.target.value)}
-            placeholder="Workspace name"
-            className="flex-1 max-w-sm px-3 py-2 text-sm rounded-md border border-border bg-surface placeholder:text-muted" />
-          <button type="submit" className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity">Create</button>
-        </form>
-      </Section>
-
-      {/* Projects */}
       <Section title="Projects" description="Projects group tasks and agent configurations within this workspace.">
         <ProjectsList workspaceId={workspace.id} onChanged={onWorkspacesChanged} />
       </Section>
