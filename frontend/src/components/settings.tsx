@@ -27,11 +27,11 @@ import {
   removeMember,
 } from "@/lib/api";
 
-type SettingsTab = "connections" | "api-keys" | "members" | "workspace";
+type SettingsTab = "connections" | "models" | "members" | "workspace";
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "connections", label: "Connections" },
-  { id: "api-keys", label: "API Keys" },
+  { id: "models", label: "Models" },
   { id: "members", label: "Members" },
   { id: "workspace", label: "Workspace" },
 ];
@@ -81,7 +81,7 @@ export function SettingsPage({
 
       {/* Tab content */}
       {tab === "connections" && ws && <ConnectionsTab workspaceId={ws.id} />}
-      {tab === "api-keys" && ws && <ApiKeysTab workspaceId={ws.id} />}
+      {tab === "models" && ws && <ModelsTab workspaceId={ws.id} />}
       {tab === "members" && ws && <MembersTab workspaceId={ws.id} isOwner={isOwner} />}
       {tab === "workspace" && ws && (
         <WorkspaceTab workspace={ws} isOwner={isOwner} onReload={() => { load(); onWorkspacesChanged?.(); }} onWorkspacesChanged={onWorkspacesChanged} />
@@ -416,87 +416,167 @@ function ConnectionDetailModal({
 }
 
 // ---------------------------------------------------------------------------
-// API Keys tab
+// Models tab
 // ---------------------------------------------------------------------------
 
-const API_KEY_PROVIDERS = [
-  { id: "anthropic", name: "Anthropic", description: "Claude API key — powers all agents", placeholder: "sk-ant-..." },
+const MODEL_PROVIDERS = [
+  { id: "anthropic", name: "Anthropic", desc: "Claude models", models: "Claude Sonnet, Opus, Haiku", placeholder: "sk-ant-...", icon: "A" },
+  { id: "openai", name: "OpenAI", desc: "GPT models", models: "GPT-4o, o1, o3", placeholder: "sk-...", icon: "O" },
+  { id: "google", name: "Google", desc: "Gemini models", models: "Gemini 2.5 Pro, Flash", placeholder: "AIza...", icon: "G" },
 ];
 
-function ApiKeysTab({ workspaceId }: { workspaceId: number }) {
+function ModelsTab({ workspaceId }: { workspaceId: number }) {
   const [statuses, setStatuses] = useState<Record<string, ApiKeyStatus>>({});
-  const [editingProvider, setEditingProvider] = useState<string | null>(null);
-  const [keyInput, setKeyInput] = useState("");
+  const [modalProvider, setModalProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const results: Record<string, ApiKeyStatus> = {};
-      for (const p of API_KEY_PROVIDERS) { results[p.id] = await getApiKeyStatus(workspaceId, p.id); }
+      for (const p of MODEL_PROVIDERS) { results[p.id] = await getApiKeyStatus(workspaceId, p.id); }
       setStatuses(results); setError(null);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed to load"); }
   }, [workspaceId]);
   useEffect(() => { load(); }, [load]);
 
-  const handleSave = async (provider: string) => {
-    if (!keyInput.trim()) return;
-    setSaving(true);
-    try { await setApiKey(workspaceId, provider, keyInput.trim()); setKeyInput(""); setEditingProvider(null); await load(); }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed to save"); }
-    finally { setSaving(false); }
-  };
-
-  const handleDelete = async (provider: string) => {
-    try { await deleteApiKey(workspaceId, provider); await load(); }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed to delete"); }
-  };
-
   return (
     <div>
       {error && <ErrorBanner message={error} />}
 
-      <Section title="API Keys" description="Manage API keys for LLM providers. Keys are encrypted at rest.">
-        <div className="space-y-3">
-          {API_KEY_PROVIDERS.map((p) => {
+      <Section title="Model Providers" description="Connect AI providers to power your agents. Keys are encrypted at rest.">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {MODEL_PROVIDERS.map((p) => {
             const status = statuses[p.id];
-            const isEditing = editingProvider === p.id;
-            return (
-              <div key={p.id} className="rounded-lg border border-border bg-surface p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${status?.has_key ? "bg-green-500" : "bg-gray-300"}`} />
-                    <span className="text-sm font-semibold">{p.name}</span>
-                    {status?.has_key && <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Connected</span>}
-                  </div>
-                  {status?.has_key && !isEditing && (
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => { setEditingProvider(p.id); setKeyInput(""); }} className="text-sm text-muted hover:text-foreground transition-colors">Replace</button>
-                      <button onClick={() => handleDelete(p.id)} className="text-sm text-red-600 hover:text-red-800 transition-colors">Remove</button>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted mb-3">{p.description}</p>
+            const isConnected = status?.has_key;
 
-                {(!status?.has_key || isEditing) && (
-                  <div className="flex gap-3">
-                    <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)}
-                      placeholder={p.placeholder}
-                      className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
-                    <button onClick={() => handleSave(p.id)} disabled={saving}
-                      className="px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50">
-                      {saving ? "..." : "Save"}
-                    </button>
-                    {isEditing && (
-                      <button onClick={() => setEditingProvider(null)} className="px-3 py-2 text-sm text-muted hover:text-foreground transition-colors">Cancel</button>
-                    )}
-                  </div>
+            return (
+              <button
+                key={p.id}
+                onClick={() => setModalProvider(p.id)}
+                className={`rounded-lg border p-5 text-center transition-all hover:shadow-md cursor-pointer ${
+                  isConnected ? "border-green-300 bg-surface" : "border-border bg-surface hover:border-accent/40"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-lg font-bold text-accent">{p.icon}</span>
+                </div>
+                <div className="text-sm font-semibold mb-0.5">{p.name}</div>
+                <div className="text-[10px] text-muted mb-1">{p.desc}</div>
+                <div className="text-[9px] text-muted mb-2">{p.models}</div>
+                {isConnected ? (
+                  <span className="text-[10px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Connected</span>
+                ) : (
+                  <span className="text-[10px] text-muted">Not connected</span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
       </Section>
+
+      {/* Modal */}
+      {modalProvider && (() => {
+        const p = MODEL_PROVIDERS.find((m) => m.id === modalProvider)!;
+        const status = statuses[p.id];
+        return (
+          <ModelProviderModal
+            provider={p}
+            isConnected={!!status?.has_key}
+            workspaceId={workspaceId}
+            onClose={() => setModalProvider(null)}
+            onChanged={load}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+function ModelProviderModal({
+  provider, isConnected, workspaceId, onClose, onChanged,
+}: {
+  provider: typeof MODEL_PROVIDERS[0];
+  isConnected: boolean;
+  workspaceId: number;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [keyInput, setKeyInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(!isConnected);
+
+  const handleSave = async () => {
+    if (!keyInput.trim()) return;
+    setSaving(true); setError(null);
+    try { await setApiKey(workspaceId, provider.id, keyInput.trim()); setKeyInput(""); setShowForm(false); onChanged(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Failed to save"); }
+    finally { setSaving(false); }
+  };
+
+  const handleRemove = async () => {
+    try { await deleteApiKey(workspaceId, provider.id); onChanged(); onClose(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Failed to remove"); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-foreground/20" onClick={onClose} />
+      <div className="relative bg-surface border border-border rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+              <span className="text-sm font-bold text-accent">{provider.icon}</span>
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">{provider.name}</h2>
+              <p className="text-xs text-muted">{provider.models}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-muted hover:text-foreground hover:bg-surface-hover transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {isConnected && !showForm && (
+            <div className="flex items-center justify-between p-3 rounded-md border border-green-300 bg-green-50">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium">API key configured</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowForm(true)} className="text-xs text-muted hover:text-foreground transition-colors">Replace</button>
+                <button onClick={handleRemove} className="text-xs text-red-600 hover:text-red-800 transition-colors">Remove</button>
+              </div>
+            </div>
+          )}
+
+          {showForm && (
+            <div className="space-y-3">
+              {error && <div className="text-xs text-red-600 p-2 bg-red-50 rounded-md">{error}</div>}
+              <div>
+                <label className="block text-xs text-muted mb-1">API Key</label>
+                <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)}
+                  placeholder={provider.placeholder}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleSave} disabled={saving}
+                  className="flex-1 px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 disabled:opacity-50">
+                  {saving ? "Saving..." : "Save key"}
+                </button>
+                {isConnected && (
+                  <button onClick={() => setShowForm(false)}
+                    className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors">Cancel</button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
