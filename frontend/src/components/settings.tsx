@@ -175,9 +175,9 @@ export function SettingsPage({
                       <button
                         key={t}
                         onClick={() => setWsSubTab(ws.id, t)}
-                        className={`px-4 py-2 text-xs capitalize -mb-px transition-colors ${
+                        className={`px-5 py-3 text-sm -mb-px transition-colors ${
                           currentSubTab === t
-                            ? "border-b-2 border-accent text-foreground font-medium"
+                            ? "border-b-2 border-accent text-foreground font-semibold"
                             : "text-muted hover:text-foreground"
                         }`}
                       >
