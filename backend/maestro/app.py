@@ -33,6 +33,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Failed to initialize database")
 
+    # Initialize OIDC (if configured)
+    from maestro.auth import init_oidc
+    init_oidc()
+
     # Initialize plugin registry
     from maestro.agent.plugin import init_plugins
     init_plugins()
