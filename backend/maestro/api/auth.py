@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from maestro.auth import create_token, get_current_user, get_oidc, is_auth_disabled
 from maestro.db.models import User
 
-_FRONTEND_URL = os.environ.get("MAESTRO_FRONTEND_URL", "http://localhost:3000")
+_FRONTEND_URL = os.environ.get("MAESTRO_FRONTEND_URL", "")
 
 router = APIRouter(prefix="/api/v1/auth")
 
@@ -118,57 +118,53 @@ async def sso_redirect(request: Request):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/callback", response_class=HTMLResponse)
+@router.get("/callback")
 async def sso_callback(request: Request):
-    """Handle OIDC callback: exchange code, verify token, create session."""
+    """Handle OIDC callback: exchange code, verify token, redirect to frontend."""
+    import logging
+    from fastapi.responses import RedirectResponse
+    import jwt as pyjwt
+
+    logger = logging.getLogger(__name__)
+
     oidc = get_oidc()
     if not oidc:
-        raise HTTPException(status_code=404, detail="SSO not configured")
+        return RedirectResponse(f"{_FRONTEND_URL}?error=SSO+not+configured")
 
     code = request.query_params.get("code")
     if not code:
-        error = request.query_params.get("error_description") or request.query_params.get("error") or "Unknown error"
-        raise HTTPException(status_code=400, detail=f"SSO failed: {error}")
+        error = request.query_params.get("error_description") or request.query_params.get("error") or "Unknown"
+        return RedirectResponse(f"{_FRONTEND_URL}?error={error}")
 
-    # Get PKCE verifier from cookie
     verifier = request.cookies.get("maestro_pkce", "")
-
     callback_url = str(request.base_url).rstrip("/") + "/api/v1/auth/callback"
 
-    # Exchange code for tokens
     try:
         token_data = await oidc.exchange_code(code, callback_url, verifier)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Token exchange failed: {e}")
+        logger.info("Token exchange response keys: %s", list(token_data.keys()))
 
-    id_token = token_data.get("id_token") or token_data.get("access_token")
-    if not id_token:
-        raise HTTPException(status_code=500, detail="No ID token in response")
+        id_token = token_data.get("id_token") or token_data.get("access_token")
+        if not id_token:
+            return RedirectResponse(f"{_FRONTEND_URL}?error=No+ID+token")
 
-    # Verify and extract email
-    try:
         email = await oidc.verify_id_token(id_token)
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"Token verification failed: {e}")
 
-    # Extract name from ID token if available
-    import jwt as pyjwt
-    try:
-        claims = pyjwt.decode(id_token, options={"verify_signature": False})
-        name = claims.get("name", "") or claims.get("given_name", "") or email.split("@")[0]
-    except Exception:
-        name = email.split("@")[0]
+        try:
+            claims = pyjwt.decode(id_token, options={"verify_signature": False})
+            name = claims.get("name", "") or claims.get("given_name", "") or email.split("@")[0]
+        except Exception:
+            name = email.split("@")[0]
 
-    # Create session JWT
-    session_token = create_token(email, name)
+        session_token = create_token(email, name)
+        logger.info("SSO login successful: %s", email)
 
-    # Redirect to frontend with token in URL fragment
-    # Frontend reads the token from the hash and stores it in localStorage
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(
-        url=f"{_FRONTEND_URL}/auth/callback#token={session_token}",
-        status_code=302,
-    )
+        return RedirectResponse(
+            url=f"{_FRONTEND_URL}/auth/callback#token={session_token}",
+            status_code=302,
+        )
+    except Exception as e:
+        logger.exception("SSO callback failed")
+        return RedirectResponse(f"{_FRONTEND_URL}?error=SSO+failed")
 
 
 # ---------------------------------------------------------------------------
