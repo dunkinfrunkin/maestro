@@ -100,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(agent_runs_router)
     app.include_router(agents_router)
     app.include_router(auth_router)
+    app.include_router(auth_router, prefix="/api")  # also serve at /api/auth/*
     app.include_router(api_router)
     app.include_router(tasks_router)
     app.include_router(workspaces_router)
