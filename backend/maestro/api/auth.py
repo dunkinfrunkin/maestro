@@ -102,7 +102,7 @@ async def sso_redirect(request: Request):
     response.set_cookie(
         "maestro_pkce",
         verifier,
-        path="/api/v1/auth",
+        path="/auth",
         max_age=300,
         httponly=True,
         samesite="lax",
