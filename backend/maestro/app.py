@@ -91,7 +91,13 @@ def create_app() -> FastAPI:
     # Session middleware — required by Authlib for OIDC state/nonce
     from starlette.middleware.sessions import SessionMiddleware
     secret = os.environ.get("MAESTRO_SECRET", "dev-secret-change-me")
-    app.add_middleware(SessionMiddleware, secret_key=secret)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=secret,
+        same_site="lax",
+        https_only=False,
+        max_age=300,  # 5 min — only needed during SSO flow
+    )
 
     cors_origins = os.environ.get("MAESTRO_CORS_ORIGINS", "http://localhost:3000").split(",")
     app.add_middleware(
