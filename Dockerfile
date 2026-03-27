@@ -11,13 +11,13 @@ RUN npm run build
 FROM python:3.12-slim AS backend-builder
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-COPY backend/pyproject.toml backend/uv.lock* backend/README.md* ./
-RUN touch README.md && uv sync --frozen --no-dev --no-editable 2>/dev/null || uv sync --no-dev
+COPY backend/ .
+RUN touch README.md && uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
 
 # ── Stage 3: Final image ──
 FROM python:3.12-slim
 
-# Install nginx and node (for Next.js standalone)
+# Install nginx and node
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     curl \
@@ -25,15 +25,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-# Backend
+# Backend — copy venv and source
 WORKDIR /app/backend
 COPY --from=backend-builder /app/.venv ./.venv
-COPY backend/ .
+COPY --from=backend-builder /app/ .
 
-# Frontend (standalone)
+# Frontend — copy standalone build
 WORKDIR /app/frontend
 COPY --from=frontend-builder /app/.next/standalone ./
 COPY --from=frontend-builder /app/.next/static ./.next/static
@@ -41,6 +38,7 @@ COPY --from=frontend-builder /app/public ./public
 
 # Nginx config
 COPY nginx.docker.conf /etc/nginx/sites-enabled/default
+RUN rm -f /etc/nginx/sites-enabled/default.bak /etc/nginx/sites-available/default
 
 # Startup script
 COPY entrypoint.sh /entrypoint.sh
