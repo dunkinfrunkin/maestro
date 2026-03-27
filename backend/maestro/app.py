@@ -33,10 +33,6 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Failed to initialize database")
 
-    # Initialize OIDC (if configured)
-    from maestro.auth import init_oidc
-    init_oidc()
-
     # Initialize plugin registry
     from maestro.agent.plugin import init_plugins
     init_plugins()
@@ -86,17 +82,6 @@ def create_app() -> FastAPI:
         description="Symphony-spec orchestration daemon for coding agents",
         version="0.1.0",
         lifespan=lifespan,
-    )
-
-    # Session middleware — required by Authlib for OIDC state/nonce
-    from starlette.middleware.sessions import SessionMiddleware
-    secret = os.environ.get("MAESTRO_SECRET", "dev-secret-change-me")
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=secret,
-        same_site="lax",
-        https_only=False,
-        max_age=300,  # 5 min — only needed during SSO flow
     )
 
     cors_origins = os.environ.get("MAESTRO_CORS_ORIGINS", "http://localhost:3000").split(",")

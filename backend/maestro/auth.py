@@ -1,15 +1,14 @@
-"""Authentication: OIDC/SSO via Authlib, JWT sessions, API tokens.
+"""Authentication: OIDC/SSO, JWT sessions, API tokens.
 
-Three auth methods (tried in order):
-1. API tokens (maestro_ prefix, SHA256 hashed)
-2. Self-signed JWT (HMAC-SHA256, signed with MAESTRO_SECRET)
-3. OIDC tokens (handled by Authlib)
+Approach matches Kit: PKCE cookie + manual token exchange.
+No session middleware, no state validation. PKCE is the CSRF protection.
 
 No passwords. Email is the identity.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import logging
 import os
@@ -17,8 +16,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
+import httpx
 import jwt
-from authlib.integrations.starlette_client import OAuth
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
@@ -33,42 +32,94 @@ _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRY_DAYS = 30
 _AUTH_DISABLED = os.environ.get("MAESTRO_AUTH_DISABLED", "").lower() in ("true", "1", "yes")
 
+OIDC_ISSUER = os.environ.get("MAESTRO_OIDC_ISSUER", "")
+OIDC_CLIENT_ID = os.environ.get("MAESTRO_OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = os.environ.get("MAESTRO_OIDC_CLIENT_SECRET", "")
 
-# ---------------------------------------------------------------------------
-# OAuth / OIDC via Authlib
-# ---------------------------------------------------------------------------
-
-oauth = OAuth()
-
-_OIDC_ISSUER = os.environ.get("MAESTRO_OIDC_ISSUER", "")
-_OIDC_CLIENT_ID = os.environ.get("MAESTRO_OIDC_CLIENT_ID", "")
-_OIDC_CLIENT_SECRET = os.environ.get("MAESTRO_OIDC_CLIENT_SECRET", "")
-
-
-def init_oidc() -> bool:
-    """Register OIDC provider with Authlib if configured."""
-    if not _OIDC_ISSUER or not _OIDC_CLIENT_ID:
-        logger.info("OIDC not configured — email-only login available")
-        return False
-
-    oauth.register(
-        name="oidc",
-        client_id=_OIDC_CLIENT_ID,
-        client_secret=_OIDC_CLIENT_SECRET or None,
-        server_metadata_url=f"{_OIDC_ISSUER.rstrip('/')}/.well-known/openid-configuration",
-        client_kwargs={"scope": "openid email profile"},
-        code_challenge_method="S256",
-    )
-    logger.info("OIDC configured via Authlib: issuer=%s", _OIDC_ISSUER)
-    return True
-
-
-def is_oidc_configured() -> bool:
-    return "oidc" in oauth._clients  # noqa: SLF001
+# Cached OIDC discovery
+_discovery: dict | None = None
 
 
 def is_auth_disabled() -> bool:
     return _AUTH_DISABLED
+
+
+def is_oidc_configured() -> bool:
+    return bool(OIDC_ISSUER and OIDC_CLIENT_ID)
+
+
+# ---------------------------------------------------------------------------
+# OIDC discovery (cached)
+# ---------------------------------------------------------------------------
+
+
+async def get_discovery() -> dict:
+    global _discovery
+    if _discovery:
+        return _discovery
+    url = f"{OIDC_ISSUER.rstrip('/')}/.well-known/openid-configuration"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        _discovery = resp.json()
+    return _discovery
+
+
+# ---------------------------------------------------------------------------
+# PKCE — matches Kit exactly
+# ---------------------------------------------------------------------------
+
+
+def generate_pkce_verifier() -> str:
+    """32 random bytes, base64url encoded (43 chars). Same as Kit."""
+    return base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+
+
+def pkce_challenge(verifier: str) -> str:
+    """SHA256 of verifier, base64url encoded. Same as Kit."""
+    return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+
+
+# ---------------------------------------------------------------------------
+# Token exchange — matches Kit exactly
+# ---------------------------------------------------------------------------
+
+
+async def exchange_code(code: str, redirect_uri: str, verifier: str) -> dict:
+    """Exchange authorization code for tokens. Form-urlencoded POST, like Kit."""
+    disc = await get_discovery()
+    token_endpoint = disc["token_endpoint"]
+
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": OIDC_CLIENT_ID,
+    }
+    if verifier:
+        data["code_verifier"] = verifier
+    if OIDC_CLIENT_SECRET:
+        data["client_secret"] = OIDC_CLIENT_SECRET
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            token_endpoint,
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        body = resp.json()
+        if resp.status_code != 200:
+            error = body.get("error_description") or body.get("error") or str(body)
+            raise ValueError(f"Token exchange failed ({resp.status_code}): {error}")
+        return body
+
+
+def extract_email_from_id_token(id_token: str) -> tuple[str, str]:
+    """Decode ID token (trusted — from direct server exchange) and return (email, name)."""
+    claims = jwt.decode(id_token, options={"verify_signature": False}, algorithms=["RS256", "HS256"])
+    email = claims.get("email") or claims.get("preferred_username") or claims.get("sub") or ""
+    name = claims.get("name", "") or claims.get("given_name", "") or ""
+    return email, name
 
 
 # ---------------------------------------------------------------------------
@@ -84,15 +135,6 @@ def create_token(email: str, name: str = "") -> str:
         "exp": datetime.now(timezone.utc) + timedelta(days=_JWT_EXPIRY_DAYS),
     }
     return jwt.encode(payload, _SECRET, algorithm=_JWT_ALGORITHM)
-
-
-def decode_token(token: str) -> dict:
-    try:
-        return jwt.decode(token, _SECRET, algorithms=[_JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # ---------------------------------------------------------------------------

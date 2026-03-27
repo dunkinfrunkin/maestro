@@ -1,24 +1,33 @@
-"""Auth API routes: SSO via Authlib, email login, config, me."""
+"""Auth API routes — matches Kit's approach exactly.
+
+SSO redirect: PKCE verifier in httponly cookie, redirect to IdP.
+Callback: read verifier from cookie, exchange code, return HTML that
+sets localStorage and redirects. No session middleware, no state
+validation. PKCE is the CSRF protection.
+"""
 
 from __future__ import annotations
 
 import logging
 import os
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from starlette.middleware.sessions import SessionMiddleware
 
 from maestro.auth import (
+    OIDC_CLIENT_ID,
+    OIDC_ISSUER,
     create_token,
+    exchange_code,
+    extract_email_from_id_token,
+    generate_pkce_verifier,
     get_current_user,
+    get_discovery,
     is_auth_disabled,
     is_oidc_configured,
-    oauth,
-    _OIDC_ISSUER,
-    _OIDC_CLIENT_ID,
-    _SECRET,
+    pkce_challenge,
 )
 from maestro.db.models import User
 
@@ -67,134 +76,127 @@ async def auth_config() -> AuthConfigResponse:
     if is_auth_disabled():
         return AuthConfigResponse(auth_disabled=True)
     if is_oidc_configured():
-        return AuthConfigResponse(
-            sso_enabled=True,
-            issuer=_OIDC_ISSUER,
-            client_id=_OIDC_CLIENT_ID,
-        )
+        return AuthConfigResponse(sso_enabled=True, issuer=OIDC_ISSUER, client_id=OIDC_CLIENT_ID)
     return AuthConfigResponse(sso_enabled=False)
 
 
 # ---------------------------------------------------------------------------
-# SSO — Authlib handles PKCE, discovery, token exchange, everything
+# SSO redirect — matches Kit: PKCE cookie, redirect to IdP
 # ---------------------------------------------------------------------------
 
 
 @router.get("/sso")
 async def sso_redirect(request: Request):
-    """Redirect to OIDC provider. Authlib handles PKCE automatically."""
     if not is_oidc_configured():
         raise HTTPException(status_code=404, detail="SSO not configured")
 
+    disc = await get_discovery()
+    auth_endpoint = disc["authorization_endpoint"]
+
+    verifier = generate_pkce_verifier()
+    challenge = pkce_challenge(verifier)
+
     callback_url = _CALLBACK_URL or (str(request.base_url).rstrip("/") + "/auth/callback")
-    return await oauth.oidc.authorize_redirect(request, callback_url)
+
+    params = {
+        "client_id": OIDC_CLIENT_ID,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "redirect_uri": callback_url,
+        "state": "ui",  # static, not validated — PKCE is the protection
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+    }
+
+    response = Response(status_code=302)
+    response.headers["Location"] = auth_endpoint + "?" + urlencode(params)
+    response.set_cookie(
+        "maestro_pkce",
+        verifier,
+        path="/",
+        max_age=300,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
 
 
-@router.get("/callback")
+# ---------------------------------------------------------------------------
+# SSO callback — matches Kit: read cookie, exchange code, return HTML
+# ---------------------------------------------------------------------------
+
+
+@router.get("/callback", response_class=HTMLResponse)
 async def sso_callback(request: Request):
-    """Handle OIDC callback. Authlib handles code exchange + PKCE."""
-    import jwt as pyjwt
-
     if not is_oidc_configured():
-        return RedirectResponse(f"{_FRONTEND_URL}?error=SSO+not+configured")
+        return _error_html("SSO not configured")
 
+    code = request.query_params.get("code")
+    if not code:
+        error = request.query_params.get("error_description") or request.query_params.get("error") or "Unknown error"
+        return _error_html(f"SSO failed: {error}")
+
+    # Read PKCE verifier from cookie
+    verifier = request.cookies.get("maestro_pkce", "")
+    if not verifier:
+        return _error_html("Missing PKCE verifier cookie")
+
+    callback_url = _CALLBACK_URL or (str(request.base_url).rstrip("/") + "/auth/callback")
+
+    # Exchange code for tokens
     try:
-        token = await oauth.oidc.authorize_access_token(request)
+        token_data = await exchange_code(code, callback_url, verifier)
     except Exception as e:
-        # State mismatch can happen with reverse proxies — fall back to
-        # manual token exchange if we have a code. PKCE is our CSRF protection.
-        code = request.query_params.get("code")
-        if not code:
-            logger.exception("OIDC callback failed, no code")
-            return RedirectResponse(f"{_FRONTEND_URL}?error=SSO+failed")
+        logger.exception("Token exchange failed")
+        return _error_html(f"Token exchange failed: {e}")
 
-        logger.warning("Authlib state mismatch, doing manual token exchange: %s", e)
-        try:
-            token = await _manual_token_exchange(request, code)
-        except Exception as e2:
-            logger.exception("Manual token exchange also failed")
-            return RedirectResponse(f"{_FRONTEND_URL}?error=Token+exchange+failed")
+    # Get ID token
+    id_token = token_data.get("id_token") or token_data.get("access_token")
+    if not id_token:
+        return _error_html("No ID token in response")
 
-    # Extract user info
-    userinfo = token.get("userinfo")
-    if not userinfo:
-        id_token_str = token.get("id_token", "")
-        if isinstance(id_token_str, str) and id_token_str:
-            try:
-                userinfo = pyjwt.decode(id_token_str, options={"verify_signature": False})
-            except Exception:
-                pass
-    if not userinfo:
-        # Try decoding from the raw token response
-        for key in ("id_token", "access_token"):
-            raw = token.get(key, "")
-            if isinstance(raw, str) and "." in raw:
-                try:
-                    userinfo = pyjwt.decode(raw, options={"verify_signature": False})
-                    break
-                except Exception:
-                    continue
+    # Extract email and name
+    try:
+        email, name = extract_email_from_id_token(id_token)
+    except Exception as e:
+        logger.exception("Failed to decode ID token")
+        return _error_html(f"Failed to decode token: {e}")
 
-    if not userinfo:
-        return RedirectResponse(f"{_FRONTEND_URL}?error=No+user+info")
-
-    email = userinfo.get("email") or userinfo.get("preferred_username") or userinfo.get("sub")
     if not email:
-        return RedirectResponse(f"{_FRONTEND_URL}?error=No+email+in+token")
+        return _error_html("No email in token")
 
-    name = userinfo.get("name", "") or userinfo.get("given_name", "") or email.split("@")[0]
+    if not name:
+        name = email.split("@")[0]
 
+    # Create session JWT
     session_token = create_token(email, name)
     logger.info("SSO login successful: %s", email)
 
-    return RedirectResponse(
-        url=f"{_FRONTEND_URL}/auth/callback#token={session_token}",
-        status_code=302,
-    )
+    # Return HTML that stores token and redirects — same pattern as Kit
+    frontend_url = _FRONTEND_URL or ""
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Maestro</title></head>
+<body style="background:#f5f0e8;color:#2c2416;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+<h2 style="color:#16a34a;margin-bottom:8px">Signed in as {email}</h2>
+<p style="color:#8a7e6b">Redirecting to dashboard...</p>
+</div>
+<script>
+localStorage.setItem('maestro-token','{session_token}');
+setTimeout(function(){{window.location.href='{frontend_url}/'}},800);
+</script></body></html>""")
 
 
-async def _manual_token_exchange(request: Request, code: str) -> dict:
-    """Manual OIDC token exchange — fallback when Authlib state fails."""
-    import httpx
-
-    callback_url = _CALLBACK_URL or (str(request.base_url).rstrip("/") + "/auth/callback")
-
-    # Get token endpoint from discovery
-    metadata_url = f"{_OIDC_ISSUER.rstrip('/')}/.well-known/openid-configuration"
-    async with httpx.AsyncClient() as client:
-        disc = await client.get(metadata_url)
-        token_endpoint = disc.json()["token_endpoint"]
-
-        # Get the PKCE verifier from the session if available
-        verifier = ""
-        session = request.session
-        for key in session:
-            if key.startswith("_state_oidc_"):
-                state_data = session[key].get("data", {})
-                verifier = state_data.get("code_verifier", "")
-                break
-
-        data = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": callback_url,
-            "client_id": _OIDC_CLIENT_ID,
-        }
-        if verifier:
-            data["code_verifier"] = verifier
-        if _OIDC_CLIENT_SECRET:
-            data["client_secret"] = _OIDC_CLIENT_SECRET
-
-        resp = await client.post(
-            token_endpoint,
-            data=data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        body = resp.json()
-        if resp.status_code != 200:
-            error = body.get("error_description") or body.get("error") or str(body)
-            raise ValueError(f"Token exchange failed ({resp.status_code}): {error}")
-        return body
+def _error_html(message: str) -> HTMLResponse:
+    frontend_url = _FRONTEND_URL or ""
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Maestro</title></head>
+<body style="background:#f5f0e8;color:#2c2416;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+<h2 style="color:#dc2626;margin-bottom:8px">Authentication failed</h2>
+<p style="color:#8a7e6b">{message}</p>
+<p><a href="{frontend_url}/" style="color:#6b5b3e">Back to login</a></p>
+</div></body></html>""", status_code=400)
 
 
 # ---------------------------------------------------------------------------
@@ -221,10 +223,7 @@ async def login(body: LoginRequest) -> AuthResponse:
             await session.refresh(user)
 
     token = create_token(user.email, user.name)
-    return AuthResponse(
-        token=token,
-        user=UserResponse(id=user.id, email=user.email, name=user.name),
-    )
+    return AuthResponse(token=token, user=UserResponse(id=user.id, email=user.email, name=user.name))
 
 
 # ---------------------------------------------------------------------------
