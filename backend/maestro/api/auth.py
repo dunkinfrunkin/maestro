@@ -78,14 +78,10 @@ async def sso_redirect(request: Request):
     if not oidc:
         raise HTTPException(status_code=404, detail="SSO not configured")
 
-    # PKCE
-    verifier = secrets.token_urlsafe(64)
-    challenge = (
-        __import__("base64")
-        .urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
-        .rstrip(b"=")
-        .decode()
-    )
+    # PKCE — match Kit: 32 random bytes, base64url encoded (43 chars)
+    import base64
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
 
     auth_endpoint = await oidc.get_authorization_endpoint()
     callback_url = _CALLBACK_URL or (str(request.base_url).rstrip("/") + "/auth/callback")
