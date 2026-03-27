@@ -11,8 +11,8 @@ RUN npm run build
 FROM python:3.12-slim AS backend-builder
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-COPY backend/pyproject.toml backend/uv.lock* ./
-RUN uv sync --frozen --no-dev --no-editable 2>/dev/null || uv sync --no-dev
+COPY backend/pyproject.toml backend/uv.lock* backend/README.md* ./
+RUN touch README.md && uv sync --frozen --no-dev --no-editable 2>/dev/null || uv sync --no-dev
 
 # ── Stage 3: Final image ──
 FROM python:3.12-slim
