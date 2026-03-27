@@ -195,10 +195,21 @@ const FORM_CFG: Record<string, { tokenPh: string; projectLabel: string; projectP
   jira: { tokenPh: "ATATT...", projectLabel: "Project key", projectPh: "ENG", projectReq: true },
 };
 
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "code", label: "Code Hosts" },
+  { id: "trackers", label: "Issue Trackers" },
+];
+
+const CATEGORY_MAP: Record<string, string> = {
+  github: "code", gitlab: "code", linear: "trackers", jira: "trackers",
+};
+
 function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [modalKind, setModalKind] = useState<string | null>(null);
+  const [filter, setFilter] = useState("all");
 
   const load = useCallback(async () => {
     try { setConnections(await fetchConnections()); setError(null); }
@@ -213,43 +224,59 @@ function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
     connByKind.set(conn.kind, list);
   }
 
+  const filtered = filter === "all"
+    ? ALL_PROVIDERS
+    : ALL_PROVIDERS.filter((p) => CATEGORY_MAP[p.kind] === filter);
+
   return (
     <div>
       {error && <ErrorBanner message={error} />}
 
-      {CATEGORIES.map((cat) => (
-        <div key={cat.name} className="mb-8">
-          <h3 className="text-sm font-semibold mb-0.5">{cat.name}</h3>
-          <p className="text-xs text-muted mb-3">{cat.desc}</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {cat.providers.map(({ kind, name, desc, Logo }) => {
-              const conns = connByKind.get(kind) || [];
-              const isConnected = conns.length > 0;
+      {/* Filter pills */}
+      <div className="flex gap-2 mb-5">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className={`px-3.5 py-1.5 text-xs rounded-full transition-colors ${
+              filter === f.id
+                ? "bg-accent text-background font-medium"
+                : "bg-surface border border-border text-muted hover:text-foreground"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-              return (
-                <button
-                  key={kind}
-                  onClick={() => setModalKind(kind)}
-                  className={`rounded-lg border p-5 text-center transition-all hover:shadow-md cursor-pointer ${
-                    isConnected ? "border-green-300 bg-surface" : "border-border bg-surface hover:border-accent/40"
-                  }`}
-                >
-                  <Logo className="w-10 h-10 mx-auto mb-3" />
-                  <div className="text-sm font-semibold mb-0.5">{name}</div>
-                  <div className="text-[10px] text-muted mb-2">{desc}</div>
-                  {isConnected ? (
-                    <span className="text-[10px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                      {conns.length} connected
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-muted">Not connected</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      {/* Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {filtered.map(({ kind, name, desc, Logo }) => {
+          const conns = connByKind.get(kind) || [];
+          const isConnected = conns.length > 0;
+
+          return (
+            <button
+              key={kind}
+              onClick={() => setModalKind(kind)}
+              className={`rounded-lg border p-5 text-center transition-all hover:shadow-md cursor-pointer ${
+                isConnected ? "border-green-300 bg-surface" : "border-border bg-surface hover:border-accent/40"
+              }`}
+            >
+              <Logo className="w-10 h-10 mx-auto mb-3" />
+              <div className="text-sm font-semibold mb-0.5">{name}</div>
+              <div className="text-[10px] text-muted mb-2">{desc}</div>
+              {isConnected ? (
+                <span className="text-[10px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                  {conns.length} connected
+                </span>
+              ) : (
+                <span className="text-[10px] text-muted">Not connected</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Modal */}
       {modalKind && (
