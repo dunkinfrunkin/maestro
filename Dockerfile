@@ -36,9 +36,9 @@ COPY --from=frontend-builder /app/.next/standalone ./
 COPY --from=frontend-builder /app/.next/static ./.next/static
 COPY --from=frontend-builder /app/public ./public
 
-# Nginx config
-COPY nginx.docker.conf /etc/nginx/sites-enabled/default
-RUN rm -f /etc/nginx/sites-enabled/default.bak /etc/nginx/sites-available/default
+# Nginx config — use conf.d since sites-enabled may not exist
+COPY nginx.docker.conf /etc/nginx/conf.d/maestro.conf
+RUN rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf 2>/dev/null; true
 
 # Startup script
 COPY entrypoint.sh /entrypoint.sh
