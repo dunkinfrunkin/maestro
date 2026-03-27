@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch auth config (SSO enabled?)
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/auth/config`)
+    fetch(`${API_BASE}/auth/config`)
       .then((r) => r.json())
       .then(setAuthConfig)
       .catch(() => setAuthConfig({ sso_enabled: false }));
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [authConfig]);
 
   const loginWithEmail = useCallback(async (email: string) => {
-    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithSSO = useCallback(() => {
     // Redirect to backend SSO endpoint — it handles the OIDC redirect
-    window.location.href = `${API_BASE}/api/v1/auth/sso`;
+    window.location.href = `${API_BASE}/auth/sso`;
   }, []);
 
   const logout = useCallback(() => {
@@ -124,7 +124,7 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 async function fetchMe(token: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+  const res = await fetch(`${API_BASE}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Invalid token");

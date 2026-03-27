@@ -43,7 +43,7 @@ Maestro supports SSO via any OpenID Connect provider.
 ### Okta
 
 1. In Okta Admin, create a new App Integration (OIDC, Web)
-2. Set the redirect URI: `http://localhost:3000/api/v1/auth/callback`
+2. Set the redirect URI: `http://localhost:3000/auth/callback`
 3. Run with your Okta credentials:
 
 ```bash
@@ -60,7 +60,7 @@ docker run -d --name maestro \
 ### Google
 
 1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create OAuth 2.0 credentials (Web application)
-2. Add redirect URI: `http://localhost:3000/api/v1/auth/callback`
+2. Add redirect URI: `http://localhost:3000/auth/callback`
 3. Run:
 
 ```bash

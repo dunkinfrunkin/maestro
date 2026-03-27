@@ -16,7 +16,7 @@ from maestro.db.models import User
 
 _FRONTEND_URL = os.environ.get("MAESTRO_FRONTEND_URL", "")
 
-router = APIRouter(prefix="/api/v1/auth")
+router = APIRouter(prefix="/auth")
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ async def sso_redirect(request: Request):
     )
 
     auth_endpoint = await oidc.get_authorization_endpoint()
-    callback_url = str(request.base_url).rstrip("/") + "/api/v1/auth/callback"
+    callback_url = str(request.base_url).rstrip("/") + "/auth/callback"
 
     params = {
         "client_id": oidc.client_id,
@@ -137,7 +137,7 @@ async def sso_callback(request: Request):
         return RedirectResponse(f"{_FRONTEND_URL}?error={error}")
 
     verifier = request.cookies.get("maestro_pkce", "")
-    callback_url = str(request.base_url).rstrip("/") + "/api/v1/auth/callback"
+    callback_url = str(request.base_url).rstrip("/") + "/auth/callback"
 
     try:
         token_data = await oidc.exchange_code(code, callback_url, verifier)
