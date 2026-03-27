@@ -115,7 +115,11 @@ class OIDCVerifier:
         return doc["token_endpoint"]
 
     async def exchange_code(self, code: str, redirect_uri: str, code_verifier: str = "") -> dict:
-        """Exchange authorization code for tokens."""
+        """Exchange authorization code for tokens.
+
+        Matches Kit's implementation: form-urlencoded POST, PKCE verifier,
+        optional client_secret, reads response body even on error.
+        """
         token_endpoint = await self.get_token_endpoint()
         data = {
             "grant_type": "authorization_code",
@@ -129,9 +133,16 @@ class OIDCVerifier:
             data["client_secret"] = self.client_secret
 
         async with httpx.AsyncClient() as client:
-            resp = await client.post(token_endpoint, data=data)
-            resp.raise_for_status()
-            return resp.json()
+            resp = await client.post(
+                token_endpoint,
+                data=data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            body = resp.json()
+            if resp.status_code != 200:
+                error = body.get("error_description") or body.get("error") or resp.text
+                raise ValueError(f"Token exchange failed ({resp.status_code}): {error}")
+            return body
 
     async def verify_id_token(self, id_token: str) -> str:
         """Verify an ID token and return the email.
