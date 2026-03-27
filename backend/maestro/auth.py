@@ -28,7 +28,11 @@ from maestro.db.models import User
 
 logger = logging.getLogger(__name__)
 
-_SECRET = os.environ.get("MAESTRO_SECRET", "dev-secret-change-me")
+_SECRET = os.environ.get("MAESTRO_SECRET", "")
+if not _SECRET:
+    import secrets as _secrets
+    _SECRET = _secrets.token_hex(32)
+    logger.warning("MAESTRO_SECRET not set — generated ephemeral secret. Sessions will not survive restarts.")
 _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRY_DAYS = 30
 _AUTH_DISABLED = os.environ.get("MAESTRO_AUTH_DISABLED", "").lower() in ("true", "1", "yes")
