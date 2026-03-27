@@ -165,12 +165,28 @@ function WorkspaceTab({
 // Connections tab
 // ---------------------------------------------------------------------------
 
-const PROVIDERS: { kind: string; name: string; desc: string; Logo: React.FC<{ className?: string }> }[] = [
-  { kind: "github", name: "GitHub", desc: "Issues and pull requests", Logo: GitHubLogo },
-  { kind: "gitlab", name: "GitLab", desc: "Issues and merge requests", Logo: GitLabLogo },
-  { kind: "linear", name: "Linear", desc: "Project issues", Logo: LinearLogo },
-  { kind: "jira", name: "Jira", desc: "Cloud or Server", Logo: JiraLogo },
+type Provider = { kind: string; name: string; desc: string; Logo: React.FC<{ className?: string }> };
+
+const CATEGORIES: { name: string; desc: string; providers: Provider[] }[] = [
+  {
+    name: "Code Hosts",
+    desc: "Source control, pull requests, and CI",
+    providers: [
+      { kind: "github", name: "GitHub", desc: "Repos, issues, and PRs", Logo: GitHubLogo },
+      { kind: "gitlab", name: "GitLab", desc: "Projects, issues, and MRs", Logo: GitLabLogo },
+    ],
+  },
+  {
+    name: "Issue Trackers",
+    desc: "Task management and project tracking",
+    providers: [
+      { kind: "linear", name: "Linear", desc: "Project issues", Logo: LinearLogo },
+      { kind: "jira", name: "Jira", desc: "Cloud or Server", Logo: JiraLogo },
+    ],
+  },
 ];
+
+const ALL_PROVIDERS = CATEGORIES.flatMap((c) => c.providers);
 
 const FORM_CFG: Record<string, { tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean }> = {
   github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false },
@@ -201,41 +217,45 @@ function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
     <div>
       {error && <ErrorBanner message={error} />}
 
-      <Section title="Connections" description="Connect issue trackers and code hosts to pull tasks into the pipeline.">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {PROVIDERS.map(({ kind, name, desc, Logo }) => {
-            const conns = connByKind.get(kind) || [];
-            const isConnected = conns.length > 0;
+      {CATEGORIES.map((cat) => (
+        <div key={cat.name} className="mb-8">
+          <h3 className="text-sm font-semibold mb-0.5">{cat.name}</h3>
+          <p className="text-xs text-muted mb-3">{cat.desc}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {cat.providers.map(({ kind, name, desc, Logo }) => {
+              const conns = connByKind.get(kind) || [];
+              const isConnected = conns.length > 0;
 
-            return (
-              <button
-                key={kind}
-                onClick={() => setModalKind(kind)}
-                className={`rounded-lg border p-4 text-center transition-all hover:shadow-md cursor-pointer ${
-                  isConnected ? "border-green-300 bg-surface" : "border-border bg-surface hover:border-accent/40"
-                }`}
-              >
-                <Logo className="w-10 h-10 mx-auto mb-3" />
-                <div className="text-sm font-semibold mb-0.5">{name}</div>
-                <div className="text-[10px] text-muted mb-2">{desc}</div>
-                {isConnected ? (
-                  <span className="text-[10px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                    {conns.length} connected
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted">Not connected</span>
-                )}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={kind}
+                  onClick={() => setModalKind(kind)}
+                  className={`rounded-lg border p-5 text-center transition-all hover:shadow-md cursor-pointer ${
+                    isConnected ? "border-green-300 bg-surface" : "border-border bg-surface hover:border-accent/40"
+                  }`}
+                >
+                  <Logo className="w-10 h-10 mx-auto mb-3" />
+                  <div className="text-sm font-semibold mb-0.5">{name}</div>
+                  <div className="text-[10px] text-muted mb-2">{desc}</div>
+                  {isConnected ? (
+                    <span className="text-[10px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                      {conns.length} connected
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted">Not connected</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </Section>
+      ))}
 
       {/* Modal */}
       {modalKind && (
         <ConnectionDetailModal
           kind={modalKind}
-          provider={PROVIDERS.find((p) => p.kind === modalKind)!}
+          provider={ALL_PROVIDERS.find((p) => p.kind === modalKind)!}
           connections={connByKind.get(modalKind) || []}
           workspaceId={workspaceId}
           onClose={() => setModalKind(null)}
@@ -250,7 +270,7 @@ function ConnectionDetailModal({
   kind, provider, connections: conns, workspaceId, onClose, onChanged,
 }: {
   kind: string;
-  provider: typeof PROVIDERS[0];
+  provider: Provider;
   connections: TrackerConnection[];
   workspaceId: number;
   onClose: () => void;
