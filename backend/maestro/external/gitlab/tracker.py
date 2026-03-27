@@ -2,6 +2,10 @@
 
 Uses GitLab REST API v4. Works with both GitLab.com and self-hosted.
 Authenticates via personal access token (PRIVATE-TOKEN header).
+
+Supports:
+- All issues the token has access to (no group specified)
+- Group-scoped issues (e.g., "engineering/ai")
 """
 
 from __future__ import annotations
@@ -23,21 +27,22 @@ class GitLabIssueTracker(IssueTracker):
     """GitLab issue tracker using REST API v4.
 
     Args:
-        token: Personal access token or project access token
-        project_id: Numeric project ID or URL-encoded path ("group/project")
+        token: Personal access token (needs api or read_api scope)
+        group: Optional group path (e.g., "engineering/ai"). If empty,
+               fetches issues across all accessible projects.
         endpoint: GitLab instance URL (default: https://gitlab.com)
     """
 
     def __init__(
         self,
         token: str,
-        project_id: str,
+        group: str = "",
         endpoint: str = "https://gitlab.com",
         timeout_ms: int = 30000,
     ) -> None:
         self._endpoint = endpoint.rstrip("/")
-        self._project_id = project_id
-        self._project_path = quote(project_id, safe="") if not project_id.isdigit() else project_id
+        self._group = group
+        self._group_path = quote(group, safe="") if group else ""
         self._http = httpx.AsyncClient(
             base_url=f"{self._endpoint}/api/v4",
             headers={
@@ -63,32 +68,39 @@ class GitLabIssueTracker(IssueTracker):
 
     async def fetch_issue_states_by_ids(self, issue_ids: list[str]) -> dict[str, str]:
         result: dict[str, str] = {}
-        for iid in issue_ids:
+        for issue_id in issue_ids:
             try:
-                resp = await self._http.get(
-                    f"/projects/{self._project_path}/issues/{iid}"
-                )
+                # issue_id format: "group/project#iid" or just "iid"
+                if "#" in issue_id:
+                    project_path, iid = issue_id.rsplit("#", 1)
+                    encoded = quote(project_path, safe="")
+                    resp = await self._http.get(f"/projects/{encoded}/issues/{iid}")
+                else:
+                    # Can't look up by IID without a project — skip
+                    continue
                 resp.raise_for_status()
                 data = resp.json()
-                result[iid] = data.get("state", "unknown")
+                result[issue_id] = data.get("state", "unknown")
             except Exception:
-                logger.warning("Failed to fetch state for GitLab issue %s", iid)
+                logger.warning("Failed to fetch state for GitLab issue %s", issue_id)
         return result
 
     async def search_issues(self, query: str) -> list[Issue]:
+        base = self._issues_base_url()
         resp = await self._http.get(
-            f"/projects/{self._project_path}/issues",
+            base,
             params={"search": query, "per_page": 30, "order_by": "created_at", "sort": "desc"},
         )
         resp.raise_for_status()
-        return [_normalize_issue(item, self._endpoint, self._project_id) for item in resp.json()]
+        return [_normalize_issue(item, self._endpoint) for item in resp.json()]
 
     async def _fetch_issues(self, state: str = "opened", per_page: int = 50) -> list[Issue]:
         all_issues: list[Issue] = []
+        base = self._issues_base_url()
         page = 1
         while True:
             resp = await self._http.get(
-                f"/projects/{self._project_path}/issues",
+                base,
                 params={
                     "state": state,
                     "per_page": per_page,
@@ -102,11 +114,17 @@ class GitLabIssueTracker(IssueTracker):
             if not items:
                 break
             for item in items:
-                all_issues.append(_normalize_issue(item, self._endpoint, self._project_id))
+                all_issues.append(_normalize_issue(item, self._endpoint))
             if len(items) < per_page:
                 break
             page += 1
         return all_issues
+
+    def _issues_base_url(self) -> str:
+        """Return the right issues endpoint based on config."""
+        if self._group_path:
+            return f"/groups/{self._group_path}/issues"
+        return "/issues"
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +132,7 @@ class GitLabIssueTracker(IssueTracker):
 # ---------------------------------------------------------------------------
 
 
-def _normalize_issue(item: dict[str, Any], endpoint: str, project_id: str) -> Issue:
+def _normalize_issue(item: dict[str, Any], endpoint: str) -> Issue:
     labels = [label.lower() for label in (item.get("labels") or [])]
 
     # Priority from labels (e.g., "priority::1")
@@ -126,11 +144,12 @@ def _normalize_issue(item: dict[str, Any], endpoint: str, project_id: str) -> Is
             except (ValueError, IndexError):
                 pass
 
-    # Blocked by — GitLab uses "blocked_by" in issue links (not in basic issue response)
     blocked_by: list[str] = []
 
     iid = item.get("iid", "")
-    identifier = f"{project_id}#{iid}"
+    # Build identifier from project path + iid
+    refs = item.get("references", {})
+    identifier = refs.get("full", "") or f"#{iid}"
 
     return Issue(
         id=str(item.get("id", "")),

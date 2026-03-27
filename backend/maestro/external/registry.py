@@ -54,7 +54,7 @@ def create_tracker(provider: str, **kwargs: Any) -> IssueTracker:
         from maestro.external.gitlab.tracker import GitLabIssueTracker
         return GitLabIssueTracker(
             token=kwargs["token"],
-            project_id=kwargs["project_id"],
+            group=kwargs.get("group", ""),
             endpoint=kwargs.get("endpoint", "https://gitlab.com"),
         )
 

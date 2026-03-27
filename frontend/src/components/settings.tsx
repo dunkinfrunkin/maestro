@@ -190,9 +190,9 @@ const ALL_PROVIDERS = CATEGORIES.flatMap((c) => c.providers);
 
 const FORM_CFG: Record<string, { tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean }> = {
   github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false },
-  gitlab: { tokenPh: "glpat-...", projectLabel: "Project ID", projectPh: "group/project", projectReq: true },
+  gitlab: { tokenPh: "glpat-...", projectLabel: "Group", projectPh: "engineering/ai (optional)", projectReq: false },
   linear: { tokenPh: "lin_api_...", projectLabel: "Project slug", projectPh: "my-project", projectReq: true },
-  jira: { tokenPh: "ATATT...", projectLabel: "Project key", projectPh: "ENG", projectReq: true },
+  jira: { tokenPh: "ATATT...", projectLabel: "Project keys", projectPh: "ENG, PLATFORM (optional — blank for all)", projectReq: false },
 };
 
 const FILTERS = [

@@ -149,7 +149,7 @@ const GUIDE_CONFIG: Record<ConnectionKind, { title: string; steps: React.ReactNo
       <>Set a name and expiration date</>,
       <>Select scopes: <strong>api</strong> (full access) or <strong>read_api</strong> + <strong>write_repository</strong></>,
       <>Click <strong>Create personal access token</strong> and copy it</>,
-      <>Note your <strong>project ID</strong> — it&apos;s on the project&apos;s main page or in the URL</>,
+      <>Optionally, enter a <strong>group path</strong> (e.g., <code className="text-xs bg-surface-hover px-1 py-0.5 rounded">engineering/ai</code>) to scope issues to that group. Leave blank for all accessible issues.</>,
     ],
   },
   linear: {
@@ -170,7 +170,7 @@ const GUIDE_CONFIG: Record<ConnectionKind, { title: string; steps: React.ReactNo
       <>Give it a label (e.g., <code className="text-xs bg-surface-hover px-1 py-0.5 rounded">Maestro</code>)</>,
       <>Copy the token</>,
       <>Note your <strong>Jira URL</strong> (e.g., <code className="text-xs bg-surface-hover px-1 py-0.5 rounded">https://yourcompany.atlassian.net</code>)</>,
-      <>Note your <strong>project key</strong> (e.g., <code className="text-xs bg-surface-hover px-1 py-0.5 rounded">ENG</code>) and your <strong>email address</strong></>,
+      <>Optionally, enter <strong>project keys</strong> (e.g., <code className="text-xs bg-surface-hover px-1 py-0.5 rounded">ENG, PLATFORM</code>) to scope issues. Leave blank for all projects. Your <strong>email address</strong> is required for Jira Cloud auth.</>,
     ],
   },
 };
@@ -202,7 +202,7 @@ const FORM_CONFIG: Record<ConnectionKind, {
   },
   gitlab: {
     tokenLabel: "Personal Access Token", tokenPlaceholder: "glpat-...",
-    projectLabel: "Project ID or path", projectPlaceholder: "group/project or 12345", projectRequired: true,
+    projectLabel: "Group", projectPlaceholder: "engineering/ai (optional — blank for all)", projectRequired: false,
     endpointPlaceholder: "https://gitlab.com",
   },
   linear: {
@@ -212,7 +212,7 @@ const FORM_CONFIG: Record<ConnectionKind, {
   },
   jira: {
     tokenLabel: "API Token", tokenPlaceholder: "ATATT...",
-    projectLabel: "Project key", projectPlaceholder: "ENG", projectRequired: true,
+    projectLabel: "Project keys", projectPlaceholder: "ENG, PLATFORM (optional — blank for all)", projectRequired: false,
     endpointPlaceholder: "https://yourcompany.atlassian.net", extraFields: ["email"],
   },
 };

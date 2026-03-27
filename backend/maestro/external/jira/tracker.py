@@ -54,7 +54,8 @@ class JiraIssueTracker(IssueTracker):
         timeout_ms: int = 30000,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        self._project_key = project_key
+        # Support comma-separated project keys: "ENG,PLATFORM,INFRA"
+        self._project_keys = [k.strip() for k in project_key.split(",") if k.strip()]
         self._active_statuses = active_statuses or [
             "To Do",
             "In Progress",
@@ -92,16 +93,27 @@ class JiraIssueTracker(IssueTracker):
     async def close(self) -> None:
         await self._http.aclose()
 
+    def _project_clause(self) -> str:
+        """Build JQL project clause — supports multiple keys."""
+        if not self._project_keys:
+            return ""
+        if len(self._project_keys) == 1:
+            return f"project = {self._project_keys[0]}"
+        keys = ", ".join(self._project_keys)
+        return f"project in ({keys})"
+
     async def fetch_candidate_issues(self) -> list[Issue]:
         status_clause = _jql_status_in(self._active_statuses)
-        jql = f"project = {self._project_key} AND {status_clause} ORDER BY created DESC"
+        project = self._project_clause()
+        jql = f"{project + ' AND ' if project else ''}{status_clause} ORDER BY created DESC"
         return await self._search(jql)
 
     async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
         if not states:
             return []
         status_clause = _jql_status_in(states)
-        jql = f"project = {self._project_key} AND {status_clause} ORDER BY created DESC"
+        project = self._project_clause()
+        jql = f"{project + ' AND ' if project else ''}{status_clause} ORDER BY created DESC"
         return await self._search(jql)
 
     async def fetch_issue_states_by_ids(
@@ -132,7 +144,8 @@ class JiraIssueTracker(IssueTracker):
         return result
 
     async def search_issues(self, query: str) -> list[Issue]:
-        jql = f'project = {self._project_key} AND text ~ "{_escape_jql(query)}" ORDER BY created DESC'
+        project = self._project_clause()
+        jql = f'{project + " AND " if project else ""}text ~ "{_escape_jql(query)}" ORDER BY created DESC'
         return await self._search(jql, max_results=30)
 
     async def _search(
