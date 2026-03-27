@@ -421,8 +421,6 @@ function ConnectionDetailModal({
 
 const MODEL_PROVIDERS = [
   { id: "anthropic", name: "Anthropic", desc: "Claude models", models: "Claude Sonnet, Opus, Haiku", placeholder: "sk-ant-...", icon: "A" },
-  { id: "openai", name: "OpenAI", desc: "GPT models", models: "GPT-4o, o1, o3", placeholder: "sk-...", icon: "O" },
-  { id: "google", name: "Google", desc: "Gemini models", models: "Gemini 2.5 Pro, Flash", placeholder: "AIza...", icon: "G" },
 ];
 
 function ModelsTab({ workspaceId }: { workspaceId: number }) {
