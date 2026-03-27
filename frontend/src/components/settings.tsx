@@ -165,17 +165,24 @@ function WorkspaceTab({
 // Connections tab
 // ---------------------------------------------------------------------------
 
-const PROVIDER_CARDS: { kind: string; name: string; desc: string; Logo: React.FC<{ className?: string }> }[] = [
+const PROVIDERS: { kind: string; name: string; desc: string; Logo: React.FC<{ className?: string }> }[] = [
   { kind: "github", name: "GitHub", desc: "Issues and pull requests", Logo: GitHubLogo },
   { kind: "gitlab", name: "GitLab", desc: "Issues and merge requests", Logo: GitLabLogo },
   { kind: "linear", name: "Linear", desc: "Project issues", Logo: LinearLogo },
-  { kind: "jira", name: "Jira", desc: "Cloud or Server projects", Logo: JiraLogo },
+  { kind: "jira", name: "Jira", desc: "Cloud or Server", Logo: JiraLogo },
 ];
+
+const FORM_CFG: Record<string, { tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean }> = {
+  github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false },
+  gitlab: { tokenPh: "glpat-...", projectLabel: "Project ID", projectPh: "group/project", projectReq: true },
+  linear: { tokenPh: "lin_api_...", projectLabel: "Project slug", projectPh: "my-project", projectReq: true },
+  jira: { tokenPh: "ATATT...", projectLabel: "Project key", projectPh: "ENG", projectReq: true },
+};
 
 function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [connectingKind, setConnectingKind] = useState<string | null>(null);
+  const [modalKind, setModalKind] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setConnections(await fetchConnections()); setError(null); }
@@ -183,7 +190,6 @@ function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  // Group connections by kind
   const connByKind = new Map<string, TrackerConnection[]>();
   for (const conn of connections) {
     const list = connByKind.get(conn.kind) || [];
@@ -196,133 +202,169 @@ function ConnectionsTab({ workspaceId }: { workspaceId: number }) {
       {error && <ErrorBanner message={error} />}
 
       <Section title="Connections" description="Connect issue trackers and code hosts to pull tasks into the pipeline.">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {PROVIDER_CARDS.map(({ kind, name, desc, Logo }) => {
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {PROVIDERS.map(({ kind, name, desc, Logo }) => {
             const conns = connByKind.get(kind) || [];
             const isConnected = conns.length > 0;
-            const isExpanded = connectingKind === kind;
 
             return (
-              <div key={kind} className={`rounded-lg border p-5 transition-colors ${
-                isConnected ? "border-green-300 bg-surface" : "border-border bg-surface"
-              }`}>
-                {/* Header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <Logo className="w-8 h-8" />
-                    <div>
-                      <div className="text-sm font-semibold">{name}</div>
-                      <div className="text-xs text-muted">{desc}</div>
-                    </div>
-                  </div>
-                  {isConnected && (
-                    <span className="text-xs font-medium text-green-700 bg-green-100 px-2.5 py-1 rounded-full">Connected</span>
-                  )}
-                </div>
-
-                {/* Connected instances */}
-                {conns.map((conn) => (
-                  <div key={conn.id} className="flex items-center justify-between py-2 px-3 rounded-md bg-background mb-2">
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium truncate">{conn.name}</div>
-                      <div className="text-[10px] text-muted truncate">{conn.project || "All repositories"}</div>
-                    </div>
-                    <button onClick={async () => { await deleteConnection(conn.id); load(); }}
-                      className="text-xs text-red-600 hover:text-red-800 transition-colors flex-shrink-0 ml-2">Remove</button>
-                  </div>
-                ))}
-
-                {/* Connect / Add another button */}
-                {!isExpanded ? (
-                  <button
-                    onClick={() => setConnectingKind(kind)}
-                    className={`w-full mt-1 px-3 py-2 text-xs rounded-md transition-colors ${
-                      isConnected
-                        ? "border border-border text-muted hover:bg-surface-hover hover:text-foreground"
-                        : "bg-accent text-background hover:opacity-90"
-                    }`}
-                  >
-                    {isConnected ? "Add another" : "Connect"}
-                  </button>
+              <button
+                key={kind}
+                onClick={() => setModalKind(kind)}
+                className={`rounded-lg border p-4 text-center transition-all hover:shadow-md cursor-pointer ${
+                  isConnected ? "border-green-300 bg-surface" : "border-border bg-surface hover:border-accent/40"
+                }`}
+              >
+                <Logo className="w-10 h-10 mx-auto mb-3" />
+                <div className="text-sm font-semibold mb-0.5">{name}</div>
+                <div className="text-[10px] text-muted mb-2">{desc}</div>
+                {isConnected ? (
+                  <span className="text-[10px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                    {conns.length} connected
+                  </span>
                 ) : (
-                  <InlineConnectionForm
-                    kind={kind}
-                    workspaceId={workspaceId}
-                    onCreated={() => { setConnectingKind(null); load(); }}
-                    onCancel={() => setConnectingKind(null)}
-                  />
+                  <span className="text-[10px] text-muted">Not connected</span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
       </Section>
+
+      {/* Modal */}
+      {modalKind && (
+        <ConnectionDetailModal
+          kind={modalKind}
+          provider={PROVIDERS.find((p) => p.kind === modalKind)!}
+          connections={connByKind.get(modalKind) || []}
+          workspaceId={workspaceId}
+          onClose={() => setModalKind(null)}
+          onChanged={load}
+        />
+      )}
     </div>
   );
 }
 
-function InlineConnectionForm({
-  kind,
-  workspaceId,
-  onCreated,
-  onCancel,
+function ConnectionDetailModal({
+  kind, provider, connections: conns, workspaceId, onClose, onChanged,
 }: {
   kind: string;
+  provider: typeof PROVIDERS[0];
+  connections: TrackerConnection[];
   workspaceId: number;
-  onCreated: () => void;
-  onCancel: () => void;
+  onClose: () => void;
+  onChanged: () => void;
 }) {
+  const [showForm, setShowForm] = useState(conns.length === 0);
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
   const [project, setProject] = useState("");
-  const [endpoint, setEndpoint] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const config: Record<string, { tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean; endpointPh: string }> = {
-    github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false, endpointPh: "https://api.github.com" },
-    gitlab: { tokenPh: "glpat-...", projectLabel: "Project ID", projectPh: "group/project", projectReq: true, endpointPh: "https://gitlab.com" },
-    linear: { tokenPh: "lin_api_...", projectLabel: "Project slug", projectPh: "my-project", projectReq: true, endpointPh: "https://api.linear.app/graphql" },
-    jira: { tokenPh: "ATATT...", projectLabel: "Project key", projectPh: "ENG", projectReq: true, endpointPh: "https://company.atlassian.net" },
-  };
-  const c = config[kind] || config.github;
+  const cfg = FORM_CFG[kind] || FORM_CFG.github;
+  const Logo = provider.Logo;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !token) { setError("Name and token required"); return; }
-    if (c.projectReq && !project) { setError(`${c.projectLabel} is required`); return; }
+    if (cfg.projectReq && !project) { setError(`${cfg.projectLabel} is required`); return; }
     if (kind === "jira" && !email) { setError("Email is required for Jira"); return; }
     setSaving(true); setError(null);
     try {
-      await createConnection({ kind, name, project, token, endpoint: endpoint || undefined, workspace_id: workspaceId });
-      onCreated();
+      await createConnection({ kind, name, project, token, endpoint: undefined, workspace_id: workspaceId });
+      setName(""); setToken(""); setProject(""); setEmail("");
+      setShowForm(false);
+      onChanged();
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
     finally { setSaving(false); }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 pt-3 border-t border-border space-y-2">
-      {error && <div className="text-xs text-red-600">{error}</div>}
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Connection name"
-        className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted" />
-      <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={c.tokenPh}
-        className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted font-mono" />
-      {kind === "jira" && (
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
-          className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted" />
-      )}
-      <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={`${c.projectLabel}${c.projectReq ? "" : " (optional)"}: ${c.projectPh}`}
-        className="w-full px-2.5 py-1.5 text-xs rounded-md border border-border bg-background placeholder:text-muted font-mono" />
-      <div className="flex gap-2 pt-1">
-        <button type="submit" disabled={saving}
-          className="flex-1 px-3 py-1.5 text-xs rounded-md bg-accent text-background hover:opacity-90 disabled:opacity-50">
-          {saving ? "..." : "Connect"}
-        </button>
-        <button type="button" onClick={onCancel}
-          className="px-3 py-1.5 text-xs rounded-md text-muted hover:text-foreground transition-colors">Cancel</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-foreground/20" onClick={onClose} />
+      <div className="relative bg-surface border border-border rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <Logo className="w-6 h-6" />
+            <h2 className="text-base font-semibold">{provider.name}</h2>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-muted hover:text-foreground hover:bg-surface-hover transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Existing connections */}
+          {conns.length > 0 && (
+            <div>
+              <div className="text-xs text-muted uppercase tracking-wider mb-2">Active connections</div>
+              <div className="space-y-2">
+                {conns.map((conn) => (
+                  <div key={conn.id} className="flex items-center justify-between p-3 rounded-md border border-border bg-background">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{conn.name}</div>
+                      <div className="text-xs text-muted truncate">{conn.project || "All repositories"}</div>
+                    </div>
+                    <button onClick={async () => { await deleteConnection(conn.id); onChanged(); }}
+                      className="text-xs text-red-600 hover:text-red-800 transition-colors flex-shrink-0 ml-3">Remove</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add form */}
+          {showForm ? (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="text-xs text-muted uppercase tracking-wider">{conns.length > 0 ? "Add another" : "Connect"}</div>
+              {error && <div className="text-xs text-red-600 p-2 bg-red-50 rounded-md">{error}</div>}
+              <div>
+                <label className="block text-xs text-muted mb-1">Connection name</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={`My ${provider.name}`}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted" />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">API Token</label>
+                <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cfg.tokenPh}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+              </div>
+              {kind === "jira" && (
+                <div>
+                  <label className="block text-xs text-muted mb-1">Email</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
+                    className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted" />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-muted mb-1">{cfg.projectLabel}{!cfg.projectReq && " (optional)"}</label>
+                <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={cfg.projectPh}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={saving}
+                  className="flex-1 px-4 py-2 text-sm rounded-md bg-accent text-background hover:opacity-90 disabled:opacity-50">
+                  {saving ? "Connecting..." : "Connect"}
+                </button>
+                {conns.length > 0 && (
+                  <button type="button" onClick={() => setShowForm(false)}
+                    className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors">Cancel</button>
+                )}
+              </div>
+            </form>
+          ) : (
+            <button onClick={() => setShowForm(true)}
+              className="w-full px-4 py-2 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors">
+              Add connection
+            </button>
+          )}
+        </div>
       </div>
-    </form>
+    </div>
   );
 }
 
