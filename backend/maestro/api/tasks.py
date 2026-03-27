@@ -448,4 +448,32 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None):
         finally:
             await client.close()
 
+    elif conn.kind == TrackerKind.GITLAB:
+        from maestro.external.gitlab.tracker import GitLabIssueTracker
+        client = GitLabIssueTracker(
+            token=token,
+            group=conn.project,  # project field stores the group path
+            endpoint=conn.endpoint or "https://gitlab.com",
+        )
+        try:
+            if search:
+                return await client.search_issues(search)
+            return await client.fetch_candidate_issues()
+        finally:
+            await client.close()
+
+    elif conn.kind == TrackerKind.JIRA:
+        from maestro.external.jira.tracker import JiraIssueTracker
+        client = JiraIssueTracker(
+            base_url=conn.endpoint or "https://jira.atlassian.net",
+            api_token=token,
+            project_key=conn.project,  # project field stores comma-separated keys
+        )
+        try:
+            if search:
+                return await client.search_issues(search)
+            return await client.fetch_candidate_issues()
+        finally:
+            await client.close()
+
     return []

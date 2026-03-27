@@ -40,6 +40,13 @@ async def init_db() -> None:
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
     async with _engine.begin() as conn:
+        # Add new enum values if they don't exist (postgres won't do this automatically)
+        for val in ("GITLAB", "JIRA"):
+            await conn.execute(
+                __import__("sqlalchemy").text(
+                    f"ALTER TYPE trackerkind ADD VALUE IF NOT EXISTS '{val}'"
+                )
+            )
         await conn.run_sync(Base.metadata.create_all)
 
 

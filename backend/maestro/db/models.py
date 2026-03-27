@@ -21,6 +21,8 @@ class Base(DeclarativeBase):
 class TrackerKind(str, enum.Enum):
     GITHUB = "github"
     LINEAR = "linear"
+    GITLAB = "gitlab"
+    JIRA = "jira"
 
 
 class PipelineStatus(str, enum.Enum):
