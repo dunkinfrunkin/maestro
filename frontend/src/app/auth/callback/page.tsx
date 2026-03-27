@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
-
   useEffect(() => {
-    const hash = window.location.hash.slice(1); // remove #
+    const hash = window.location.hash.slice(1);
     const params = new URLSearchParams(hash);
     const token = params.get("token");
 
     if (token) {
       localStorage.setItem("maestro-token", token);
-      router.replace("/");
-    } else {
-      router.replace("/");
     }
-  }, [router]);
+
+    // Hard redirect to clear the hash fragment
+    window.location.href = "/";
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
