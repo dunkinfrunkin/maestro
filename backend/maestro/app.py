@@ -88,9 +88,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    cors_origins = os.environ.get("MAESTRO_CORS_ORIGINS", "http://localhost:3000").split(",")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
+        allow_origins=[o.strip() for o in cors_origins if o.strip()],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

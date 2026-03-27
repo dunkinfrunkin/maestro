@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-maestro}
+      POSTGRES_USER: ${POSTGRES_USER:-maestro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maestro}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-maestro}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-maestro}
+      POSTGRES_USER: ${POSTGRES_USER:-maestro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maestro}
+      # Auth
+      MAESTRO_SECRET: ${MAESTRO_SECRET:?Set MAESTRO_SECRET in .env}
+      MAESTRO_AUTH_DISABLED: ${MAESTRO_AUTH_DISABLED:-false}
+      MAESTRO_FRONTEND_URL: ""
+      MAESTRO_CORS_ORIGINS: ""
+      # OIDC / SSO (optional)
+      MAESTRO_OIDC_ISSUER: ${MAESTRO_OIDC_ISSUER:-}
+      MAESTRO_OIDC_CLIENT_ID: ${MAESTRO_OIDC_CLIENT_ID:-}
+      MAESTRO_OIDC_CLIENT_SECRET: ${MAESTRO_OIDC_CLIENT_SECRET:-}
+      # Encryption
+      MAESTRO_ENCRYPTION_KEY: ${MAESTRO_ENCRYPTION_KEY:-}
+      # LLM
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ""
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  pgdata:
