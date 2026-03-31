@@ -4,9 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PIPELINE_STATUSES,
-  PipelineStatus,
   UnifiedTask,
-  AgentRunResponse,
   fetchTasks,
   updateTaskStatus,
   removeTaskStatus,
@@ -35,29 +33,35 @@ const STATUS_COLORS: Record<string, string> = {
 export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; projectId?: number }) {
   const router = useRouter();
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
+  const [total, setTotal] = useState(0);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
   const [search, setSearch] = useState("");
   const [filterConnection, setFilterConnection] = useState<number | undefined>();
   const [filterPipeline, setFilterPipeline] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const pageSize = 10;
 
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (p = page) => {
     try {
       setLoading(true);
       const data = await fetchTasks({
         connection_id: filterConnection,
         search: search || undefined,
         pipeline_status: filterPipeline || undefined,
+        offset: p * pageSize,
+        limit: pageSize,
       });
-      setTasks(data);
+      setTasks(data.tasks);
+      setTotal(data.total);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch tasks");
     } finally {
       setLoading(false);
     }
-  }, [search, filterConnection, filterPipeline]);
+  }, [search, filterConnection, filterPipeline, page]);
 
   useEffect(() => {
     fetchConnections().then(setConnections).catch(() => {});
@@ -88,6 +92,8 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
     }
   };
 
+  const totalPages = Math.ceil(total / pageSize);
+
   return (
     <div className="space-y-4">
       {/* Search & Filters */}
@@ -97,14 +103,15 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
           placeholder="Search tasks..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && loadTasks()}
+          onKeyDown={(e) => { if (e.key === "Enter") { setPage(0); loadTasks(0); } }}
           className="flex-1 min-w-[200px] px-3 py-2 text-sm rounded-md border border-border bg-surface placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <select
           value={filterConnection ?? ""}
-          onChange={(e) =>
-            setFilterConnection(e.target.value ? Number(e.target.value) : undefined)
-          }
+          onChange={(e) => {
+            setFilterConnection(e.target.value ? Number(e.target.value) : undefined);
+            setPage(0);
+          }}
           className="px-3 py-2 text-sm rounded-md border border-border bg-surface text-foreground"
         >
           <option value="">All connections</option>
@@ -116,7 +123,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
         </select>
         <select
           value={filterPipeline}
-          onChange={(e) => setFilterPipeline(e.target.value)}
+          onChange={(e) => { setFilterPipeline(e.target.value); setPage(0); }}
           className="px-3 py-2 text-sm rounded-md border border-border bg-surface text-foreground"
         >
           <option value="">All statuses</option>
@@ -128,7 +135,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
           ))}
         </select>
         <button
-          onClick={loadTasks}
+          onClick={() => { setPage(0); loadTasks(0); }}
           className="px-3 py-2 text-sm rounded-md border border-border hover:bg-surface-hover transition-colors"
         >
           Search
@@ -152,16 +159,42 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
             : "No tasks found"}
         </div>
       ) : (
-        <div className="space-y-2">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.external_ref}
-              task={task}
-              onStatusChange={handleStatusChange}
-              onClick={() => router.push(task.id ? `/tasks/${task.id}` : `/tasks/${encodeURIComponent(task.external_ref)}`)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-2">
+            {tasks.map((task) => (
+              <TaskCard
+                key={task.external_ref}
+                task={task}
+                onStatusChange={handleStatusChange}
+                onClick={() => router.push(task.id ? `/tasks/${task.id}` : `/tasks/${encodeURIComponent(task.external_ref)}`)}
+              />
+            ))}
+          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-muted">
+                {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage(page - 1)}
+                  className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage(page + 1)}
+                  className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

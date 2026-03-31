@@ -232,7 +232,6 @@ function ConnectionForm({
   const [project, setProject] = useState("");
   const [token, setToken] = useState("");
   const [endpoint, setEndpoint] = useState("");
-  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -244,7 +243,6 @@ function ConnectionForm({
     e.preventDefault();
     if (!name || !token) { setError("Name and token are required"); return; }
     if (config.projectRequired && !project) { setError(`${config.projectLabel} is required`); return; }
-    if (kind === "jira" && !email) { setError("Email is required for Jira Cloud"); return; }
     if (kind === "jira" && !endpoint) { setError("Jira URL is required (e.g. https://yourcompany.atlassian.net)"); return; }
     setSaving(true);
     setError(null);
@@ -253,7 +251,6 @@ function ConnectionForm({
         kind, name, project, token,
         endpoint: endpoint || undefined,
         workspace_id: workspaceId,
-        ...(kind === "jira" ? { email } : {}),
       });
       onCreated();
     } catch (err) {
@@ -287,15 +284,6 @@ function ConnectionForm({
           placeholder={config.tokenPlaceholder}
           className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
       </div>
-
-      {kind === "jira" && (
-        <div>
-          <label className="block text-xs text-muted mb-1">Email <span className="text-muted">(your Atlassian account email)</span></label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-            className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted" />
-        </div>
-      )}
 
       <div>
         <label className="block text-xs text-muted mb-1">

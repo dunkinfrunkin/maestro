@@ -55,8 +55,8 @@ class GitLabIssueTracker(IssueTracker):
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def fetch_candidate_issues(self) -> list[Issue]:
-        return await self._fetch_issues(state="opened")
+    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
+        return await self._fetch_issues(state="opened", max_results=max_results)
 
     async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
         all_issues: list[Issue] = []
@@ -94,10 +94,11 @@ class GitLabIssueTracker(IssueTracker):
         resp.raise_for_status()
         return [_normalize_issue(item, self._endpoint) for item in resp.json()]
 
-    async def _fetch_issues(self, state: str = "opened", per_page: int = 50) -> list[Issue]:
+    async def _fetch_issues(self, state: str = "opened", max_results: int = 100) -> list[Issue]:
         all_issues: list[Issue] = []
         base = self._issues_base_url()
         page = 1
+        per_page = min(50, max_results)
         while True:
             resp = await self._http.get(
                 base,
@@ -115,10 +116,10 @@ class GitLabIssueTracker(IssueTracker):
                 break
             for item in items:
                 all_issues.append(_normalize_issue(item, self._endpoint))
-            if len(items) < per_page:
+            if len(all_issues) >= max_results or len(items) < per_page:
                 break
             page += 1
-        return all_issues
+        return all_issues[:max_results]
 
     def _issues_base_url(self) -> str:
         """Return the right issues endpoint based on config."""

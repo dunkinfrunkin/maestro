@@ -56,7 +56,6 @@ class JiraIssueTracker(IssueTracker):
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._assignee_email = assignee_email
-        self._assignee_account_id: str | None = None  # resolved lazily
         # Support comma-separated project keys: "ENG,PLATFORM,INFRA"
         self._project_keys = [k.strip() for k in project_key.split(",") if k.strip()]
         self._active_statuses = active_statuses or [
@@ -105,49 +104,33 @@ class JiraIssueTracker(IssueTracker):
         keys = ", ".join(self._project_keys)
         return f"project in ({keys})"
 
-    async def _resolve_assignee_account_id(self) -> str | None:
-        """Resolve the assignee email to a Jira account ID (cached)."""
-        if self._assignee_account_id is not None:
-            return self._assignee_account_id
-        if not self._assignee_email:
-            return None
-        try:
-            resp = await self._http.get(
-                f"{self._api_base}/user/search",
-                params={"query": self._assignee_email, "maxResults": 1},
-            )
-            resp.raise_for_status()
-            users = resp.json()
-            if users:
-                self._assignee_account_id = users[0].get("accountId", "")
-                return self._assignee_account_id
-        except Exception:
-            logger.warning("Failed to resolve Jira account for %s", self._assignee_email)
-        return None
+    def _base_clauses(self) -> list[str]:
+        """Collect non-empty base JQL clauses (project + assignee).
 
-    async def _base_clauses(self) -> list[str]:
-        """Collect non-empty base JQL clauses (project + assignee)."""
+        Uses currentUser() for assignee filtering — this resolves to whoever
+        owns the API token, which is the correct behavior since each user
+        connects with their own Jira credentials.
+        """
         clauses = []
         project = self._project_clause()
         if project:
             clauses.append(project)
-        account_id = await self._resolve_assignee_account_id()
-        if account_id:
-            clauses.append(f'assignee = "{account_id}"')
+        if self._assignee_email:
+            clauses.append("assignee = currentUser()")
         return clauses
 
-    async def fetch_candidate_issues(self) -> list[Issue]:
+    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
         status_clause = _jql_status_in(self._active_statuses)
-        clauses = await self._base_clauses()
+        clauses = self._base_clauses()
         clauses.append(status_clause)
         jql = " AND ".join(clauses) + " ORDER BY created DESC"
-        return await self._search(jql)
+        return await self._search(jql, max_results=max_results)
 
     async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
         if not states:
             return []
         status_clause = _jql_status_in(states)
-        clauses = await self._base_clauses()
+        clauses = self._base_clauses()
         clauses.append(status_clause)
         jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql)
@@ -180,7 +163,7 @@ class JiraIssueTracker(IssueTracker):
         return result
 
     async def search_issues(self, query: str) -> list[Issue]:
-        clauses = await self._base_clauses()
+        clauses = self._base_clauses()
         clauses.append(f'text ~ "{_escape_jql(query)}"')
         jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql, max_results=30)
@@ -189,10 +172,11 @@ class JiraIssueTracker(IssueTracker):
         self,
         jql: str,
         fields: list[str] | None = None,
-        max_results: int = 50,
+        max_results: int = 100,
     ) -> list[Issue]:
         all_issues: list[Issue] = []
         start_at = 0
+        per_page = min(50, max_results)
 
         default_fields = [
             "summary",
@@ -207,13 +191,14 @@ class JiraIssueTracker(IssueTracker):
         ]
 
         while True:
-            resp = await self._http.post(
-                f"{self._api_base}/search",
-                json={
+            # Jira Cloud deprecated POST /search — use GET /search/jql
+            resp = await self._http.get(
+                f"{self._api_base}/search/jql",
+                params={
                     "jql": jql,
                     "startAt": start_at,
-                    "maxResults": max_results,
-                    "fields": fields or default_fields,
+                    "maxResults": per_page,
+                    "fields": ",".join(fields or default_fields),
                 },
             )
             resp.raise_for_status()
@@ -224,10 +209,10 @@ class JiraIssueTracker(IssueTracker):
 
             total = data.get("total", 0)
             start_at += len(data.get("issues", []))
-            if start_at >= total or start_at >= max_results:
+            if start_at >= total or len(all_issues) >= max_results:
                 break
 
-        return all_issues
+        return all_issues[:max_results]
 
 
 # ---------------------------------------------------------------------------
