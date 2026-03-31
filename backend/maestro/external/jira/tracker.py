@@ -278,21 +278,145 @@ def _normalize_issue(item: dict[str, Any], base_url: str) -> Issue:
 
 
 def _extract_adf_text(adf: dict[str, Any]) -> str:
-    """Extract plain text from Atlassian Document Format."""
+    """Convert Atlassian Document Format to Markdown."""
+    return _adf_node_to_md(adf).strip()
+
+
+def _adf_node_to_md(node: Any, list_depth: int = 0) -> str:
+    """Recursively convert an ADF node tree into Markdown."""
+    if not isinstance(node, dict):
+        return ""
+
+    node_type = node.get("type", "")
+    content = node.get("content", [])
+
+    # --- Block nodes ---
+    if node_type == "doc":
+        return _adf_children(content, list_depth)
+
+    if node_type == "paragraph":
+        text = _adf_inline(content)
+        return f"{text}\n\n"
+
+    if node_type in ("heading",):
+        level = node.get("attrs", {}).get("level", 1)
+        text = _adf_inline(content)
+        return f"{'#' * level} {text}\n\n"
+
+    if node_type == "bulletList":
+        items = ""
+        for child in content:
+            items += _adf_node_to_md(child, list_depth)
+        return items + "\n"
+
+    if node_type == "orderedList":
+        items = ""
+        for i, child in enumerate(content, 1):
+            items += _adf_node_to_md(child, list_depth)
+        return items + "\n"
+
+    if node_type == "listItem":
+        indent = "  " * list_depth
+        parts = []
+        for child in content:
+            if child.get("type") in ("bulletList", "orderedList"):
+                parts.append(_adf_node_to_md(child, list_depth + 1))
+            else:
+                text = _adf_inline(child.get("content", []))
+                parts.append(f"{indent}- {text}\n")
+        return "".join(parts)
+
+    if node_type == "codeBlock":
+        lang = node.get("attrs", {}).get("language", "")
+        text = _adf_inline(content)
+        return f"```{lang}\n{text}\n```\n\n"
+
+    if node_type == "blockquote":
+        inner = _adf_children(content, list_depth).strip()
+        quoted = "\n".join(f"> {line}" for line in inner.split("\n"))
+        return f"{quoted}\n\n"
+
+    if node_type == "rule":
+        return "---\n\n"
+
+    if node_type == "table":
+        return _adf_table(content)
+
+    if node_type == "mediaSingle" or node_type == "media":
+        return ""
+
+    # Fallback: recurse into children
+    return _adf_children(content, list_depth)
+
+
+def _adf_children(content: list[Any], list_depth: int = 0) -> str:
+    return "".join(_adf_node_to_md(child, list_depth) for child in content)
+
+
+def _adf_inline(content: list[Any]) -> str:
+    """Convert inline ADF nodes to Markdown text."""
     parts: list[str] = []
+    for node in content:
+        if not isinstance(node, dict):
+            continue
+        node_type = node.get("type", "")
+        if node_type == "text":
+            text = node.get("text", "")
+            marks = node.get("marks", [])
+            for mark in marks:
+                mt = mark.get("type", "")
+                if mt == "strong":
+                    text = f"**{text}**"
+                elif mt == "em":
+                    text = f"*{text}*"
+                elif mt == "code":
+                    text = f"`{text}`"
+                elif mt == "strike":
+                    text = f"~~{text}~~"
+                elif mt == "link":
+                    href = mark.get("attrs", {}).get("href", "")
+                    text = f"[{text}]({href})"
+            parts.append(text)
+        elif node_type == "hardBreak":
+            parts.append("\n")
+        elif node_type == "mention":
+            parts.append(f"@{node.get('attrs', {}).get('text', '')}")
+        elif node_type == "emoji":
+            parts.append(node.get("attrs", {}).get("shortName", ""))
+        elif node_type == "inlineCard":
+            url = node.get("attrs", {}).get("url", "")
+            parts.append(f"[{url}]({url})" if url else "")
+        else:
+            # Recurse for unknown inline types
+            parts.append(_adf_inline(node.get("content", [])))
+    return "".join(parts)
 
-    def walk(node: Any) -> None:
-        if isinstance(node, dict):
-            if node.get("type") == "text":
-                parts.append(node.get("text", ""))
-            for child in node.get("content", []):
-                walk(child)
-        elif isinstance(node, list):
-            for item in node:
-                walk(item)
 
-    walk(adf)
-    return "\n".join(parts) if parts else ""
+def _adf_table(content: list[Any]) -> str:
+    """Convert ADF table to Markdown table."""
+    rows: list[list[str]] = []
+    for row_node in content:
+        if row_node.get("type") != "tableRow":
+            continue
+        cells = []
+        for cell in row_node.get("content", []):
+            text = _adf_children(cell.get("content", [])).strip().replace("\n", " ")
+            cells.append(text)
+        rows.append(cells)
+
+    if not rows:
+        return ""
+
+    # Build markdown table
+    lines = []
+    lines.append("| " + " | ".join(rows[0]) + " |")
+    lines.append("| " + " | ".join("---" for _ in rows[0]) + " |")
+    for row in rows[1:]:
+        # Pad row to match header width
+        while len(row) < len(rows[0]):
+            row.append("")
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines) + "\n\n"
 
 
 def _parse_dt(val: str | None) -> datetime | None:

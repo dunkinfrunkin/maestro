@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   AgentRunResponse,
   AgentLogEntry,
@@ -105,7 +107,15 @@ export function TaskDetailPage({
           ) : task.title}
         </h2>
         {task.description && (
-          <p className="text-sm text-muted mt-2 whitespace-pre-wrap">{task.description}</p>
+          <div className="text-sm text-muted mt-2 prose prose-sm prose-neutral dark:prose-invert max-w-none
+            prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
+            prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5
+            prose-code:text-xs prose-code:bg-surface-hover prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+            prose-pre:bg-surface-hover prose-pre:border prose-pre:border-border prose-pre:rounded-md
+            prose-a:text-accent prose-a:no-underline hover:prose-a:underline
+            prose-strong:text-foreground prose-hr:border-border">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown>
+          </div>
         )}
         {task.labels.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3">
