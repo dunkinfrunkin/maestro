@@ -366,12 +366,83 @@ async def get_task_detail(external_ref: str) -> dict:
     return await _build_task_from_ref(external_ref)
 
 
+async def _fetch_single_issue(conn, token: str, issue_id: str):
+    """Fetch a single issue from any tracker type by its ID/key."""
+    from maestro.models import Issue
+
+    if conn.kind == TrackerKind.GITHUB:
+        client = GitHubClient(token=token, repo=conn.project, endpoint=conn.endpoint or "https://api.github.com")
+        try:
+            # Try direct fetch by issue number if we have a repo
+            if conn.project and issue_id.isdigit():
+                issues = await client.search_issues(f"#{issue_id}")
+                return next((i for i in issues if i.id == issue_id), None)
+            issues = await client.fetch_candidate_issues(max_results=50)
+            return next((i for i in issues if i.id == issue_id), None)
+        finally:
+            await client.close()
+
+    elif conn.kind == TrackerKind.LINEAR:
+        client = LinearClient(
+            api_key=token, project_slug=conn.project,
+            active_states=["Todo", "In Progress", "Done", "Canceled"],
+            terminal_states=[],
+            endpoint=conn.endpoint or "https://api.linear.app/graphql",
+        )
+        try:
+            # Linear IDs are UUIDs — fetch states by ID to check it exists
+            states = await client.fetch_issue_states_by_ids([issue_id])
+            if not states:
+                return None
+            # Need full issue data — search candidate issues
+            issues = await client.fetch_candidate_issues(max_results=50)
+            return next((i for i in issues if i.id == issue_id), None)
+        finally:
+            await client.close()
+
+    elif conn.kind == TrackerKind.GITLAB:
+        from maestro.external.gitlab.tracker import GitLabIssueTracker
+        client = GitLabIssueTracker(
+            token=token, group=conn.project,
+            endpoint=conn.endpoint or "https://gitlab.com",
+        )
+        try:
+            issues = await client.fetch_candidate_issues(max_results=50)
+            return next((i for i in issues if i.id == issue_id), None)
+        finally:
+            await client.close()
+
+    elif conn.kind == TrackerKind.JIRA:
+        from maestro.external.jira.tracker import JiraIssueTracker
+        client = JiraIssueTracker(
+            base_url=conn.endpoint or "https://jira.atlassian.net",
+            api_token=token,
+            project_key=conn.project or "",
+            email=conn.email,
+        )
+        try:
+            # Jira: fetch by issue ID directly via JQL
+            states = await client.fetch_issue_states_by_ids([issue_id])
+            if states:
+                # Got the state — now search for full issue data
+                issues = await client.search_issues(issue_id) if "-" in issue_id else []
+                if issues:
+                    return issues[0]
+            # Fallback: scan candidates
+            issues = await client.fetch_candidate_issues(max_results=50)
+            return next((i for i in issues if i.id == issue_id), None)
+        finally:
+            await client.close()
+
+    return None
+
+
 async def _build_task_from_ref(external_ref: str) -> dict:
     """Build task detail from external_ref without a pipeline record."""
     parts = external_ref.split(":")
     kind = parts[0] if len(parts) >= 1 else ""
     conn_id = int(parts[1]) if len(parts) >= 2 else 0
-    issue_id = parts[2] if len(parts) >= 3 else ""
+    issue_id = ":".join(parts[2:]) if len(parts) >= 3 else ""
 
     issue = None
     try:
@@ -379,14 +450,7 @@ async def _build_task_from_ref(external_ref: str) -> dict:
             conn = await crud.get_connection(session, conn_id)
         if conn:
             token = crud.get_decrypted_token(conn)
-            if conn.kind == TrackerKind.GITHUB:
-                from maestro.tracker.github import GitHubClient
-                client = GitHubClient(token=token, repo=conn.project, endpoint=conn.endpoint or "https://api.github.com")
-                try:
-                    issues = await client.fetch_candidate_issues()
-                    issue = next((i for i in issues if i.id == issue_id), None)
-                finally:
-                    await client.close()
+            issue = await _fetch_single_issue(conn, token, issue_id)
     except Exception:
         pass
 
@@ -418,7 +482,7 @@ async def _build_task_detail(record) -> dict:
     parts = external_ref.split(":")
     kind = parts[0] if len(parts) >= 1 else ""
     conn_id = int(parts[1]) if len(parts) >= 2 else 0
-    issue_id = parts[2] if len(parts) >= 3 else ""
+    issue_id = ":".join(parts[2:]) if len(parts) >= 3 else ""
 
     # Try to fetch from tracker
     issue = None
@@ -427,14 +491,7 @@ async def _build_task_detail(record) -> dict:
             conn = await crud.get_connection(session, conn_id)
         if conn:
             token = crud.get_decrypted_token(conn)
-            if conn.kind == TrackerKind.GITHUB:
-                from maestro.tracker.github import GitHubClient
-                client = GitHubClient(token=token, repo=conn.project, endpoint=conn.endpoint or "https://api.github.com")
-                try:
-                    issues = await client.fetch_candidate_issues()
-                    issue = next((i for i in issues if i.id == issue_id), None)
-                finally:
-                    await client.close()
+            issue = await _fetch_single_issue(conn, token, issue_id)
     except Exception:
         pass
 
