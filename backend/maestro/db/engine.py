@@ -39,21 +39,32 @@ async def init_db() -> None:
     _engine = create_async_engine(get_database_url(), echo=False)
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
-    async with _engine.begin() as conn:
-        # Add new enum values if they don't exist (postgres won't do this automatically)
-        for val in ("GITLAB", "JIRA"):
-            await conn.execute(
-                __import__("sqlalchemy").text(
+    import sqlalchemy as sa
+
+    # Step 1: Add enum values for existing DBs (must be outside the main DDL transaction
+    # because asyncpg aborts the whole transaction on any error)
+    try:
+        async with _engine.begin() as conn:
+            for val in ("GITLAB", "JIRA"):
+                await conn.execute(sa.text(
                     f"ALTER TYPE trackerkind ADD VALUE IF NOT EXISTS '{val}'"
-                )
-            )
+                ))
+    except Exception:
+        pass  # fresh DB — type doesn't exist yet, create_all will handle it
+
+    # Step 2: Create tables + run migrations
+    async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Add email column to tracker_connections if it doesn't exist
-        await conn.execute(
-            __import__("sqlalchemy").text(
-                "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''"
-            )
-        )
+        await conn.execute(sa.text(
+            "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''"
+        ))
+        # Migrate old model IDs to CLI aliases
+        await conn.execute(sa.text(
+            "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"
+        ))
+        await conn.execute(sa.text(
+            "UPDATE agent_configs SET model = 'opus' WHERE model = 'claude-opus-4-6'"
+        ))
 
 
 async def close_db() -> None:

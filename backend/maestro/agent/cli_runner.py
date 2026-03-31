@@ -13,7 +13,7 @@ from maestro.db.models import AgentRunLog
 
 logger = logging.getLogger(__name__)
 
-_pr_pattern = re.compile(r"https://github\.com/[^\s\"']+/pull/\d+")
+_pr_pattern = re.compile(r"https://(?:github\.com/[^\s\"']+/pull/\d+|[^\s\"']+/-/merge_requests/\d+)")
 
 
 async def _write_log(run_id: int, entry_type: str, content: str) -> None:
@@ -70,20 +70,12 @@ async def run_cli_with_logging(
 
     await _write_log(run_id, "status", f"$ claude -p '...' --model {model} --output-format stream-json")
 
-    env = {
-        "ANTHROPIC_API_KEY": api_key,
-        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:" +
-                "/Users/frankchan/.local/bin:/Users/frankchan/.nvm/versions/node/v22.14.0/bin",
-        "HOME": "/Users/frankchan",
-        "GH_TOKEN": "",  # Will be populated if available
-    }
-
-    # Inherit GH_TOKEN from environment if set
     import os
-    if os.environ.get("GH_TOKEN"):
-        env["GH_TOKEN"] = os.environ["GH_TOKEN"]
-    # Also check for gh auth
-    env["GITHUB_TOKEN"] = os.environ.get("GITHUB_TOKEN", "")
+
+    env = {
+        **os.environ,
+        "ANTHROPIC_API_KEY": api_key,
+    }
 
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -91,7 +83,7 @@ async def run_cli_with_logging(
             cwd=workspace_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "ANTHROPIC_API_KEY": api_key},
+            env=env,
         )
 
         print(f"[MAESTRO-CLI] Run {run_id} started, PID={proc.pid}")

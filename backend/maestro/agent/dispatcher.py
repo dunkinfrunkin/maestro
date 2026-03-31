@@ -82,27 +82,54 @@ async def dispatch_agent_for_status(
         pr_number = task_record.pr_number if task_record else ""
         repo = task_record.repo if task_record else ""
 
-        # If repo is empty, try to get it from the connection or external_ref
-        if not repo and task_record:
+        # Get connection info for clone auth
+        conn = None
+        tracker_token = ""
+        if task_record:
             conn = await crud.get_connection(session, task_record.tracker_connection_id)
+            if conn:
+                tracker_token = crud.get_decrypted_token(conn)
+
+        # Resolve repo: task record → connection project → description/URL
+        if not repo and task_record:
             if conn and conn.project:
                 repo = conn.project
-            elif task_record.external_ref:
-                # external_ref format: "github:conn_id:issue_id"
-                # issue identifier might be "owner/repo#number"
-                parts = task_record.external_ref.split(":")
-                if len(parts) >= 3:
-                    issue_id = parts[2]
-                    # For issues fetched across all repos, identifier has repo in it
-                    # but issue_id here is just the number
-                    # Fall back to connection project
-                    pass
+            # Try to extract repo from issue description or URL
+            if not repo:
+                repo = _extract_repo_from_text(
+                    issue_description,
+                    issue_url,
+                    conn.kind.value if conn else "",
+                    conn.endpoint if conn else "",
+                )
             # Save repo back to task record for future runs
             if repo:
                 task_record.repo = repo
                 await session.commit()
 
-        model = agent_config.model if agent_config else "claude-sonnet-4-6"
+        # Build clone URL with auth
+        # If the task tracker doesn't host code (Jira, Linear), find a
+        # code-hosting connection (GitHub/GitLab) that can clone this repo.
+        clone_url = ""
+        clone_conn = conn
+        clone_token = tracker_token
+        if repo and conn and conn.kind.value in ("jira", "linear"):
+            all_conns = await crud.list_connections(session)
+            for c in all_conns:
+                if c.kind.value in ("github", "gitlab"):
+                    clone_conn = c
+                    clone_token = crud.get_decrypted_token(c)
+                    break
+        if repo and clone_conn:
+            clone_url = _build_clone_url(
+                repo=repo,
+                tracker_kind=clone_conn.kind.value,
+                endpoint=clone_conn.endpoint,
+                token=clone_token,
+                email=clone_conn.email,
+            )
+
+        model = agent_config.model if agent_config else "sonnet"
 
         # Create agent run record
         run = AgentRun(
@@ -132,6 +159,7 @@ async def dispatch_agent_for_status(
             pr_url=pr_url,
             pr_number=pr_number,
             repo=repo,
+            clone_url=clone_url,
             extra_config=extra if agent_config else {},
         )
     )
@@ -172,6 +200,7 @@ async def _execute_agent(
     pr_url: str,
     pr_number: str,
     repo: str,
+    clone_url: str,
     extra_config: dict,
 ) -> None:
     """Execute an agent in the background with live log streaming."""
@@ -194,20 +223,25 @@ async def _execute_agent(
 
     # Clone repo if available
     from maestro.agent.sdk_runner import _write_log
-    if repo:
+    if clone_url:
+        # Log repo name but not the token-embedded URL
         await _write_log(run_id, "status", f"Cloning repository: {repo}")
-        proc = await asyncio.create_subprocess_shell(
-            f"git clone https://github.com/{repo}.git {workspace_path}/repo",
+        proc = await asyncio.create_subprocess_exec(
+            "git", "clone", "--depth", "1", clone_url, f"{workspace_path}/repo",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
             workspace_path = f"{workspace_path}/repo"
-            await _write_log(run_id, "status", f"Repository cloned successfully")
+            await _write_log(run_id, "status", "Repository cloned successfully")
         else:
+            # Sanitize error output to avoid leaking tokens
             err_msg = stderr.decode(errors="replace")[:300] if stderr else "Unknown error"
+            err_msg = _sanitize_clone_error(err_msg)
             await _write_log(run_id, "error", f"Clone failed: {err_msg}")
+    elif repo:
+        await _write_log(run_id, "error", f"Repository '{repo}' found but could not build clone URL — check connection settings")
     else:
         await _write_log(run_id, "status", "No repository configured — working in empty workspace")
 
@@ -514,3 +548,102 @@ def _extract_verdict(result: dict) -> str:
     if "APPROVE" in upper:
         return "APPROVE"
     return "APPROVE"  # default to approve if unclear
+
+
+# ---------------------------------------------------------------------------
+# Repo resolution helpers
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+# Patterns that match repo paths in URLs and text
+_GITHUB_REPO_RE = _re.compile(r"github\.com[/:]([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git|/|#|\s|$)")
+_GITLAB_REPO_RE = _re.compile(r"gitlab\.com[/:]([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+?)(?:\.git|/-/|/|#|\s|$)")
+_GENERIC_GIT_RE = _re.compile(r"(?:https?://[^/]+/|git@[^:]+:)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git|/|#|\s|$)")
+
+
+def _extract_repo_from_text(description: str, url: str, tracker_kind: str, endpoint: str) -> str:
+    """Try to extract a repository path from issue description or URL.
+
+    Looks for patterns like:
+    - https://github.com/owner/repo
+    - https://gitlab.com/group/subgroup/repo
+    - git@github.com:owner/repo.git
+    - owner/repo (in description text near keywords like "repo", "repository")
+    """
+    texts = [description or "", url or ""]
+    combined = "\n".join(texts)
+
+    if not combined.strip():
+        return ""
+
+    # Try tracker-specific patterns first
+    if tracker_kind == "github":
+        match = _GITHUB_REPO_RE.search(combined)
+        if match:
+            return match.group(1).rstrip(".")
+    elif tracker_kind == "gitlab":
+        # For GitLab, also check the endpoint domain
+        if endpoint:
+            domain = endpoint.rstrip("/").split("//")[-1]
+            gitlab_re = _re.compile(
+                _re.escape(domain) + r"[/:]([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+?)(?:\.git|/-/|/|#|\s|$)"
+            )
+            match = gitlab_re.search(combined)
+            if match:
+                return match.group(1).rstrip(".")
+        match = _GITLAB_REPO_RE.search(combined)
+        if match:
+            return match.group(1).rstrip(".")
+
+    # Generic: try any git URL
+    match = _GENERIC_GIT_RE.search(combined)
+    if match:
+        return match.group(1).rstrip(".")
+
+    return ""
+
+
+def _build_clone_url(repo: str, tracker_kind: str, endpoint: str, token: str, email: str) -> str:
+    """Build an authenticated HTTPS clone URL for any tracker type.
+
+    Args:
+        repo: Repository path (e.g., "owner/repo" or "group/subgroup/repo")
+        tracker_kind: "github", "gitlab", "jira", etc.
+        endpoint: Base URL of the tracker (e.g., "https://gitlab.com")
+        token: API token for authentication
+        email: User email (used for Jira/Bitbucket basic auth)
+    """
+    if not repo or not token:
+        return ""
+
+    if tracker_kind == "github":
+        host = "github.com"
+        if endpoint and "github.com" not in endpoint:
+            # GitHub Enterprise
+            host = endpoint.rstrip("/").split("//")[-1]
+        return f"https://x-access-token:{token}@{host}/{repo}.git"
+
+    elif tracker_kind == "gitlab":
+        host = "gitlab.com"
+        if endpoint:
+            host = endpoint.rstrip("/").split("//")[-1]
+        return f"https://oauth2:{token}@{host}/{repo}.git"
+
+    elif tracker_kind == "jira":
+        # Jira doesn't host code — but the repo field might point to a GitHub/GitLab repo
+        # Try to infer from the repo path
+        if "github.com" in repo or "github" in repo.lower():
+            clean = _re.sub(r"https?://github\.com/", "", repo)
+            return f"https://x-access-token:{token}@github.com/{clean}.git"
+        # Default: assume it's a path on the endpoint host (Bitbucket etc.)
+        return ""
+
+    return ""
+
+
+def _sanitize_clone_error(error: str) -> str:
+    """Remove tokens/credentials from git clone error messages."""
+    # Replace anything that looks like a token in a URL
+    sanitized = _re.sub(r"(https?://)[^@]+@", r"\1***@", error)
+    return sanitized

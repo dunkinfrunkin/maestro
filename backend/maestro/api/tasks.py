@@ -39,6 +39,7 @@ class UnifiedTask(BaseModel):
     updated_at: str | None = None
     pipeline_status: str | None = None  # our harness engineering status
     pr_url: str | None = None
+    repo: str | None = None  # associated repository (e.g., "owner/repo")
 
 
 class ConnectionCreate(BaseModel):
@@ -125,6 +126,43 @@ async def create_connection(body: ConnectionCreate, user: User = Depends(get_cur
         )
 
 
+class ConnectionUpdate(BaseModel):
+    name: str | None = None
+    project: str | None = None
+    endpoint: str | None = None
+    token: str | None = None
+
+
+@router.put("/connections/{connection_id}")
+async def update_connection(connection_id: int, body: ConnectionUpdate) -> ConnectionResponse:
+    """Update a connection's settings."""
+    async with get_session() as session:
+        conn = await crud.get_connection(session, connection_id)
+        if not conn:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        if body.name is not None:
+            conn.name = body.name
+        if body.project is not None:
+            conn.project = body.project
+        if body.endpoint is not None:
+            conn.endpoint = body.endpoint
+        if body.token is not None:
+            from maestro.db.encryption import encrypt_token
+            conn.encrypted_token = encrypt_token(body.token)
+        await session.commit()
+        await session.refresh(conn)
+        return ConnectionResponse(
+            id=conn.id,
+            kind=conn.kind.value,
+            name=conn.name,
+            project=conn.project,
+            endpoint=conn.endpoint,
+            email=conn.email or "",
+            has_token=bool(conn.encrypted_token),
+            created_at=conn.created_at.isoformat() if conn.created_at else "",
+        )
+
+
 @router.delete("/connections/{connection_id}")
 async def delete_connection(connection_id: int) -> dict:
     async with get_session() as session:
@@ -190,23 +228,124 @@ async def test_connection(connection_id: int) -> dict:
 
 @router.get("/connections/{connection_id}/repos")
 async def list_connection_repos(connection_id: int) -> list[dict]:
-    """List repos accessible via a GitHub connection's token."""
+    """List repos/projects accessible via a connection's token."""
     async with get_session() as session:
         conn = await crud.get_connection(session, connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
-    if conn.kind != TrackerKind.GITHUB:
-        raise HTTPException(status_code=400, detail="Only GitHub connections support repo listing")
 
     token = crud.get_decrypted_token(conn)
-    client = GitHubClient(
-        token=token,
-        endpoint=conn.endpoint or "https://api.github.com",
-    )
+
+    if conn.kind == TrackerKind.GITHUB:
+        client = GitHubClient(
+            token=token,
+            endpoint=conn.endpoint or "https://api.github.com",
+        )
+        try:
+            return await client.fetch_repos()
+        finally:
+            await client.close()
+
+    elif conn.kind == TrackerKind.GITLAB:
+        from maestro.external.gitlab.tracker import GitLabIssueTracker
+        client = GitLabIssueTracker(
+            token=token,
+            group=conn.project,
+            endpoint=conn.endpoint or "https://gitlab.com",
+        )
+        try:
+            return await client.fetch_projects()
+        finally:
+            await client.close()
+
+    raise HTTPException(status_code=400, detail=f"{conn.kind.value} connections don't support repo listing")
+
+
+@router.get("/repos")
+async def list_all_repos(search: str | None = Query(None)) -> list[dict]:
+    """List repos across all code-hosting connections (GitHub, GitLab).
+
+    When `search` is provided it's passed to each tracker's native search
+    API so filtering happens server-side and results come back fast.
+    """
+    import asyncio
+    import logging
+
+    log = logging.getLogger(__name__)
+
+    async with get_session() as session:
+        connections = await crud.list_connections(session)
+
+    code_connections = [c for c in connections if c.kind in (TrackerKind.GITHUB, TrackerKind.GITLAB)]
+    if not code_connections:
+        return []
+
+    async def _fetch_for_conn(conn) -> list[dict]:
+        token = crud.get_decrypted_token(conn)
+        try:
+            if conn.kind == TrackerKind.GITHUB:
+                client = GitHubClient(token=token, endpoint=conn.endpoint or "https://api.github.com", timeout_ms=10000)
+                try:
+                    repos = await client.fetch_repos(search=search or "")
+                finally:
+                    await client.close()
+            elif conn.kind == TrackerKind.GITLAB:
+                from maestro.external.gitlab.tracker import GitLabIssueTracker
+                client = GitLabIssueTracker(
+                    token=token, group=conn.project,
+                    endpoint=conn.endpoint or "https://gitlab.com",
+                    timeout_ms=10000,
+                )
+                try:
+                    repos = await client.fetch_projects(search=search or "")
+                finally:
+                    await client.close()
+            else:
+                return []
+
+            for repo in repos:
+                repo["connection_id"] = conn.id
+                repo["tracker_kind"] = conn.kind.value
+            return repos
+        except Exception as exc:
+            log.warning("Failed to list repos from connection %s: %s", conn.name, exc)
+            return [{
+                "full_name": f"[Error: {conn.name}] {str(exc)[:100]}",
+                "name": conn.name,
+                "owner": "",
+                "private": False,
+                "open_issues_count": 0,
+                "html_url": "",
+                "connection_id": conn.id,
+                "tracker_kind": f"{conn.kind.value} (error)",
+            }]
+
+    # Fetch from all connections in parallel with a 10s overall timeout
+    tasks = [_fetch_for_conn(c) for c in code_connections]
     try:
-        return await client.fetch_repos()
-    finally:
-        await client.close()
+        results = await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=10.0)
+    except asyncio.TimeoutError:
+        return []
+
+    all_repos: list[dict] = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            conn = code_connections[i]
+            log.warning("Repo fetch failed for %s: %s", conn.name, result)
+            all_repos.append({
+                "full_name": f"[Error: {conn.name}] {str(result)[:100]}",
+                "name": conn.name,
+                "owner": "",
+                "private": False,
+                "open_issues_count": 0,
+                "html_url": "",
+                "connection_id": conn.id,
+                "tracker_kind": f"{conn.kind.value} (error)",
+            })
+        else:
+            all_repos.extend(result)
+
+    return all_repos
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +409,7 @@ async def list_tasks(
                         id=record.id if record else None,
                         pipeline_status=record.status.value if record else None,
                         pr_url=record.pr_url if record and record.pr_url else None,
+                        repo=record.repo if record and record.repo else None,
                     )
 
                     # Apply filters
@@ -471,6 +611,7 @@ async def _build_task_from_ref(external_ref: str) -> dict:
             "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
             "pipeline_status": None,
             "pr_url": None,
+            "repo": None,
         }
 
     raise HTTPException(status_code=404, detail="Task not found in tracker")
@@ -512,6 +653,7 @@ async def _build_task_detail(record) -> dict:
             "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
             "pipeline_status": record.status.value if record.status else None,
             "pr_url": record.pr_url or None,
+            "repo": record.repo or None,
         }
 
     return {
@@ -530,6 +672,7 @@ async def _build_task_detail(record) -> dict:
         "updated_at": None,
         "pipeline_status": record.status.value if record.status else None,
         "pr_url": record.pr_url or None,
+        "repo": record.repo or None,
     }
 
 
@@ -541,6 +684,27 @@ async def remove_task_status(external_ref: str) -> dict:
         if not ok:
             raise HTTPException(status_code=404, detail="No pipeline record for this task")
         return {"status": "removed"}
+
+
+class TaskRepoUpdate(BaseModel):
+    repo: str
+
+
+@router.put("/tasks/{external_ref:path}/repo")
+async def update_task_repo(external_ref: str, body: TaskRepoUpdate) -> dict:
+    """Set or update the repository associated with a task."""
+    async with get_session() as session:
+        record = await crud.get_pipeline_record(session, external_ref)
+        if not record:
+            # Create a minimal pipeline record to store the repo
+            parts = external_ref.split(":")
+            conn_id = int(parts[1]) if len(parts) >= 2 else 0
+            record = await crud.set_pipeline_status(
+                session, external_ref, conn_id, PipelineStatus.QUEUED, project_id=0
+            )
+        record.repo = body.repo
+        await session.commit()
+        return {"external_ref": external_ref, "repo": record.repo}
 
 
 # ---------------------------------------------------------------------------

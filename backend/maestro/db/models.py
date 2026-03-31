@@ -210,7 +210,7 @@ class AgentConfig(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     agent_type: Mapped[AgentType] = mapped_column(Enum(AgentType), nullable=False)
-    model: Mapped[str] = mapped_column(String(100), nullable=False, default="claude-sonnet-4-6")
+    model: Mapped[str] = mapped_column(String(100), nullable=False, default="sonnet")
     # JSON-serialized extra config (e.g., risk threshold for risk_profile agent)
     extra_config: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(

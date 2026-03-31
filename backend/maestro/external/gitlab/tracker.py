@@ -55,6 +55,41 @@ class GitLabIssueTracker(IssueTracker):
     async def close(self) -> None:
         await self._http.aclose()
 
+    async def fetch_projects(self, search: str = "") -> list[dict[str, Any]]:
+        """Fetch projects (repos) accessible to the token, optionally filtered."""
+        projects: list[dict[str, Any]] = []
+        page = 1
+        base = f"/groups/{self._group_path}/projects" if self._group_path else "/projects"
+        params: dict[str, Any] = {
+            "per_page": 50,
+            "page": page,
+            "order_by": "last_activity_at",
+            "sort": "desc",
+            "membership": "true",
+        }
+        if search:
+            params["search"] = search
+        while True:
+            params["page"] = page
+            resp = await self._http.get(base, params=params)
+            resp.raise_for_status()
+            items = resp.json()
+            if not items:
+                break
+            for item in items:
+                projects.append({
+                    "full_name": item.get("path_with_namespace", ""),
+                    "name": item.get("name", ""),
+                    "owner": item.get("namespace", {}).get("full_path", ""),
+                    "private": item.get("visibility") == "private",
+                    "open_issues_count": item.get("open_issues_count", 0),
+                    "html_url": item.get("web_url", ""),
+                })
+            if len(items) < 50:
+                break
+            page += 1
+        return projects
+
     async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
         return await self._fetch_issues(state="opened", max_results=max_results)
 

@@ -8,9 +8,12 @@ import {
   AgentLogEntry,
   PIPELINE_STATUSES,
   UnifiedTask,
+  RepoEntry,
   fetchTaskRuns,
   fetchRunLogs,
   updateTaskStatus,
+  fetchRepos,
+  updateTaskRepo,
 } from "@/lib/api";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -141,6 +144,9 @@ export function TaskDetailPage({
             </a>
           </div>
         )}
+
+        {/* Repo selector */}
+        <RepoSelector task={task} onRepoChanged={onTaskUpdated} />
 
         {/* Status selector + re-run */}
         <div className="mt-4 flex items-center gap-3">
@@ -303,6 +309,126 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function RepoSelector({ task, onRepoChanged }: { task: UnifiedTask; onRepoChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [repos, setRepos] = useState<RepoEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const loadRepos = useCallback(async (q: string) => {
+    if (!q.trim()) { setRepos([]); return; }
+    setLoading(true);
+    try {
+      const data = await fetchRepos(q);
+      setRepos(data);
+    } catch {
+      setRepos([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleSelect = async (repoName: string) => {
+    setSaving(true);
+    try {
+      await updateTaskRepo(task.external_ref, repoName);
+      onRepoChanged();
+    } catch {}
+    setSaving(false);
+    setOpen(false);
+  };
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    clearTimeout(debounceRef.current);
+    if (!val.trim()) { setRepos([]); setLoading(false); return; }
+    setLoading(true);
+    debounceRef.current = setTimeout(() => loadRepos(val), 300);
+  };
+
+  return (
+    <div className="mt-3" ref={dropdownRef}>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted">Repository:</span>
+        <button
+          onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
+          className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-surface-hover transition-colors font-mono flex items-center gap-1.5"
+        >
+          {saving ? "Saving..." : task.repo || "Select repo..."}
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-1 w-full max-w-md rounded-md border border-border bg-surface shadow-lg z-10 relative">
+          <div className="p-2 border-b border-border">
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && search.trim()) {
+                  handleSelect(search.trim());
+                }
+              }}
+              placeholder="Search or type repo path..."
+              className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent font-mono"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {!search.trim() ? (
+              <div className="px-3 py-2 text-xs text-muted">Type to search repos...</div>
+            ) : loading ? (
+              <div className="px-3 py-2 text-xs text-muted">Searching...</div>
+            ) : repos.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted">
+                <button
+                  onClick={() => handleSelect(search.trim())}
+                  className="hover:text-foreground transition-colors"
+                >
+                  No repos found. Press Enter to use <span className="font-mono">{search}</span>
+                </button>
+              </div>
+            ) : (
+              repos.map((r) => (
+                <button
+                  key={`${r.tracker_kind}:${r.full_name}`}
+                  onClick={() => handleSelect(r.full_name)}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-hover transition-colors flex items-center justify-between ${
+                    task.repo === r.full_name ? "bg-accent/5 text-accent" : ""
+                  }`}
+                >
+                  <span className="font-mono truncate">{r.full_name}</span>
+                  <span className="text-[10px] text-muted ml-2 flex-shrink-0">{r.tracker_kind}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
