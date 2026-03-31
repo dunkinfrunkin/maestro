@@ -294,7 +294,7 @@ export async function fetchTasks(params?: {
   if (params?.label) qs.set("label", params.label);
   if (params?.pipeline_status) qs.set("pipeline_status", params.pipeline_status);
   const query = qs.toString();
-  const res = await fetch(`${API_BASE}/api/v1/tasks${query ? `?${query}` : ""}`, { cache: "no-store" });
+  const res = await authFetch(`${API_BASE}/api/v1/tasks${query ? `?${query}` : ""}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }

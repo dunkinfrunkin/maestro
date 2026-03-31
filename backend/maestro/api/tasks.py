@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from maestro.auth import get_current_user
 from maestro.db import crud
 from maestro.db.engine import get_session
-from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerKind
+from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerKind, User
 from maestro.tracker.github import GitHubClient
 from maestro.tracker.linear import LinearClient
 
@@ -161,6 +162,7 @@ async def list_tasks(
     search: str | None = Query(None),
     label: str | None = Query(None),
     pipeline_status: str | None = Query(None),
+    user: User = Depends(get_current_user),
 ) -> list[UnifiedTask]:
     """Fetch tasks from connected tracker(s) with optional search/filter."""
     async with get_session() as session:
@@ -177,7 +179,7 @@ async def list_tasks(
     for conn in connections:
         try:
             token = crud.get_decrypted_token(conn)
-            issues = await _fetch_from_tracker(conn, token, search)
+            issues = await _fetch_from_tracker(conn, token, search, user_email=user.email)
 
             # Load pipeline records for these issues
             async with get_session() as session:
@@ -418,7 +420,7 @@ async def remove_task_status(external_ref: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def _fetch_from_tracker(conn: Any, token: str, search: str | None):
+async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_email: str = ""):
     """Fetch issues from a tracker connection."""
     from maestro.models import Issue
 
@@ -468,6 +470,7 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None):
             base_url=conn.endpoint or "https://jira.atlassian.net",
             api_token=token,
             project_key=conn.project,  # project field stores comma-separated keys
+            assignee_email=user_email,
         )
         try:
             if search:

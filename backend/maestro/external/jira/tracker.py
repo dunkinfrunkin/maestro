@@ -48,12 +48,14 @@ class JiraIssueTracker(IssueTracker):
         api_token: str,
         project_key: str,
         email: str = "",
+        assignee_email: str = "",
         active_statuses: list[str] | None = None,
         terminal_statuses: list[str] | None = None,
         api_version: str = "3",
         timeout_ms: int = 30000,
     ) -> None:
         self._base_url = base_url.rstrip("/")
+        self._assignee_email = assignee_email
         # Support comma-separated project keys: "ENG,PLATFORM,INFRA"
         self._project_keys = [k.strip() for k in project_key.split(",") if k.strip()]
         self._active_statuses = active_statuses or [
@@ -102,18 +104,37 @@ class JiraIssueTracker(IssueTracker):
         keys = ", ".join(self._project_keys)
         return f"project in ({keys})"
 
+    def _assignee_clause(self) -> str:
+        """Build JQL assignee clause from the authenticated user's email."""
+        if not self._assignee_email:
+            return ""
+        return f'assignee = "{_escape_jql(self._assignee_email)}"'
+
+    def _base_clauses(self) -> list[str]:
+        """Collect non-empty base JQL clauses (project + assignee)."""
+        clauses = []
+        project = self._project_clause()
+        if project:
+            clauses.append(project)
+        assignee = self._assignee_clause()
+        if assignee:
+            clauses.append(assignee)
+        return clauses
+
     async def fetch_candidate_issues(self) -> list[Issue]:
         status_clause = _jql_status_in(self._active_statuses)
-        project = self._project_clause()
-        jql = f"{project + ' AND ' if project else ''}{status_clause} ORDER BY created DESC"
+        clauses = self._base_clauses()
+        clauses.append(status_clause)
+        jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql)
 
     async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
         if not states:
             return []
         status_clause = _jql_status_in(states)
-        project = self._project_clause()
-        jql = f"{project + ' AND ' if project else ''}{status_clause} ORDER BY created DESC"
+        clauses = self._base_clauses()
+        clauses.append(status_clause)
+        jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql)
 
     async def fetch_issue_states_by_ids(
@@ -144,8 +165,9 @@ class JiraIssueTracker(IssueTracker):
         return result
 
     async def search_issues(self, query: str) -> list[Issue]:
-        project = self._project_clause()
-        jql = f'{project + " AND " if project else ""}text ~ "{_escape_jql(query)}" ORDER BY created DESC'
+        clauses = self._base_clauses()
+        clauses.append(f'text ~ "{_escape_jql(query)}"')
+        jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql, max_results=30)
 
     async def _search(
