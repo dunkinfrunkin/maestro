@@ -43,10 +43,10 @@ class GitHubIssueTracker(IssueTracker):
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def fetch_candidate_issues(self) -> list[Issue]:
+    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
         if self._repo:
-            return await self._fetch_repo_issues(self._repo, state="open")
-        return await self._fetch_all_issues(state="open")
+            return await self._fetch_repo_issues(self._repo, state="open", max_results=max_results)
+        return await self._fetch_all_issues(state="open", max_results=max_results)
 
     async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
         all_issues: list[Issue] = []
@@ -129,16 +129,17 @@ class GitHubIssueTracker(IssueTracker):
             for item in data.get("items", [])
         ]
 
-    async def _fetch_all_issues(self, state: str = "open") -> list[Issue]:
+    async def _fetch_all_issues(self, state: str = "open", max_results: int = 100) -> list[Issue]:
         all_issues: list[Issue] = []
         page = 1
+        per_page = min(50, max_results)
         while True:
             resp = await self._http.get(
                 "/user/issues",
                 params={
                     "state": state,
                     "filter": "all",
-                    "per_page": 50,
+                    "per_page": per_page,
                     "page": page,
                     "sort": "created",
                     "direction": "desc",
@@ -153,19 +154,20 @@ class GitHubIssueTracker(IssueTracker):
                     continue
                 repo = item.get("repository", {}).get("full_name", "")
                 all_issues.append(_normalize_issue(item, repo))
-            if len(items) < 50:
+            if len(all_issues) >= max_results or len(items) < per_page:
                 break
             page += 1
-        return all_issues
+        return all_issues[:max_results]
 
     async def _fetch_repo_issues(
         self,
         repo: str,
         state: str = "open",
-        per_page: int = 50,
+        max_results: int = 100,
     ) -> list[Issue]:
         all_issues: list[Issue] = []
         page = 1
+        per_page = min(50, max_results)
         while True:
             resp = await self._http.get(
                 f"/repos/{repo}/issues",
@@ -185,10 +187,10 @@ class GitHubIssueTracker(IssueTracker):
                 if "pull_request" in item:
                     continue
                 all_issues.append(_normalize_issue(item, repo))
-            if len(items) < per_page:
+            if len(all_issues) >= max_results or len(items) < per_page:
                 break
             page += 1
-        return all_issues
+        return all_issues[:max_results]
 
 
 def _normalize_issue(item: dict[str, Any], repo: str) -> Issue:

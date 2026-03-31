@@ -26,7 +26,7 @@ class IssueTracker(ABC):
     """
 
     @abstractmethod
-    async def fetch_candidate_issues(self) -> list[Issue]:
+    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
         """Fetch active issues eligible for pipeline dispatch."""
         ...
 

@@ -230,7 +230,6 @@ export async function createConnection(body: {
   project: string;
   token: string;
   endpoint?: string;
-  email?: string;
   workspace_id?: number;
 }): Promise<TrackerConnection> {
   const res = await authFetch(`${API_BASE}/api/v1/connections`, {
@@ -248,6 +247,12 @@ export async function createConnection(body: {
 export async function deleteConnection(id: number): Promise<void> {
   const res = await authFetch(`${API_BASE}/api/v1/connections/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export async function testConnection(id: number): Promise<{ status: string; message: string }> {
+  const res = await authFetch(`${API_BASE}/api/v1/connections/${id}/test`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
 }
 
 // ---------------------------------------------------------------------------
@@ -283,19 +288,29 @@ export const PIPELINE_STATUSES = [
 
 export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
 
+export interface PaginatedTasks {
+  tasks: UnifiedTask[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 export async function fetchTasks(params?: {
   connection_id?: number;
   search?: string;
   label?: string;
   pipeline_status?: string;
-}): Promise<UnifiedTask[]> {
+  offset?: number;
+  limit?: number;
+}): Promise<PaginatedTasks> {
   const qs = new URLSearchParams();
   if (params?.connection_id) qs.set("connection_id", String(params.connection_id));
   if (params?.search) qs.set("search", params.search);
   if (params?.label) qs.set("label", params.label);
   if (params?.pipeline_status) qs.set("pipeline_status", params.pipeline_status);
-  const query = qs.toString();
-  const res = await authFetch(`${API_BASE}/api/v1/tasks${query ? `?${query}` : ""}`);
+  qs.set("offset", String(params?.offset ?? 0));
+  qs.set("limit", String(params?.limit ?? 10));
+  const res = await authFetch(`${API_BASE}/api/v1/tasks?${qs.toString()}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }

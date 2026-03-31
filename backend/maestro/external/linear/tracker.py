@@ -121,10 +121,11 @@ class LinearIssueTracker(IssueTracker):
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def fetch_candidate_issues(self) -> list[Issue]:
+    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
         return await self._paginated_issues(
             _FETCH_CANDIDATES,
             {"projectSlug": self._project_slug, "states": self._active_states},
+            max_results=max_results,
         )
 
     async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
@@ -156,7 +157,7 @@ class LinearIssueTracker(IssueTracker):
         return body.get("data", {})
 
     async def _paginated_issues(
-        self, query: str, variables: dict[str, Any]
+        self, query: str, variables: dict[str, Any], max_results: int = 100
     ) -> list[Issue]:
         all_issues: list[Issue] = []
         cursor: str | None = None
@@ -166,13 +167,15 @@ class LinearIssueTracker(IssueTracker):
             issues_data = data.get("issues", {})
             for node in issues_data.get("nodes", []):
                 all_issues.append(_normalize_issue(node))
+            if len(all_issues) >= max_results:
+                break
             page_info = issues_data.get("pageInfo", {})
             if not page_info.get("hasNextPage"):
                 break
             cursor = page_info.get("endCursor")
             if not cursor:
                 break
-        return all_issues
+        return all_issues[:max_results]
 
 
 # ---------------------------------------------------------------------------

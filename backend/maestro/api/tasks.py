@@ -47,7 +47,6 @@ class ConnectionCreate(BaseModel):
     project: str = ""  # optional for GitHub (access all repos)
     token: str
     endpoint: str = ""
-    email: str = ""  # required for Jira Cloud (basic auth email)
     workspace_id: int | None = None
 
 
@@ -97,7 +96,7 @@ async def list_connections() -> list[ConnectionResponse]:
 
 
 @router.post("/connections")
-async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
+async def create_connection(body: ConnectionCreate, user: User = Depends(get_current_user)) -> ConnectionResponse:
     try:
         kind = TrackerKind(body.kind)
     except ValueError:
@@ -111,7 +110,7 @@ async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
             project=body.project,
             token=body.token,
             endpoint=body.endpoint,
-            email=body.email,
+            email=user.email,
             workspace_id=body.workspace_id,
         )
         return ConnectionResponse(
@@ -133,6 +132,60 @@ async def delete_connection(connection_id: int) -> dict:
         if not ok:
             raise HTTPException(status_code=404, detail="Connection not found")
         return {"status": "deleted"}
+
+
+@router.get("/connections/{connection_id}/test")
+async def test_connection(connection_id: int) -> dict:
+    """Test a tracker connection by making a lightweight API call."""
+    async with get_session() as session:
+        conn = await crud.get_connection(session, connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    token = crud.get_decrypted_token(conn)
+    try:
+        if conn.kind == TrackerKind.GITHUB:
+            client = GitHubClient(token=token, endpoint=conn.endpoint or "https://api.github.com")
+            try:
+                await client.fetch_repos()
+            finally:
+                await client.close()
+
+        elif conn.kind == TrackerKind.LINEAR:
+            client = LinearClient(api_key=token, project_slug=conn.project, endpoint=conn.endpoint or "https://api.linear.app/graphql")
+            try:
+                await client.fetch_candidate_issues(max_results=1)
+            finally:
+                await client.close()
+
+        elif conn.kind == TrackerKind.GITLAB:
+            from maestro.external.gitlab.tracker import GitLabIssueTracker
+            client = GitLabIssueTracker(token=token, group=conn.project, endpoint=conn.endpoint or "https://gitlab.com")
+            try:
+                await client.fetch_candidate_issues(max_results=1)
+            finally:
+                await client.close()
+
+        elif conn.kind == TrackerKind.JIRA:
+            from maestro.external.jira.tracker import JiraIssueTracker
+            client = JiraIssueTracker(
+                base_url=conn.endpoint or "https://jira.atlassian.net",
+                api_token=token,
+                project_key=conn.project or "",
+                email=conn.email,
+            )
+            try:
+                await client.fetch_candidate_issues(max_results=1)
+            finally:
+                await client.close()
+
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown tracker kind: {conn.kind.value}")
+
+        return {"status": "ok", "message": "Connection successful"}
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.get("/connections/{connection_id}/repos")
@@ -161,14 +214,23 @@ async def list_connection_repos(connection_id: int) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+class PaginatedTasks(BaseModel):
+    tasks: list[UnifiedTask]
+    total: int
+    offset: int
+    limit: int
+
+
 @router.get("/tasks")
 async def list_tasks(
     connection_id: int | None = Query(None),
     search: str | None = Query(None),
     label: str | None = Query(None),
     pipeline_status: str | None = Query(None),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
     user: User = Depends(get_current_user),
-) -> list[UnifiedTask]:
+) -> PaginatedTasks:
     """Fetch tasks from connected tracker(s) with optional search/filter."""
     async with get_session() as session:
         connections = await crud.list_connections(session)
@@ -184,7 +246,7 @@ async def list_tasks(
     for conn in connections:
         try:
             token = crud.get_decrypted_token(conn)
-            issues = await _fetch_from_tracker(conn, token, search, user_email=user.email)
+            issues = await _fetch_from_tracker(conn, token, search, user_email=user.email, max_results=offset + limit)
 
             # Load pipeline records for these issues
             async with get_session() as session:
@@ -227,7 +289,11 @@ async def list_tasks(
                 "Failed to fetch from connection %s (%s)", conn.name, conn.kind.value
             )
 
-    return all_tasks
+    # Sort newest first
+    all_tasks.sort(key=lambda t: t.created_at or "", reverse=True)
+    total = len(all_tasks)
+    page = all_tasks[offset : offset + limit]
+    return PaginatedTasks(tasks=page, total=total, offset=offset, limit=limit)
 
 
 @router.put("/tasks/{external_ref:path}/status")
@@ -425,7 +491,7 @@ async def remove_task_status(external_ref: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_email: str = ""):
+async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_email: str = "", max_results: int = 100):
     """Fetch issues from a tracker connection."""
     from maestro.models import Issue
 
@@ -438,7 +504,7 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_em
         try:
             if search:
                 return await client.search_issues(search)
-            return await client.fetch_candidate_issues()
+            return await client.fetch_candidate_issues(max_results=max_results)
         finally:
             await client.close()
 
@@ -451,7 +517,7 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_em
             endpoint=conn.endpoint or "https://api.linear.app/graphql",
         )
         try:
-            return await client.fetch_candidate_issues()
+            return await client.fetch_candidate_issues(max_results=max_results)
         finally:
             await client.close()
 
@@ -465,7 +531,7 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_em
         try:
             if search:
                 return await client.search_issues(search)
-            return await client.fetch_candidate_issues()
+            return await client.fetch_candidate_issues(max_results=max_results)
         finally:
             await client.close()
 
@@ -481,7 +547,7 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_em
         try:
             if search:
                 return await client.search_issues(search)
-            return await client.fetch_candidate_issues()
+            return await client.fetch_candidate_issues(max_results=max_results)
         finally:
             await client.close()
 

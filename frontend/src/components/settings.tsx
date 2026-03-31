@@ -18,6 +18,7 @@ import {
   fetchConnections,
   createConnection,
   deleteConnection,
+  testConnection,
   fetchMembers,
   addMember,
   ApiKeyStatus,
@@ -188,11 +189,14 @@ const CATEGORIES: { name: string; desc: string; providers: Provider[] }[] = [
 
 const ALL_PROVIDERS = CATEGORIES.flatMap((c) => c.providers);
 
-const FORM_CFG: Record<string, { tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean }> = {
-  github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false },
-  gitlab: { tokenPh: "glpat-...", projectLabel: "Group", projectPh: "engineering/ai (optional)", projectReq: false },
-  linear: { tokenPh: "lin_api_...", projectLabel: "Project slug", projectPh: "my-project", projectReq: true },
-  jira: { tokenPh: "ATATT...", projectLabel: "Project keys", projectPh: "ENG, PLATFORM (optional — blank for all)", projectReq: false },
+const FORM_CFG: Record<string, {
+  tokenPh: string; projectLabel: string; projectPh: string; projectReq: boolean;
+  endpointLabel?: string; endpointPh?: string; endpointDefault?: string; endpointReq?: boolean;
+}> = {
+  github: { tokenPh: "github_pat_...", projectLabel: "Repository", projectPh: "owner/repo", projectReq: false, endpointPh: "https://api.github.com" },
+  gitlab: { tokenPh: "glpat-...", projectLabel: "Group", projectPh: "engineering/ai (optional)", projectReq: false, endpointPh: "https://gitlab.com" },
+  linear: { tokenPh: "lin_api_...", projectLabel: "Project slug", projectPh: "my-project", projectReq: true, endpointPh: "https://api.linear.app/graphql" },
+  jira: { tokenPh: "ATATT...", projectLabel: "Project keys", projectPh: "ENG, PLATFORM (optional)", projectReq: false, endpointLabel: "Jira URL", endpointPh: "https://yourcompany.atlassian.net", endpointDefault: "https://jira.atlassian.net", endpointReq: true },
 };
 
 const FILTERS = [
@@ -307,21 +311,41 @@ function ConnectionDetailModal({
   const [name, setName] = useState("");
   const [token, setToken] = useState("");
   const [project, setProject] = useState("");
-  const [email, setEmail] = useState("");
+  const [endpoint, setEndpoint] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testResults, setTestResults] = useState<Record<number, { status: string; message: string; loading: boolean }>>({});
   const cfg = FORM_CFG[kind] || FORM_CFG.github;
   const Logo = provider.Logo;
+
+  const handleTest = async (connId: number) => {
+    setTestResults((prev) => ({ ...prev, [connId]: { status: "loading", message: "Testing...", loading: true } }));
+    try {
+      const result = await testConnection(connId);
+      setTestResults((prev) => ({ ...prev, [connId]: { ...result, loading: false } }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [connId]: { status: "error", message: "Request failed", loading: false } }));
+    }
+  };
+
+  // Auto-test connections on mount
+  useEffect(() => {
+    for (const conn of conns) { handleTest(conn.id); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !token) { setError("Name and token required"); return; }
     if (cfg.projectReq && !project) { setError(`${cfg.projectLabel} is required`); return; }
-    if (kind === "jira" && !email) { setError("Email is required for Jira"); return; }
+    if (cfg.endpointReq && !endpoint) { setError(`${cfg.endpointLabel || "Endpoint"} is required`); return; }
     setSaving(true); setError(null);
     try {
-      await createConnection({ kind, name, project, token, endpoint: undefined, workspace_id: workspaceId });
-      setName(""); setToken(""); setProject(""); setEmail("");
+      await createConnection({
+        kind, name, project, token,
+        endpoint: endpoint || cfg.endpointDefault || undefined,
+        workspace_id: workspaceId,
+      });
+      setName(""); setToken(""); setProject(""); setEndpoint("");
       setShowForm(false);
       onChanged();
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
@@ -351,16 +375,34 @@ function ConnectionDetailModal({
             <div>
               <div className="text-xs text-muted uppercase tracking-wider mb-2">Active connections</div>
               <div className="space-y-2">
-                {conns.map((conn) => (
-                  <div key={conn.id} className="flex items-center justify-between p-3 rounded-md border border-border bg-background">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{conn.name}</div>
-                      <div className="text-xs text-muted truncate">{conn.project || "All repositories"}</div>
+                {conns.map((conn) => {
+                  const test = testResults[conn.id];
+                  return (
+                    <div key={conn.id} className="p-3 rounded-md border border-border bg-background">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{conn.name}</div>
+                          <div className="text-xs text-muted truncate">{conn.project || "All repositories"}</div>
+                          {conn.endpoint && <div className="text-xs text-muted truncate">{conn.endpoint}</div>}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          <button onClick={() => handleTest(conn.id)}
+                            className="text-xs text-muted hover:text-foreground transition-colors">Test</button>
+                          <button onClick={async () => { await deleteConnection(conn.id); onChanged(); }}
+                            className="text-xs text-red-600 hover:text-red-800 transition-colors">Remove</button>
+                        </div>
+                      </div>
+                      {test && (
+                        <div className={`mt-2 text-xs px-2 py-1 rounded ${
+                          test.loading ? "text-muted bg-surface-hover" :
+                          test.status === "ok" ? "text-green-700 bg-green-50" : "text-red-700 bg-red-50"
+                        }`}>
+                          {test.loading ? "Testing..." : test.status === "ok" ? "Connected" : test.message}
+                        </div>
+                      )}
                     </div>
-                    <button onClick={async () => { await deleteConnection(conn.id); onChanged(); }}
-                      className="text-xs text-red-600 hover:text-red-800 transition-colors flex-shrink-0 ml-3">Remove</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -380,13 +422,13 @@ function ConnectionDetailModal({
                 <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cfg.tokenPh}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
               </div>
-              {kind === "jira" && (
-                <div>
-                  <label className="block text-xs text-muted mb-1">Email</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
-                    className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted" />
-                </div>
-              )}
+              <div>
+                <label className="block text-xs text-muted mb-1">
+                  {cfg.endpointLabel || "Endpoint"}{!cfg.endpointReq && " (optional)"}
+                </label>
+                <input type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={cfg.endpointPh}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />
+              </div>
               <div>
                 <label className="block text-xs text-muted mb-1">{cfg.projectLabel}{!cfg.projectReq && " (optional)"}</label>
                 <input type="text" value={project} onChange={(e) => setProject(e.target.value)} placeholder={cfg.projectPh}
