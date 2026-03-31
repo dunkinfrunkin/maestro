@@ -48,6 +48,12 @@ async def init_db() -> None:
                 )
             )
         await conn.run_sync(Base.metadata.create_all)
+        # Add email column to tracker_connections if it doesn't exist
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''"
+            )
+        )
 
 
 async def close_db() -> None:

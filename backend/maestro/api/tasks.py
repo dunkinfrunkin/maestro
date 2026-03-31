@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from maestro.auth import get_current_user
 from maestro.db import crud
 from maestro.db.engine import get_session
-from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerKind
+from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerKind, User
 from maestro.tracker.github import GitHubClient
 from maestro.tracker.linear import LinearClient
 
@@ -41,11 +42,12 @@ class UnifiedTask(BaseModel):
 
 
 class ConnectionCreate(BaseModel):
-    kind: str  # "github" or "linear"
+    kind: str  # "github", "linear", "gitlab", or "jira"
     name: str
     project: str = ""  # optional for GitHub (access all repos)
     token: str
     endpoint: str = ""
+    email: str = ""  # required for Jira Cloud (basic auth email)
     workspace_id: int | None = None
 
 
@@ -55,6 +57,7 @@ class ConnectionResponse(BaseModel):
     name: str
     project: str
     endpoint: str
+    email: str = ""
     has_token: bool
     created_at: str
 
@@ -85,6 +88,7 @@ async def list_connections() -> list[ConnectionResponse]:
                 name=c.name,
                 project=c.project,
                 endpoint=c.endpoint,
+                email=c.email or "",
                 has_token=bool(c.encrypted_token),
                 created_at=c.created_at.isoformat() if c.created_at else "",
             )
@@ -107,6 +111,7 @@ async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
             project=body.project,
             token=body.token,
             endpoint=body.endpoint,
+            email=body.email,
             workspace_id=body.workspace_id,
         )
         return ConnectionResponse(
@@ -115,6 +120,7 @@ async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
             name=conn.name,
             project=conn.project,
             endpoint=conn.endpoint,
+            email=conn.email or "",
             has_token=True,
             created_at=conn.created_at.isoformat() if conn.created_at else "",
         )
@@ -161,6 +167,7 @@ async def list_tasks(
     search: str | None = Query(None),
     label: str | None = Query(None),
     pipeline_status: str | None = Query(None),
+    user: User = Depends(get_current_user),
 ) -> list[UnifiedTask]:
     """Fetch tasks from connected tracker(s) with optional search/filter."""
     async with get_session() as session:
@@ -177,7 +184,7 @@ async def list_tasks(
     for conn in connections:
         try:
             token = crud.get_decrypted_token(conn)
-            issues = await _fetch_from_tracker(conn, token, search)
+            issues = await _fetch_from_tracker(conn, token, search, user_email=user.email)
 
             # Load pipeline records for these issues
             async with get_session() as session:
@@ -418,7 +425,7 @@ async def remove_task_status(external_ref: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def _fetch_from_tracker(conn: Any, token: str, search: str | None):
+async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_email: str = ""):
     """Fetch issues from a tracker connection."""
     from maestro.models import Issue
 
@@ -468,6 +475,8 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None):
             base_url=conn.endpoint or "https://jira.atlassian.net",
             api_token=token,
             project_key=conn.project,  # project field stores comma-separated keys
+            email=conn.email,  # Jira Cloud basic auth
+            assignee_email=user_email,
         )
         try:
             if search:

@@ -230,6 +230,7 @@ export async function createConnection(body: {
   project: string;
   token: string;
   endpoint?: string;
+  email?: string;
   workspace_id?: number;
 }): Promise<TrackerConnection> {
   const res = await authFetch(`${API_BASE}/api/v1/connections`, {
@@ -288,12 +289,13 @@ export async function fetchTasks(params?: {
   label?: string;
   pipeline_status?: string;
 }): Promise<UnifiedTask[]> {
-  const url = new URL(`${API_BASE}/api/v1/tasks`);
-  if (params?.connection_id) url.searchParams.set("connection_id", String(params.connection_id));
-  if (params?.search) url.searchParams.set("search", params.search);
-  if (params?.label) url.searchParams.set("label", params.label);
-  if (params?.pipeline_status) url.searchParams.set("pipeline_status", params.pipeline_status);
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const qs = new URLSearchParams();
+  if (params?.connection_id) qs.set("connection_id", String(params.connection_id));
+  if (params?.search) qs.set("search", params.search);
+  if (params?.label) qs.set("label", params.label);
+  if (params?.pipeline_status) qs.set("pipeline_status", params.pipeline_status);
+  const query = qs.toString();
+  const res = await authFetch(`${API_BASE}/api/v1/tasks${query ? `?${query}` : ""}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
