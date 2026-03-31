@@ -12,12 +12,12 @@ from claude_agent_sdk import ClaudeAgentOptions, query, AssistantMessage, Result
 logger = logging.getLogger(__name__)
 
 AVAILABLE_MODELS = [
-    {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "description": "Best speed/intelligence balance"},
-    {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "description": "Most capable, best for complex tasks"},
-    {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "description": "Fastest, good for simple tasks"},
+    {"id": "sonnet", "name": "Claude Sonnet", "description": "Best speed/intelligence balance"},
+    {"id": "opus", "name": "Claude Opus", "description": "Most capable, best for complex tasks"},
+    {"id": "haiku", "name": "Claude Haiku", "description": "Fastest, good for simple tasks"},
 ]
 
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "sonnet"
 
 SYSTEM_PROMPT = """You are an implementation agent for Maestro, a coding orchestration platform.
 
@@ -87,7 +87,7 @@ async def run_implementation_agent(
 
     Args:
         api_key: Anthropic API key
-        model: Model ID (e.g., claude-sonnet-4-6)
+        model: Model alias (e.g., sonnet, opus, haiku)
         workspace_path: Directory to work in (should be a cloned repo)
         issue_title: Issue title
         issue_description: Issue description/body

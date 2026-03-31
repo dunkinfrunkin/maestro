@@ -79,8 +79,10 @@ class GitHubIssueTracker(IssueTracker):
                 logger.warning("Failed to fetch state for issue %s", issue_id)
         return result
 
-    async def fetch_repos(self) -> list[dict[str, Any]]:
-        """Fetch all repos accessible to the token."""
+    async def fetch_repos(self, search: str = "") -> list[dict[str, Any]]:
+        """Fetch repos accessible to the token, optionally filtered by search."""
+        if search:
+            return await self._search_repos(search)
         repos: list[dict[str, Any]] = []
         page = 1
         while True:
@@ -98,18 +100,21 @@ class GitHubIssueTracker(IssueTracker):
             if not items:
                 break
             for item in items:
-                repos.append({
-                    "full_name": item["full_name"],
-                    "name": item["name"],
-                    "owner": item["owner"]["login"],
-                    "private": item["private"],
-                    "open_issues_count": item.get("open_issues_count", 0),
-                    "html_url": item["html_url"],
-                })
+                repos.append(_normalize_repo(item))
             if len(items) < 100:
                 break
             page += 1
         return repos
+
+    async def _search_repos(self, query: str) -> list[dict[str, Any]]:
+        """Search repos using GitHub's search API."""
+        resp = await self._http.get(
+            "/search/repositories",
+            params={"q": query, "per_page": 30, "sort": "updated"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return [_normalize_repo(item) for item in data.get("items", [])]
 
     async def search_issues(self, query: str) -> list[Issue]:
         q = f"{query} is:issue"
@@ -191,6 +196,17 @@ class GitHubIssueTracker(IssueTracker):
                 break
             page += 1
         return all_issues[:max_results]
+
+
+def _normalize_repo(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "full_name": item["full_name"],
+        "name": item["name"],
+        "owner": item["owner"]["login"],
+        "private": item["private"],
+        "open_issues_count": item.get("open_issues_count", 0),
+        "html_url": item["html_url"],
+    }
 
 
 def _normalize_issue(item: dict[str, Any], repo: str) -> Issue:

@@ -275,6 +275,18 @@ export interface UnifiedTask {
   updated_at: string | null;
   pipeline_status: string | null;
   pr_url: string | null;
+  repo: string | null;
+}
+
+export interface RepoEntry {
+  full_name: string;
+  name: string;
+  owner: string;
+  private: boolean;
+  open_issues_count: number;
+  html_url: string;
+  connection_id: number;
+  tracker_kind: string;
 }
 
 export const PIPELINE_STATUSES = [
@@ -480,4 +492,20 @@ export async function getDefaultPrompt(agentType: string): Promise<string> {
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   const data = await res.json();
   return data.default_prompt;
+}
+
+export async function fetchRepos(search?: string): Promise<RepoEntry[]> {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : "";
+  const res = await authFetch(`${API_BASE}/api/v1/repos${qs}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function updateTaskRepo(externalRef: string, repo: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/repo`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
 }

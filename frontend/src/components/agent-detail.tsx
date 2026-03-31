@@ -142,14 +142,14 @@ export function AgentDetailPage({
             <div className="text-sm font-medium mb-2">Model</div>
             <div className="space-y-1.5">
               {(config?.available_models || [
-                { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Best speed/intelligence balance" },
-                { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Most capable, best for complex tasks" },
-                { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", description: "Fastest, good for simple tasks" },
+                { id: "sonnet", name: "Claude Sonnet", description: "Best speed/intelligence balance" },
+                { id: "opus", name: "Claude Opus", description: "Most capable, best for complex tasks" },
+                { id: "haiku", name: "Claude Haiku", description: "Fastest, good for simple tasks" },
               ]).map((m) => (
                 <label
                   key={m.id}
                   className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${
-                    (config?.model || "claude-sonnet-4-6") === m.id
+                    (config?.model || "sonnet") === m.id
                       ? "border-accent bg-accent/5"
                       : "border-border hover:bg-surface-hover"
                   }`}
@@ -157,7 +157,7 @@ export function AgentDetailPage({
                   <input
                     type="radio"
                     name="model"
-                    checked={(config?.model || "claude-sonnet-4-6") === m.id}
+                    checked={(config?.model || "sonnet") === m.id}
                     onChange={() => handleModelChange(m.id)}
                     className="accent-accent"
                   />

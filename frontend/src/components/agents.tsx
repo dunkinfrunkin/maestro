@@ -37,7 +37,7 @@ export function AgentsPage({ workspaceId }: { workspaceId: number }) {
       {AGENTS.map((agent) => {
         const config = configs[agent.type];
         const enabled = (config?.extra_config?.enabled ?? true) as boolean;
-        const model = config?.model || "claude-sonnet-4-6";
+        const model = config?.model || "sonnet";
         const modelName = config?.available_models?.find((m) => m.id === model)?.name || model;
 
         return (
