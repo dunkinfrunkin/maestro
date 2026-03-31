@@ -245,6 +245,7 @@ function ConnectionForm({
     if (!name || !token) { setError("Name and token are required"); return; }
     if (config.projectRequired && !project) { setError(`${config.projectLabel} is required`); return; }
     if (kind === "jira" && !email) { setError("Email is required for Jira Cloud"); return; }
+    if (kind === "jira" && !endpoint) { setError("Jira URL is required (e.g. https://yourcompany.atlassian.net)"); return; }
     setSaving(true);
     setError(null);
     try {
@@ -307,7 +308,10 @@ function ConnectionForm({
       </div>
 
       <div>
-        <label className="block text-xs text-muted mb-1">Endpoint <span className="text-muted">(optional, for self-hosted)</span></label>
+        <label className="block text-xs text-muted mb-1">
+          {kind === "jira" ? "Jira URL" : "Endpoint"}{" "}
+          {kind !== "jira" && <span className="text-muted">(optional, for self-hosted)</span>}
+        </label>
         <input type="text" value={endpoint} onChange={(e) => setEndpoint(e.target.value)}
           placeholder={config.endpointPlaceholder}
           className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background placeholder:text-muted font-mono" />

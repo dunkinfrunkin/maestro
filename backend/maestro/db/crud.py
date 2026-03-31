@@ -30,6 +30,7 @@ async def create_connection(
     project: str,
     token: str,
     endpoint: str = "",
+    email: str = "",
     workspace_id: int | None = None,
 ) -> TrackerConnection:
     conn = TrackerConnection(
@@ -38,6 +39,7 @@ async def create_connection(
         name=name,
         project=project,
         endpoint=endpoint,
+        email=email,
         encrypted_token=encrypt_token(token),
     )
     session.add(conn)

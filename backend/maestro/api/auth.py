@@ -1,9 +1,11 @@
-"""Auth API routes — matches Kit's approach exactly.
+"""Auth API routes.
 
 SSO redirect: PKCE verifier in httponly cookie, redirect to IdP.
 Callback: read verifier from cookie, exchange code, return HTML that
 sets localStorage and redirects. No session middleware, no state
 validation. PKCE is the CSRF protection.
+
+Works with any OIDC provider (Okta, Google, Azure AD, etc.) via env vars.
 """
 
 from __future__ import annotations
@@ -33,10 +35,26 @@ from maestro.db.models import User
 
 logger = logging.getLogger(__name__)
 
-_FRONTEND_URL = os.environ.get("MAESTRO_FRONTEND_URL", "")
-_CALLBACK_URL = os.environ.get("MAESTRO_CALLBACK_URL", "")
+_FRONTEND_URL = os.environ.get("MAESTRO_FRONTEND_URL", "").rstrip("/")
+_CALLBACK_URL = os.environ.get("MAESTRO_CALLBACK_URL", "").rstrip("/")
+_OIDC_SCOPES = os.environ.get("MAESTRO_OIDC_SCOPES", "openid email profile")
 
 router = APIRouter(prefix="/auth")
+
+
+def _get_callback_url(request: Request) -> str:
+    """Determine the OAuth callback URL.
+
+    Priority:
+    1. MAESTRO_CALLBACK_URL — explicit override, use as-is
+    2. MAESTRO_FRONTEND_URL + /auth/callback — standard setup
+    3. Derive from request.base_url — fallback for single-origin deploys
+    """
+    if _CALLBACK_URL:
+        return _CALLBACK_URL
+    if _FRONTEND_URL:
+        return f"{_FRONTEND_URL}/auth/callback"
+    return str(request.base_url).rstrip("/") + "/auth/callback"
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +99,7 @@ async def auth_config() -> AuthConfigResponse:
 
 
 # ---------------------------------------------------------------------------
-# SSO redirect — matches Kit: PKCE cookie, redirect to IdP
+# SSO redirect
 # ---------------------------------------------------------------------------
 
 
@@ -95,15 +113,14 @@ async def sso_redirect(request: Request):
 
     verifier = generate_pkce_verifier()
     challenge = pkce_challenge(verifier)
-
-    callback_url = _CALLBACK_URL or (str(request.base_url).rstrip("/") + "/auth/callback")
+    callback_url = _get_callback_url(request)
 
     params = {
         "client_id": OIDC_CLIENT_ID,
         "response_type": "code",
-        "scope": "openid email profile",
+        "scope": _OIDC_SCOPES,
         "redirect_uri": callback_url,
-        "state": "ui",  # static, not validated — PKCE is the protection
+        "state": "ui",
         "code_challenge": challenge,
         "code_challenge_method": "S256",
     }
@@ -122,7 +139,7 @@ async def sso_redirect(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# SSO callback — matches Kit: read cookie, exchange code, return HTML
+# SSO callback
 # ---------------------------------------------------------------------------
 
 
@@ -141,7 +158,8 @@ async def sso_callback(request: Request):
     if not verifier:
         return _error_html("Missing PKCE verifier cookie")
 
-    callback_url = _CALLBACK_URL or (str(request.base_url).rstrip("/") + "/auth/callback")
+    # redirect_uri for token exchange must match the one used in /sso
+    callback_url = _get_callback_url(request)
 
     # Exchange code for tokens
     try:
@@ -172,7 +190,9 @@ async def sso_callback(request: Request):
     session_token = create_token(email, name)
     logger.info("SSO login successful: %s", email)
 
-    # Return HTML that stores token and redirects — same pattern as Kit
+    # Return HTML that stores token in localStorage and redirects.
+    # This works because /auth/* is proxied through the frontend origin,
+    # so localStorage is on the same domain as the app.
     frontend_url = _FRONTEND_URL or ""
     return HTMLResponse(f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Maestro</title></head>

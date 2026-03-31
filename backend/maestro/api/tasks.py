@@ -42,11 +42,12 @@ class UnifiedTask(BaseModel):
 
 
 class ConnectionCreate(BaseModel):
-    kind: str  # "github" or "linear"
+    kind: str  # "github", "linear", "gitlab", or "jira"
     name: str
     project: str = ""  # optional for GitHub (access all repos)
     token: str
     endpoint: str = ""
+    email: str = ""  # required for Jira Cloud (basic auth email)
     workspace_id: int | None = None
 
 
@@ -56,6 +57,7 @@ class ConnectionResponse(BaseModel):
     name: str
     project: str
     endpoint: str
+    email: str = ""
     has_token: bool
     created_at: str
 
@@ -86,6 +88,7 @@ async def list_connections() -> list[ConnectionResponse]:
                 name=c.name,
                 project=c.project,
                 endpoint=c.endpoint,
+                email=c.email or "",
                 has_token=bool(c.encrypted_token),
                 created_at=c.created_at.isoformat() if c.created_at else "",
             )
@@ -108,6 +111,7 @@ async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
             project=body.project,
             token=body.token,
             endpoint=body.endpoint,
+            email=body.email,
             workspace_id=body.workspace_id,
         )
         return ConnectionResponse(
@@ -116,6 +120,7 @@ async def create_connection(body: ConnectionCreate) -> ConnectionResponse:
             name=conn.name,
             project=conn.project,
             endpoint=conn.endpoint,
+            email=conn.email or "",
             has_token=True,
             created_at=conn.created_at.isoformat() if conn.created_at else "",
         )
@@ -470,6 +475,7 @@ async def _fetch_from_tracker(conn: Any, token: str, search: str | None, user_em
             base_url=conn.endpoint or "https://jira.atlassian.net",
             api_token=token,
             project_key=conn.project,  # project field stores comma-separated keys
+            email=conn.email,  # Jira Cloud basic auth
             assignee_email=user_email,
         )
         try:

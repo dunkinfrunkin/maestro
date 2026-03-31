@@ -121,6 +121,7 @@ class TrackerConnection(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     project: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     endpoint: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     encrypted_token: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

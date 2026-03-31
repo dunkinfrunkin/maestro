@@ -230,6 +230,7 @@ export async function createConnection(body: {
   project: string;
   token: string;
   endpoint?: string;
+  email?: string;
   workspace_id?: number;
 }): Promise<TrackerConnection> {
   const res = await authFetch(`${API_BASE}/api/v1/connections`, {
