@@ -70,6 +70,7 @@ export function TaskDetailPage({
 
   const handleStatusChange = async (status: string) => {
     try {
+      console.log("[MAESTRO] handleStatusChange", { status, title: task.title, descLen: task.description?.length, url: task.url });
       await updateTaskStatus(task.external_ref, status, {
         workspace_id: workspaceId,
         project_id: projectId,

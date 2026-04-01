@@ -90,6 +90,26 @@ async def dispatch_agent_for_status(
             if conn:
                 tracker_token = crud.get_decrypted_token(conn)
 
+        # Fetch issue title/description from tracker if not provided
+        if not issue_title and task_record and conn and tracker_token:
+            try:
+                parts = task_record.external_ref.split(":")
+                issue_id = ":".join(parts[2:]) if len(parts) >= 3 else ""
+                print(f"[MAESTRO] Fetching issue from tracker: kind={conn.kind.value}, issue_id={issue_id}")
+                if issue_id:
+                    issue = await _fetch_issue_for_dispatch(conn, tracker_token, issue_id)
+                    if issue:
+                        issue_title = issue.title or ""
+                        issue_description = issue.description or ""
+                        issue_url = issue.url or issue_url
+                        print(f"[MAESTRO] Fetched issue: title={issue_title!r}, desc_len={len(issue_description)}")
+                    else:
+                        print(f"[MAESTRO] Issue not found for id={issue_id}")
+            except Exception as exc:
+                import traceback
+                print(f"[MAESTRO] Failed to fetch issue from tracker: {exc}")
+                traceback.print_exc()
+
         # Resolve repo: task record → connection project → description/URL
         if not repo and task_record:
             if conn and conn.project:
@@ -144,6 +164,11 @@ async def dispatch_agent_for_status(
         await session.refresh(run)
         run_id = run.id
 
+    # Determine code host type for prompt adaptation
+    code_host = ""
+    if clone_conn:
+        code_host = clone_conn.kind.value  # "github" or "gitlab"
+
     # Dispatch in background
     asyncio.create_task(
         _execute_agent(
@@ -160,6 +185,7 @@ async def dispatch_agent_for_status(
             pr_number=pr_number,
             repo=repo,
             clone_url=clone_url,
+            code_host=code_host,
             extra_config=extra if agent_config else {},
         )
     )
@@ -201,6 +227,7 @@ async def _execute_agent(
     pr_number: str,
     repo: str,
     clone_url: str,
+    code_host: str,
     extra_config: dict,
 ) -> None:
     """Execute an agent in the background with live log streaming."""
@@ -257,7 +284,11 @@ async def _execute_agent(
             system_prompt = ""
             try:
                 mod = __import__(f"maestro.agent.{plugin.name}", fromlist=["SYSTEM_PROMPT"])
-                system_prompt = getattr(mod, "SYSTEM_PROMPT", "")
+                # Pick host-specific prompt if available
+                if code_host == "gitlab":
+                    system_prompt = getattr(mod, "SYSTEM_PROMPT_GITLAB", "") or getattr(mod, "SYSTEM_PROMPT", "")
+                else:
+                    system_prompt = getattr(mod, "SYSTEM_PROMPT_GITHUB", "") or getattr(mod, "SYSTEM_PROMPT", "")
             except (ImportError, AttributeError):
                 system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
 
@@ -284,25 +315,36 @@ async def _execute_agent(
 
         # Add context for feedback loop
         iteration = iteration_count // 2 + 1
+        is_gitlab = code_host == "gitlab"
+        mr_or_pr = "MR" if is_gitlab else "PR"
+
         if plugin.name == "implementation" and pr_url:
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
-            prompt_parts.append(
-                f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
-                f"\nPR #{pr_num} already exists with review comments that MUST be addressed."
-                f"\n1. Checkout the PR branch: `gh pr checkout {pr_num} --repo {repo}`"
-                f"\n2. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
-                f"\n3. Address EVERY comment — do not skip any"
-                f"\n4. Commit and push your fixes"
-            )
+            if is_gitlab:
+                prompt_parts.append(
+                    f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                    f"\n{mr_or_pr} !{pr_num} already exists with review comments that MUST be addressed."
+                    f"\n1. Checkout the MR branch (check `git branch -a` for the branch name)"
+                    f"\n2. Read the MR comments to understand feedback"
+                    f"\n3. Address EVERY comment — do not skip any"
+                    f"\n4. Commit and push your fixes"
+                )
+            else:
+                prompt_parts.append(
+                    f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                    f"\n{mr_or_pr} #{pr_num} already exists with review comments that MUST be addressed."
+                    f"\n1. Checkout the PR branch: `gh pr checkout {pr_num} --repo {repo}`"
+                    f"\n2. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
+                    f"\n3. Address EVERY comment — do not skip any"
+                    f"\n4. Commit and push your fixes"
+                )
         elif plugin.name == "review" and iteration > 1:
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             prompt_parts.append(
                 f"\n## THIS IS A RE-REVIEW (iteration {iteration}/{max_iterations})"
                 f"\nThe implementation agent has pushed fixes for previous review comments."
-                f"\n1. List previous comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
-                f"\n2. Check if EACH comment was addressed in the latest code"
-                f"\n3. Resolve addressed comments, flag remaining ones"
-                f"\n4. Only APPROVE if ALL comments are resolved and no new issues"
+                f"\nCheck if EACH comment was addressed in the latest code."
+                f"\nOnly APPROVE if ALL comments are resolved and no new issues."
             )
         elif plugin.name == "review":
             prompt_parts.append(
@@ -312,6 +354,9 @@ async def _execute_agent(
 
         prompt_parts.append("\nProceed with your task.")
         prompt = "\n".join(prompt_parts)
+
+        print(f"[MAESTRO] Agent {plugin.name} prompt for run {run_id}: title={issue_title!r}, desc_len={len(issue_description)}, prompt_len={len(prompt)}")
+        print(f"[MAESTRO] Prompt preview: {prompt[:500]}")
 
         # Run with live logging via Claude Code CLI
         result = await run_cli_with_logging(
@@ -552,6 +597,34 @@ def _extract_verdict(result: dict) -> str:
 
 # ---------------------------------------------------------------------------
 # Repo resolution helpers
+async def _fetch_issue_for_dispatch(conn, token: str, issue_id: str):
+    """Fetch a single issue from any tracker by ID. Handles Jira numeric IDs."""
+    from maestro.db.models import TrackerKind
+
+    if conn.kind == TrackerKind.JIRA:
+        from maestro.external.jira.tracker import JiraIssueTracker
+        client = JiraIssueTracker(
+            base_url=conn.endpoint or "https://jira.atlassian.net",
+            api_token=token,
+            project_key=conn.project or "",
+            email=conn.email,
+        )
+        try:
+            # Use JQL to fetch by id (numeric) or key (PROJ-123)
+            if "-" in issue_id:
+                jql = f'key = "{issue_id}"'
+            else:
+                jql = f"id = {issue_id}"
+            issues = await client._search(jql, max_results=1)
+            return issues[0] if issues else None
+        finally:
+            await client.close()
+
+    # For other trackers, use the existing _fetch_single_issue
+    from maestro.api.tasks import _fetch_single_issue
+    return await _fetch_single_issue(conn, token, issue_id)
+
+
 # ---------------------------------------------------------------------------
 
 import re as _re
