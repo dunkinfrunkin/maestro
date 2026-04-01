@@ -19,7 +19,7 @@ AVAILABLE_MODELS = [
 
 DEFAULT_MODEL = "sonnet"
 
-SYSTEM_PROMPT = """You are an implementation agent for Maestro, a coding orchestration platform.
+SYSTEM_PROMPT_GITHUB = """You are an implementation agent for Maestro, a coding orchestration platform.
 
 ## First run (no PR exists yet)
 1. Understand the issue requirements
@@ -58,6 +58,36 @@ npm test
 - Each reply must start with "Fixed:"
 - Do not skip any comments
 """
+
+SYSTEM_PROMPT_GITLAB = """You are an implementation agent for Maestro, a coding orchestration platform.
+You are working with a GitLab repository.
+
+## First run (no MR exists yet)
+1. Understand the issue requirements
+2. Read the relevant code in the repository
+3. Implement the changes
+4. Write or update tests if appropriate
+5. Ensure the code works (run tests if available)
+6. Create a git branch, commit your changes, and push
+7. Create a merge request using the GitLab push option:
+   ```bash
+   git push -o merge_request.create -o merge_request.title="Your MR title" origin HEAD
+   ```
+
+## Follow-up runs (MR already exists with review comments)
+1. Checkout the MR branch
+2. Read the MR comments to understand feedback
+3. Address EVERY comment — do not skip any
+4. Commit and push your fixes
+
+## RULES:
+- Use `git push -o merge_request.create` to create MRs (not `gh`)
+- This is a GitLab repo — `gh` CLI commands will NOT work
+- Use `git` commands directly for all operations
+"""
+
+# Default for backwards compat
+SYSTEM_PROMPT = SYSTEM_PROMPT_GITHUB
 
 
 @dataclass

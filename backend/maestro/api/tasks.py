@@ -439,6 +439,11 @@ async def list_tasks(
 @router.put("/tasks/{external_ref:path}/status")
 async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> dict:
     """Set or update a task's pipeline status. Dispatches agent if applicable."""
+    import logging as _log
+    _log.getLogger(__name__).info(
+        "[STATUS] ref=%s status=%s title=%r desc_len=%d url=%r",
+        external_ref, body.status, body.issue_title, len(body.issue_description), body.issue_url,
+    )
     try:
         status = PipelineStatus(body.status)
     except ValueError:
