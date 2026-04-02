@@ -84,6 +84,7 @@ async def run_cli_with_logging(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
+            limit=10 * 1024 * 1024,  # 10MB line buffer (Claude CLI can emit large JSON)
         )
 
         print(f"[MAESTRO-CLI] Run {run_id} started, PID={proc.pid}")

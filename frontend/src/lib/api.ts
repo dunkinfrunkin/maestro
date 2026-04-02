@@ -501,11 +501,11 @@ export async function fetchRepos(search?: string): Promise<RepoEntry[]> {
   return res.json();
 }
 
-export async function updateTaskRepo(externalRef: string, repo: string): Promise<void> {
+export async function updateTaskRepo(externalRef: string, repo: string, projectId?: number): Promise<void> {
   const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/repo`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repo }),
+    body: JSON.stringify({ repo, project_id: projectId }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
