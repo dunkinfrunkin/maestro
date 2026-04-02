@@ -566,16 +566,15 @@ async def _fetch_single_issue(conn, token: str, issue_id: str):
             email=conn.email,
         )
         try:
-            # Jira: fetch by issue ID directly via JQL
-            states = await client.fetch_issue_states_by_ids([issue_id])
-            if states:
-                # Got the state — now search for full issue data
-                issues = await client.search_issues(issue_id) if "-" in issue_id else []
-                if issues:
-                    return issues[0]
-            # Fallback: scan candidates
-            issues = await client.fetch_candidate_issues(max_results=50)
-            return next((i for i in issues if i.id == issue_id), None)
+            # Fetch by key (PROJ-123) or numeric id
+            if "-" in issue_id:
+                jql = f'key = "{issue_id}"'
+            else:
+                jql = f"id = {issue_id}"
+            issues = await client._search(jql, max_results=1)
+            if issues:
+                return issues[0]
+            return None
         finally:
             await client.close()
 
