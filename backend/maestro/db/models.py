@@ -245,6 +245,8 @@ class AgentRun(Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     cost_usd: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    input_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

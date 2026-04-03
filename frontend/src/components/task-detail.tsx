@@ -270,6 +270,22 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           {run.started_at && `Started ${new Date(run.started_at).toLocaleString()}`}
           {run.finished_at && ` — Finished ${new Date(run.finished_at).toLocaleTimeString()}`}
         </div>
+        {(run.cost_usd > 0 || run.input_tokens > 0 || run.output_tokens > 0) && (
+          <div className="text-xs text-muted mb-2 flex items-center gap-3">
+            {run.cost_usd > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="text-green-600">💰</span>
+                ${run.cost_usd.toFixed(4)}
+              </span>
+            )}
+            {(run.input_tokens > 0 || run.output_tokens > 0) && (
+              <span className="flex items-center gap-1">
+                <span className="text-blue-600">🪙</span>
+                {run.input_tokens.toLocaleString()}in / {run.output_tokens.toLocaleString()}out
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Live logs */}
         {logs.length > 0 && (
