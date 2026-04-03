@@ -543,35 +543,39 @@ function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: Unifie
 
                   return (
                     <div key={run.id} className="flex items-center h-16">
-                      {/* Agent info */}
-                      <div className="w-36 text-sm pr-4 flex-shrink-0">
-                        <div className="font-semibold capitalize text-foreground">{run.agent_type.replace('_', ' ')}</div>
-                        <div className="text-xs text-muted">{run.model || 'sonnet'}</div>
-                        <div className="text-xs text-muted">
-                          {run.started_at ? new Date(run.started_at).toLocaleTimeString() : 'Pending'}
-                        </div>
-                      </div>
-
-                      {/* Large chart bar */}
-                      <div className="flex-1 relative h-12 bg-surface-hover rounded-md">
+                      {/* Large chart bar - full width */}
+                      <div className="w-full relative h-14 bg-surface-hover rounded-md">
                         <div
                           className={`
-                            absolute h-full rounded-md flex items-center justify-between px-4 text-sm transition-colors overflow-hidden
+                            absolute h-full rounded-md flex items-start justify-between px-4 py-2 text-sm transition-colors overflow-hidden
                             ${AGENT_COLORS[run.agent_type]?.[run.status as keyof typeof AGENT_COLORS[string]] || 'bg-gray-500 text-white'}
                           `}
                           style={{
                             left: `${leftPercent}%`,
                             width: `${widthPercent}%`,
-                            minWidth: '200px'
+                            minWidth: '280px'
                           }}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold">
-                              {formatDuration(runDuration)}
-                            </span>
-                            <span className="text-xs opacity-90 capitalize">
-                              {run.status}
-                            </span>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold capitalize">
+                                {run.agent_type.replace('_', ' ')}
+                              </span>
+                              <span className="text-xs opacity-90">
+                                {run.model || 'sonnet'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className="text-xs font-semibold">
+                                {formatDuration(runDuration)}
+                              </span>
+                              <span className="text-xs opacity-80 capitalize">
+                                {run.status}
+                              </span>
+                              <span className="text-xs opacity-80">
+                                {run.started_at ? new Date(run.started_at).toLocaleTimeString() : 'Pending'}
+                              </span>
+                            </div>
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className="font-mono text-sm">
@@ -590,7 +594,7 @@ function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: Unifie
 
               {/* Time axis */}
               <div className="mt-6 pt-4 border-t border-border">
-                <div className="relative h-6 ml-36">
+                <div className="relative h-6">
                   {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
                     <div
                       key={fraction}
