@@ -204,7 +204,7 @@ export function TaskDetailPage({
         )}
 
         {/* Activity Log */}
-        <div className="rounded-lg border border-border bg-surface overflow-hidden">
+        <div className="rounded-lg border border-border bg-surface overflow-hidden mt-4">
           <div className="px-5 py-3 border-b border-border">
             <h3 className="text-sm font-medium">Activity</h3>
           </div>
