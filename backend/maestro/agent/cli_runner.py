@@ -174,9 +174,10 @@ async def run_cli_with_logging(
                             messages.append({"type": "text", "text": text[:500]})
 
             elif event_type == "result":
-                total_cost_usd = event.get("cost_usd", 0.0) or 0.0
-                input_tokens = event.get("input_tokens", 0) or 0
-                output_tokens = event.get("output_tokens", 0) or 0
+                total_cost_usd = event.get("total_cost_usd", 0.0) or 0.0
+                usage = event.get("usage", {})
+                input_tokens = usage.get("input_tokens", 0) or 0
+                output_tokens = usage.get("output_tokens", 0) or 0
                 result_text = event.get("result", "")
                 if result_text:
                     all_text += "\n" + result_text
