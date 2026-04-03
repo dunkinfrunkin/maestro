@@ -199,9 +199,7 @@ export function TaskDetailPage({
         </div>
 
         {/* Agent Execution Trace */}
-        {runs.length > 0 && (
-          <ExecutionTrace runs={runs} />
-        )}
+        <ExecutionTrace runs={runs} task={task} />
 
         {/* Activity Log */}
         <div className="rounded-lg border border-border bg-surface overflow-hidden mt-4">
@@ -395,7 +393,7 @@ export function TaskDetailPage({
   );
 }
 
-function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
+function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: UnifiedTask }) {
   const [showModal, setShowModal] = useState(false);
 
   // Calculate waterfall chart data
@@ -426,11 +424,16 @@ function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
       </div>
 
       <div className="p-5">
-        <div className="overflow-x-auto">
-          <div className="min-w-[700px]">
-            {/* Agent runs */}
-            <div className="space-y-2">
-              {sortedRuns.map((run) => {
+        {runs.length === 0 ? (
+          <div className="text-xs text-muted">
+            {task.pipeline_status ? "No agent execution yet. Agents are triggered when you move the task to a pipeline stage." : "Set a pipeline status to start."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[700px]">
+              {/* Agent runs */}
+              <div className="space-y-2">
+                {sortedRuns.map((run) => {
                 const startTime = run.started_at ? new Date(run.started_at).getTime() : earliestStart;
                 const endTime = run.finished_at ? new Date(run.finished_at).getTime() : Date.now();
                 const runDuration = endTime - startTime;
@@ -477,25 +480,26 @@ function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
               })}
             </div>
 
-            {/* Time axis */}
-            <div className="mt-3 pt-2 border-t border-border">
-              <div className="relative h-4">
-                {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
-                  <div
-                    key={fraction}
-                    className="absolute bottom-0 text-xs text-muted font-mono"
-                    style={{
-                      left: `${fraction * 100}%`,
-                      transform: fraction === 0 ? 'translateX(0%)' : fraction === 1 ? 'translateX(-100%)' : 'translateX(-50%)'
-                    }}
-                  >
-                    {fraction === 0 ? '0s' : formatDuration(totalDuration * fraction)}
-                  </div>
-                ))}
+              {/* Time axis */}
+              <div className="mt-3 pt-2 border-t border-border">
+                <div className="relative h-4">
+                  {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+                    <div
+                      key={fraction}
+                      className="absolute bottom-0 text-xs text-muted font-mono"
+                      style={{
+                        left: `${fraction * 100}%`,
+                        transform: fraction === 0 ? 'translateX(0%)' : fraction === 1 ? 'translateX(-100%)' : 'translateX(-50%)'
+                      }}
+                    >
+                      {fraction === 0 ? '0s' : formatDuration(totalDuration * fraction)}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Expanded Modal */}
