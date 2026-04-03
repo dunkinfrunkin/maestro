@@ -752,9 +752,20 @@ function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; p
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [localRepo, setLocalRepo] = useState(task.repo || "");
-  useEffect(() => { setLocalRepo(task.repo || ""); }, [task.repo]);
+  const [showFullName, setShowFullName] = useState(false);
+  useEffect(() => {
+    setLocalRepo(task.repo || "");
+    setShowFullName(false); // Reset display when repo changes
+  }, [task.repo]);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get the repo name (last part after final /)
+  const getDisplayName = (repoPath: string) => {
+    if (!repoPath) return "";
+    const parts = repoPath.split("/");
+    return parts[parts.length - 1];
+  };
 
   const loadRepos = useCallback(async (q: string) => {
     if (!q.trim()) { setRepos([]); return; }
@@ -769,21 +780,39 @@ function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; p
     }
   }, []);
 
-  // Close dropdown on click outside
+  // Close dropdown on click outside or escape key
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setShowFullName(false); // Reset to short name when closing
+        setSearch(""); // Clear search when closing
+        setRepos([]); // Clear repos list
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setShowFullName(false);
+        setSearch(""); // Clear search when closing
+        setRepos([]); // Clear repos list
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
 
   const handleSelect = async (repoName: string) => {
     setLocalRepo(repoName);
     setOpen(false);
+    setShowFullName(false); // Reset to short name after selection
+    setSearch(""); // Clear search after selection
+    setRepos([]); // Clear repos list
     setSaving(true);
     try {
       await updateTaskRepo(task.external_ref, repoName, projectId);
@@ -806,10 +835,29 @@ function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; p
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
+        onClick={() => {
+          if (!open) {
+            setShowFullName(true);
+            setSearch(localRepo || ""); // Pre-populate search with current repo
+            clearTimeout(debounceRef.current); // Clear any pending searches
+            if (localRepo) {
+              loadRepos(localRepo); // Trigger search with current repo
+            }
+          }
+          setOpen(!open);
+          setTimeout(() => inputRef.current?.focus(), 50);
+        }}
         className="w-full text-xs px-2 py-1.5 rounded-md border border-border bg-background hover:bg-surface-hover transition-colors font-mono flex items-center justify-between"
+        title={localRepo && !saving ? localRepo : undefined}
       >
-        <span className="truncate">{saving ? "Saving..." : localRepo || "Select repo..."}</span>
+        <span className="truncate">
+          {saving
+            ? "Saving..."
+            : localRepo
+              ? (showFullName ? localRepo : getDisplayName(localRepo))
+              : "Select repo..."
+          }
+        </span>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3 ml-2 flex-shrink-0">
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
@@ -839,12 +887,24 @@ function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; p
               <div className="px-3 py-2 text-xs text-muted">Searching...</div>
             ) : repos.length === 0 ? (
               <div className="px-3 py-2 text-xs text-muted">
-                <button
-                  onClick={() => handleSelect(search.trim())}
-                  className="hover:text-foreground transition-colors"
-                >
-                  No repos found. Press Enter to use <span className="font-mono">{search}</span>
-                </button>
+                {search.trim() === localRepo ? (
+                  <div className="flex items-start gap-2">
+                    <svg className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <div className="text-green-700 font-medium">Current repository</div>
+                      <div className="font-mono text-xs text-muted mt-1 break-all">{search}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleSelect(search.trim())}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    No repos found. Press Enter to use <span className="font-mono">{search}</span>
+                  </button>
+                )}
               </div>
             ) : (
               repos.map((r) => (
@@ -855,7 +915,14 @@ function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; p
                     localRepo === r.full_name ? "bg-accent/5 text-accent" : ""
                   }`}
                 >
-                  <span className="font-mono truncate">{r.full_name}</span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {localRepo === r.full_name && (
+                      <svg className="w-3 h-3 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className="font-mono truncate">{r.full_name}</span>
+                  </div>
                   <span className="text-[10px] text-muted ml-2 flex-shrink-0">{r.tracker_kind}</span>
                 </button>
               ))
