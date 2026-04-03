@@ -163,82 +163,128 @@ export function TaskDetailPage({
           </div>
         )}
 
-        {/* PR link */}
-        {task.pr_url && (
-          <div className="mt-3 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-muted">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
-            </svg>
-            <a
-              href={task.pr_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-accent hover:underline font-mono"
-            >
-              {task.pr_url}
-            </a>
-          </div>
-        )}
-
-        {/* Repo selector */}
-        <RepoSelector task={task} projectId={projectId} onRepoChanged={onTaskUpdated} />
-
-        {/* Status selector + re-run */}
-        <div className="mt-4 flex items-center gap-3">
-          <span className="text-xs text-muted">Pipeline:</span>
-          <select
-            value={task.pipeline_status || ""}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            className="text-xs px-2 py-1 rounded-md border border-border bg-background text-foreground"
-          >
-            <option value="" disabled>Set status...</option>
-            {PIPELINE_STATUSES.map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-            ))}
-          </select>
-          {task.pipeline_status && task.pipeline_status !== "queued" && (
-            <button
-              onClick={() => handleStatusChange(task.pipeline_status!)}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:bg-surface-hover transition-colors text-muted hover:text-foreground"
-              title="Re-run the current stage agent"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-              </svg>
-              Re-run
-            </button>
-          )}
         </div>
-      </div>
+
+        {/* Agent Execution Trace */}
+        {runs.length > 0 && (
+          <ExecutionTrace runs={runs} />
+        )}
 
         {/* Activity Log */}
         <div className="rounded-lg border border-border bg-surface overflow-hidden">
-        <div className="px-5 py-3 border-b border-border">
-          <h3 className="text-sm font-medium">Activity</h3>
-        </div>
-        <div className="p-5">
-          {runs.length === 0 ? (
-            <div className="text-xs text-muted">
-              {task.pipeline_status ? "No agent activity yet. Agents are triggered when you move the task to a pipeline stage." : "Set a pipeline status to start."}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {runs.map((run) => (
-                <RunEntry
-                  key={run.id}
-                  run={run}
-                  onRerun={() => handleStatusChange(run.agent_type === "implementation" ? "implement" : run.agent_type === "risk_profile" ? "risk_profile" : run.agent_type)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          <div className="px-5 py-3 border-b border-border">
+            <h3 className="text-sm font-medium">Activity</h3>
+          </div>
+          <div className="p-5">
+            {runs.length === 0 ? (
+              <div className="text-xs text-muted">
+                {task.pipeline_status ? "No agent activity yet. Agents are triggered when you move the task to a pipeline stage." : "Set a pipeline status to start."}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {runs.map((run) => (
+                  <RunEntry
+                    key={run.id}
+                    run={run}
+                    onRerun={() => handleStatusChange(run.agent_type === "implementation" ? "implement" : run.agent_type === "risk_profile" ? "risk_profile" : run.agent_type)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Metrics Sidebar */}
+      {/* Sidebar */}
       <div className="w-72 flex-shrink-0">
-        <div className="sticky top-20">
+        <div className="sticky top-20 space-y-4">
+
+          {/* Task Settings */}
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Task Settings
+            </h3>
+
+            <div className="space-y-4">
+              {/* Task Link */}
+              {task.url && (
+                <div>
+                  <div className="text-xs text-muted mb-2">Issue Link</div>
+                  <a
+                    href={task.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-accent hover:underline p-2 rounded border border-border hover:bg-surface-hover transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    {task.identifier}
+                  </a>
+                </div>
+              )}
+
+              {/* Repository */}
+              <div>
+                <div className="text-xs text-muted mb-2">Repository</div>
+                <RepoSelector task={task} projectId={projectId} onRepoChanged={onTaskUpdated} />
+              </div>
+
+              {/* Pipeline Status */}
+              <div>
+                <div className="text-xs text-muted mb-2">Pipeline Status</div>
+                <div className="flex gap-2">
+                  <select
+                    value={task.pipeline_status || ""}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="flex-1 text-xs px-2 py-1 rounded-md border border-border bg-background text-foreground"
+                  >
+                    <option value="" disabled>Set status...</option>
+                    {PIPELINE_STATUSES.map((s) => (
+                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                  {task.pipeline_status && task.pipeline_status !== "queued" && (
+                    <button
+                      onClick={() => handleStatusChange(task.pipeline_status!)}
+                      className="flex items-center justify-center w-8 h-6 rounded-md border border-border hover:bg-surface-hover transition-colors text-muted hover:text-foreground"
+                      title="Re-run the current stage agent"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* PR Link */}
+              {task.pr_url && (
+                <div>
+                  <div className="text-xs text-muted mb-2">Pull Request</div>
+                  <a
+                    href={task.pr_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-accent hover:underline p-2 rounded border border-border hover:bg-surface-hover transition-colors font-mono"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    <span className="truncate">
+                      {task.pr_url.replace(/^https?:\/\//, '')}
+                    </span>
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Task Metrics */}
           <div className="rounded-lg border border-border bg-surface p-5">
             <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
               <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,6 +357,99 @@ export function TaskDetailPage({
           </div>
         </div>
       </div>
+    </div>
+    </div>
+  );
+}
+
+function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
+  // Calculate waterfall chart data
+  const sortedRuns = [...runs].sort((a, b) => new Date(a.started_at || 0).getTime() - new Date(b.started_at || 0).getTime());
+  const earliestStart = sortedRuns[0]?.started_at ? new Date(sortedRuns[0].started_at).getTime() : Date.now();
+  const latestEnd = Math.max(...sortedRuns.map(r => r.finished_at ? new Date(r.finished_at).getTime() : Date.now()));
+  const totalDuration = latestEnd - earliestStart || 1;
+
+  return (
+    <div className="rounded-lg border border-border bg-surface overflow-hidden mt-4">
+      <div className="px-5 py-3 border-b border-border">
+        <h3 className="text-sm font-medium flex items-center gap-2">
+          <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Execution Trace
+        </h3>
+      </div>
+
+      <div className="p-5">
+        <div className="overflow-x-auto">
+          <div className="min-w-[700px]">
+            {/* Agent runs */}
+            <div className="space-y-2">
+              {sortedRuns.map((run) => {
+                const startTime = run.started_at ? new Date(run.started_at).getTime() : earliestStart;
+                const endTime = run.finished_at ? new Date(run.finished_at).getTime() : Date.now();
+                const runDuration = endTime - startTime;
+                const leftPercent = ((startTime - earliestStart) / totalDuration) * 100;
+                const widthPercent = Math.max((runDuration / totalDuration) * 100, 3);
+
+                return (
+                  <div key={run.id} className="flex items-center h-8">
+                    {/* Agent name */}
+                    <div className="w-28 text-xs font-medium text-foreground pr-3 flex-shrink-0">
+                      {run.agent_type.replace('_', ' ')}
+                    </div>
+
+                    {/* Chart bar area */}
+                    <div className="flex-1 relative h-5 bg-surface-hover rounded-sm">
+                      <div
+                        className={`
+                          absolute h-full rounded-sm flex items-center px-2 text-xs font-medium transition-colors
+                          ${run.status === 'completed'
+                            ? 'bg-green-600 text-white'
+                            : run.status === 'failed'
+                            ? 'bg-red-600 text-white'
+                            : run.status === 'running'
+                            ? 'bg-blue-600 text-white animate-pulse'
+                            : 'bg-muted text-muted-foreground'
+                          }
+                        `}
+                        style={{
+                          left: `${leftPercent}%`,
+                          width: `${widthPercent}%`,
+                          minWidth: '50px'
+                        }}
+                      >
+                        <span className="truncate">
+                          {formatDuration(runDuration)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Status & Cost */}
+                    <div className="w-20 text-right text-xs text-muted font-mono pl-3 flex-shrink-0">
+                      ${(run.cost_usd || 0).toFixed(4)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Time axis */}
+            <div className="mt-3 pt-2 border-t border-border">
+              <div className="relative h-4 ml-28">
+                {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+                  <div
+                    key={fraction}
+                    className="absolute bottom-0 text-xs text-muted font-mono"
+                    style={{ left: `${fraction * 100}%`, transform: 'translateX(-50%)' }}
+                  >
+                    {fraction === 0 ? '0s' : formatDuration(totalDuration * fraction)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -511,22 +650,19 @@ function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; p
   };
 
   return (
-    <div className="mt-3" ref={dropdownRef}>
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted">Repository:</span>
-        <button
-          onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
-          className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-surface-hover transition-colors font-mono flex items-center gap-1.5"
-        >
-          {saving ? "Saving..." : localRepo || "Select repo..."}
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-      </div>
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
+        className="w-full text-xs px-2 py-1.5 rounded-md border border-border bg-background hover:bg-surface-hover transition-colors font-mono flex items-center justify-between"
+      >
+        <span className="truncate">{saving ? "Saving..." : localRepo || "Select repo..."}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3 ml-2 flex-shrink-0">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
 
       {open && (
-        <div className="mt-1 w-full max-w-md rounded-md border border-border bg-surface shadow-lg z-10 relative">
+        <div className="absolute top-full left-0 right-0 mt-1 rounded-md border border-border bg-surface shadow-lg z-10">
           <div className="p-2 border-b border-border">
             <input
               ref={inputRef}
