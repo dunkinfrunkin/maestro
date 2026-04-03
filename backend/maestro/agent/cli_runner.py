@@ -42,12 +42,14 @@ async def run_cli_with_logging(
 ) -> dict[str, Any]:
     """Run Claude Code CLI and stream log entries to the DB.
 
-    Returns dict with: status, error, total_cost_usd, messages, last_text, all_text, pr_url, review_verdict
+    Returns dict with: status, error, total_cost_usd, input_tokens, output_tokens, messages, last_text, all_text, pr_url, review_verdict
     """
     messages: list[dict[str, Any]] = []
     status = "completed"
     error = None
     total_cost_usd = 0.0
+    input_tokens = 0
+    output_tokens = 0
     last_text = ""
     all_text = ""
     pr_url = ""
@@ -172,7 +174,10 @@ async def run_cli_with_logging(
                             messages.append({"type": "text", "text": text[:500]})
 
             elif event_type == "result":
-                total_cost_usd = event.get("cost_usd", 0.0) or 0.0
+                total_cost_usd = event.get("total_cost_usd", 0.0) or 0.0
+                usage = event.get("usage", {})
+                input_tokens = usage.get("input_tokens", 0) or 0
+                output_tokens = usage.get("output_tokens", 0) or 0
                 result_text = event.get("result", "")
                 if result_text:
                     all_text += "\n" + result_text
@@ -197,7 +202,7 @@ async def run_cli_with_logging(
                     await _write_log(run_id, "error", f"Agent failed: {error}")
                 else:
                     status = "completed"
-                    await _write_log(run_id, "status", f"Claude Code CLI completed (cost: ${total_cost_usd:.4f})")
+                    await _write_log(run_id, "status", f"Claude Code CLI completed (cost: ${total_cost_usd:.4f}, tokens: {input_tokens}in/{output_tokens}out)")
 
         # Wait for process to exit
         await proc.wait()
@@ -224,6 +229,8 @@ async def run_cli_with_logging(
         "status": status,
         "error": error,
         "total_cost_usd": total_cost_usd,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
         "messages": messages,
         "last_text": last_text,
         "all_text": all_text,

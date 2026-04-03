@@ -44,6 +44,8 @@ async def get_task_runs(
             "summary": r.summary,
             "error": r.error,
             "cost_usd": r.cost_usd,
+            "input_tokens": r.input_tokens,
+            "output_tokens": r.output_tokens,
             "started_at": r.started_at.isoformat() if r.started_at else None,
             "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             "created_at": r.created_at.isoformat() if r.created_at else None,

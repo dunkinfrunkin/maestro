@@ -58,6 +58,13 @@ async def init_db() -> None:
         await conn.execute(sa.text(
             "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''"
         ))
+        # Add token tracking columns to agent_runs
+        await conn.execute(sa.text(
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS input_tokens INTEGER NOT NULL DEFAULT 0"
+        ))
+        await conn.execute(sa.text(
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS output_tokens INTEGER NOT NULL DEFAULT 0"
+        ))
         # Migrate old model IDs to CLI aliases
         await conn.execute(sa.text(
             "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"

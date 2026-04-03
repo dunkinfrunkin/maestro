@@ -357,6 +357,8 @@ export interface AgentRunResponse {
   summary: string;
   error: string;
   cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
   started_at: string | null;
   finished_at: string | null;
   created_at: string | null;
