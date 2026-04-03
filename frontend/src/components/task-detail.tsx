@@ -116,15 +116,17 @@ export function TaskDetailPage({
 
 
   return (
-    <div className="flex gap-6 w-full">
-      <div className="flex-1 min-w-0">
-        {/* Back button */}
-        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-4 transition-colors">
+    <div className="w-full">
+      {/* Back button */}
+      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-4 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
         </svg>
         Back to tasks
-        </button>
+      </button>
+
+      <div className="flex gap-6 w-full">
+        <div className="flex-1 min-w-0">
 
         {/* Header */}
         <div className="rounded-lg border border-border bg-surface p-5 mb-4">
@@ -236,7 +238,7 @@ export function TaskDetailPage({
 
       {/* Metrics Sidebar */}
       <div className="w-72 flex-shrink-0">
-        <div className="sticky top-4">
+        <div className="sticky top-20">
           <div className="rounded-lg border border-border bg-surface p-5">
             <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
               <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,6 +310,7 @@ export function TaskDetailPage({
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
