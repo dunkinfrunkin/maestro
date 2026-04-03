@@ -52,6 +52,39 @@ const RUN_STATUS_COLORS: Record<string, string> = {
   failed: "bg-red-100 text-red-700 border-red-300",
 };
 
+const AGENT_COLORS: Record<string, { completed: string; failed: string; running: string; pending: string }> = {
+  implementation: {
+    completed: "bg-green-600 text-white",
+    failed: "bg-green-800 text-white",
+    running: "bg-green-500 text-white animate-pulse",
+    pending: "bg-green-300 text-green-800"
+  },
+  review: {
+    completed: "bg-purple-600 text-white",
+    failed: "bg-purple-800 text-white",
+    running: "bg-purple-500 text-white animate-pulse",
+    pending: "bg-purple-300 text-purple-800"
+  },
+  risk_profile: {
+    completed: "bg-orange-600 text-white",
+    failed: "bg-orange-800 text-white",
+    running: "bg-orange-500 text-white animate-pulse",
+    pending: "bg-orange-300 text-orange-800"
+  },
+  deployment: {
+    completed: "bg-blue-600 text-white",
+    failed: "bg-blue-800 text-white",
+    running: "bg-blue-500 text-white animate-pulse",
+    pending: "bg-blue-300 text-blue-800"
+  },
+  monitor: {
+    completed: "bg-teal-600 text-white",
+    failed: "bg-teal-800 text-white",
+    running: "bg-teal-500 text-white animate-pulse",
+    pending: "bg-teal-300 text-teal-800"
+  }
+};
+
 export function TaskDetailPage({
   task,
   workspaceId,
@@ -363,6 +396,8 @@ export function TaskDetailPage({
 }
 
 function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
+  const [showModal, setShowModal] = useState(false);
+
   // Calculate waterfall chart data
   const sortedRuns = [...runs].sort((a, b) => new Date(a.started_at || 0).getTime() - new Date(b.started_at || 0).getTime());
   const earliestStart = sortedRuns[0]?.started_at ? new Date(sortedRuns[0].started_at).getTime() : Date.now();
@@ -371,13 +406,23 @@ function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
 
   return (
     <div className="rounded-lg border border-border bg-surface overflow-hidden mt-4">
-      <div className="px-5 py-3 border-b border-border">
+      <div className="px-5 py-3 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-medium flex items-center gap-2">
           <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
           Execution Trace
         </h3>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-surface-hover"
+          title="Expand trace view"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+          Expand
+        </button>
       </div>
 
       <div className="p-5">
@@ -393,41 +438,39 @@ function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
                 const widthPercent = Math.max((runDuration / totalDuration) * 100, 3);
 
                 return (
-                  <div key={run.id} className="flex items-center h-8">
-                    {/* Agent name */}
-                    <div className="w-28 text-xs font-medium text-foreground pr-3 flex-shrink-0">
-                      {run.agent_type.replace('_', ' ')}
-                    </div>
-
-                    {/* Chart bar area */}
-                    <div className="flex-1 relative h-5 bg-surface-hover rounded-sm">
+                  <div key={run.id} className="flex items-center h-12">
+                    {/* Chart bar area - full width */}
+                    <div className="w-full relative h-10 bg-surface-hover rounded-md">
                       <div
                         className={`
-                          absolute h-full rounded-sm flex items-center px-2 text-xs font-medium transition-colors
-                          ${run.status === 'completed'
-                            ? 'bg-green-600 text-white'
-                            : run.status === 'failed'
-                            ? 'bg-red-600 text-white'
-                            : run.status === 'running'
-                            ? 'bg-blue-600 text-white animate-pulse'
-                            : 'bg-muted text-muted-foreground'
-                          }
+                          absolute h-full rounded-md flex flex-col justify-center px-4 py-3 text-xs transition-colors overflow-hidden
+                          ${AGENT_COLORS[run.agent_type]?.[run.status as keyof typeof AGENT_COLORS[string]] || 'bg-gray-500 text-white'}
                         `}
                         style={{
                           left: `${leftPercent}%`,
                           width: `${widthPercent}%`,
-                          minWidth: '50px'
+                          minWidth: '140px'
                         }}
                       >
-                        <span className="truncate">
-                          {formatDuration(runDuration)}
-                        </span>
+                        <div className="flex items-center justify-between leading-tight">
+                          <div>
+                            <div className="font-semibold truncate capitalize">
+                              {run.agent_type.replace('_', ' ')}
+                            </div>
+                            <div className="text-xs opacity-80 leading-tight">
+                              {formatDuration(runDuration)}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-mono text-xs">
+                              ${(run.cost_usd || 0).toFixed(4)}
+                            </div>
+                            <div className="font-mono text-xs opacity-80">
+                              {(run.input_tokens || 0).toLocaleString()}/{(run.output_tokens || 0).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Status & Cost */}
-                    <div className="w-20 text-right text-xs text-muted font-mono pl-3 flex-shrink-0">
-                      ${(run.cost_usd || 0).toFixed(4)}
                     </div>
                   </div>
                 );
@@ -436,12 +479,15 @@ function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
 
             {/* Time axis */}
             <div className="mt-3 pt-2 border-t border-border">
-              <div className="relative h-4 ml-28">
+              <div className="relative h-4">
                 {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
                   <div
                     key={fraction}
                     className="absolute bottom-0 text-xs text-muted font-mono"
-                    style={{ left: `${fraction * 100}%`, transform: 'translateX(-50%)' }}
+                    style={{
+                      left: `${fraction * 100}%`,
+                      transform: fraction === 0 ? 'translateX(0%)' : fraction === 1 ? 'translateX(-100%)' : 'translateX(-50%)'
+                    }}
                   >
                     {fraction === 0 ? '0s' : formatDuration(totalDuration * fraction)}
                   </div>
@@ -451,6 +497,114 @@ function ExecutionTrace({ runs }: { runs: AgentRunResponse[] }) {
           </div>
         </div>
       </div>
+
+      {/* Expanded Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-surface border border-border rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-background">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Execution Trace
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-surface-hover transition-colors text-muted hover:text-foreground"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {/* Agent runs - larger format */}
+              <div className="space-y-4 mb-6">
+                {sortedRuns.map((run) => {
+                  const startTime = run.started_at ? new Date(run.started_at).getTime() : earliestStart;
+                  const endTime = run.finished_at ? new Date(run.finished_at).getTime() : Date.now();
+                  const runDuration = endTime - startTime;
+                  const leftPercent = ((startTime - earliestStart) / totalDuration) * 100;
+                  const widthPercent = Math.max((runDuration / totalDuration) * 100, 5);
+
+                  return (
+                    <div key={run.id} className="flex items-center h-16">
+                      {/* Agent info */}
+                      <div className="w-36 text-sm pr-4 flex-shrink-0">
+                        <div className="font-semibold capitalize text-foreground">{run.agent_type.replace('_', ' ')}</div>
+                        <div className="text-xs text-muted">{run.model || 'sonnet'}</div>
+                        <div className="text-xs text-muted">
+                          {run.started_at ? new Date(run.started_at).toLocaleTimeString() : 'Pending'}
+                        </div>
+                      </div>
+
+                      {/* Large chart bar */}
+                      <div className="flex-1 relative h-12 bg-surface-hover rounded-md">
+                        <div
+                          className={`
+                            absolute h-full rounded-md flex items-center justify-between px-4 text-sm transition-colors overflow-hidden
+                            ${AGENT_COLORS[run.agent_type]?.[run.status as keyof typeof AGENT_COLORS[string]] || 'bg-gray-500 text-white'}
+                          `}
+                          style={{
+                            left: `${leftPercent}%`,
+                            width: `${widthPercent}%`,
+                            minWidth: '200px'
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold">
+                              {formatDuration(runDuration)}
+                            </span>
+                            <span className="text-xs opacity-90 capitalize">
+                              {run.status}
+                            </span>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-mono text-sm">
+                              ${(run.cost_usd || 0).toFixed(4)}
+                            </div>
+                            <div className="font-mono text-xs opacity-90">
+                              {(run.input_tokens || 0).toLocaleString()}/{(run.output_tokens || 0).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Time axis */}
+              <div className="mt-6 pt-4 border-t border-border">
+                <div className="relative h-6 ml-36">
+                  {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+                    <div
+                      key={fraction}
+                      className="absolute bottom-0 text-xs text-muted font-mono"
+                      style={{
+                        left: `${fraction * 100}%`,
+                        transform: fraction === 0 ? 'translateX(0%)' : fraction === 1 ? 'translateX(-100%)' : 'translateX(-50%)'
+                      }}
+                    >
+                      {fraction === 0 ? '0s' : formatDuration(totalDuration * fraction)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
