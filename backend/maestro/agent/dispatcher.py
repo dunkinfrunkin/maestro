@@ -149,6 +149,18 @@ async def dispatch_agent_for_status(
                 email=clone_conn.email,
             )
 
+        # If the existing PR/MR is closed/merged, clear it so the agent creates a new one
+        if pr_url and clone_conn and clone_token:
+            pr_state = await _check_pr_state(pr_url, clone_conn, clone_token)
+            if pr_state in ("closed", "merged"):
+                print(f"[MAESTRO] Existing PR/MR is {pr_state}, clearing so agent creates a new one")
+                pr_url = ""
+                pr_number = ""
+                if task_record:
+                    task_record.pr_url = ""
+                    task_record.pr_number = ""
+                    await session.commit()
+
         model = agent_config.model if agent_config else "sonnet"
 
         # Create agent run record
@@ -597,6 +609,61 @@ def _extract_verdict(result: dict) -> str:
 
 # ---------------------------------------------------------------------------
 # Repo resolution helpers
+async def _check_pr_state(pr_url: str, conn, token: str) -> str:
+    """Check if a PR/MR is open, closed, or merged. Returns state string."""
+    import httpx
+
+    try:
+        if "/-/merge_requests/" in pr_url:
+            # GitLab MR — extract project path and MR iid from URL
+            # URL format: https://gitlab.example.com/group/project/-/merge_requests/123
+            parts = pr_url.split("/-/merge_requests/")
+            if len(parts) != 2:
+                return "unknown"
+            mr_iid = parts[1].rstrip("/")
+            project_url = parts[0]
+            # Extract project path from URL
+            endpoint = conn.endpoint.rstrip("/") if conn.endpoint else "https://gitlab.com"
+            project_path = project_url.replace(endpoint + "/", "")
+            encoded_path = __import__("urllib.parse", fromlist=["quote"]).quote(project_path, safe="")
+            async with httpx.AsyncClient(
+                base_url=f"{endpoint}/api/v4",
+                headers={"PRIVATE-TOKEN": token, "Accept": "application/json"},
+                timeout=10.0,
+            ) as http:
+                resp = await http.get(f"/projects/{encoded_path}/merge_requests/{mr_iid}")
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("state", "unknown")  # "opened", "closed", "merged"
+
+        elif "/pull/" in pr_url:
+            # GitHub PR — extract owner/repo and PR number
+            # URL format: https://github.com/owner/repo/pull/123
+            import re
+            match = re.search(r"github\.com/([^/]+/[^/]+)/pull/(\d+)", pr_url)
+            if not match:
+                return "unknown"
+            repo_path, pr_num = match.group(1), match.group(2)
+            endpoint = conn.endpoint or "https://api.github.com"
+            async with httpx.AsyncClient(
+                base_url=endpoint,
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+                timeout=10.0,
+            ) as http:
+                resp = await http.get(f"/repos/{repo_path}/pulls/{pr_num}")
+                resp.raise_for_status()
+                data = resp.json()
+                state = data.get("state", "unknown")  # "open", "closed"
+                if data.get("merged"):
+                    return "merged"
+                return state
+    except Exception as exc:
+        print(f"[MAESTRO] Failed to check PR/MR state: {exc}")
+        return "unknown"
+
+    return "unknown"
+
+
 async def _fetch_issue_for_dispatch(conn, token: str, issue_id: str):
     """Fetch a single issue from any tracker by ID. Handles Jira numeric IDs."""
     from maestro.db.models import TrackerKind

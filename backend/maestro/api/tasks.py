@@ -566,16 +566,15 @@ async def _fetch_single_issue(conn, token: str, issue_id: str):
             email=conn.email,
         )
         try:
-            # Jira: fetch by issue ID directly via JQL
-            states = await client.fetch_issue_states_by_ids([issue_id])
-            if states:
-                # Got the state — now search for full issue data
-                issues = await client.search_issues(issue_id) if "-" in issue_id else []
-                if issues:
-                    return issues[0]
-            # Fallback: scan candidates
-            issues = await client.fetch_candidate_issues(max_results=50)
-            return next((i for i in issues if i.id == issue_id), None)
+            # Fetch by key (PROJ-123) or numeric id
+            if "-" in issue_id:
+                jql = f'key = "{issue_id}"'
+            else:
+                jql = f"id = {issue_id}"
+            issues = await client._search(jql, max_results=1)
+            if issues:
+                return issues[0]
+            return None
         finally:
             await client.close()
 
@@ -695,18 +694,38 @@ class TaskRepoUpdate(BaseModel):
     repo: str
 
 
+class TaskRepoUpdateBody(BaseModel):
+    repo: str
+    project_id: int | None = None
+
+
 @router.put("/tasks/{external_ref:path}/repo")
-async def update_task_repo(external_ref: str, body: TaskRepoUpdate) -> dict:
-    """Set or update the repository associated with a task."""
+async def update_task_repo(external_ref: str, body: TaskRepoUpdateBody) -> dict:
+    """Set or update the repository associated with a task.
+
+    Creates a pipeline record if one doesn't exist (status defaults to queued).
+    """
     async with get_session() as session:
         record = await crud.get_pipeline_record(session, external_ref)
         if not record:
-            # Create a minimal pipeline record to store the repo
+            project_id = body.project_id
+            if not project_id:
+                from sqlalchemy import select
+                from maestro.db.models import Project
+                first = (await session.execute(select(Project).limit(1))).scalar()
+                if not first:
+                    raise HTTPException(status_code=400, detail="No project exists yet")
+                project_id = first.id
             parts = external_ref.split(":")
             conn_id = int(parts[1]) if len(parts) >= 2 else 0
-            record = await crud.set_pipeline_status(
-                session, external_ref, conn_id, PipelineStatus.QUEUED, project_id=0
+            record = TaskPipelineRecord(
+                external_ref=external_ref,
+                tracker_connection_id=conn_id,
+                status=PipelineStatus.QUEUED,
+                project_id=project_id,
             )
+            session.add(record)
+            await session.flush()
         record.repo = body.repo
         await session.commit()
         return {"external_ref": external_ref, "repo": record.repo}

@@ -147,7 +147,7 @@ export function TaskDetailPage({
         )}
 
         {/* Repo selector */}
-        <RepoSelector task={task} onRepoChanged={onTaskUpdated} />
+        <RepoSelector task={task} projectId={projectId} onRepoChanged={onTaskUpdated} />
 
         {/* Status selector + re-run */}
         <div className="mt-4 flex items-center gap-3">
@@ -314,12 +314,14 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
   );
 }
 
-function RepoSelector({ task, onRepoChanged }: { task: UnifiedTask; onRepoChanged: () => void }) {
+function RepoSelector({ task, projectId, onRepoChanged }: { task: UnifiedTask; projectId?: number; onRepoChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [repos, setRepos] = useState<RepoEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [localRepo, setLocalRepo] = useState(task.repo || "");
+  useEffect(() => { setLocalRepo(task.repo || ""); }, [task.repo]);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -349,13 +351,16 @@ function RepoSelector({ task, onRepoChanged }: { task: UnifiedTask; onRepoChange
   }, [open]);
 
   const handleSelect = async (repoName: string) => {
+    setLocalRepo(repoName);
+    setOpen(false);
     setSaving(true);
     try {
-      await updateTaskRepo(task.external_ref, repoName);
+      await updateTaskRepo(task.external_ref, repoName, projectId);
       onRepoChanged();
-    } catch {}
+    } catch {
+      setLocalRepo(task.repo || ""); // revert on failure
+    }
     setSaving(false);
-    setOpen(false);
   };
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -375,7 +380,7 @@ function RepoSelector({ task, onRepoChanged }: { task: UnifiedTask; onRepoChange
           onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
           className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-surface-hover transition-colors font-mono flex items-center gap-1.5"
         >
-          {saving ? "Saving..." : task.repo || "Select repo..."}
+          {saving ? "Saving..." : localRepo || "Select repo..."}
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
@@ -419,7 +424,7 @@ function RepoSelector({ task, onRepoChanged }: { task: UnifiedTask; onRepoChange
                   key={`${r.tracker_kind}:${r.full_name}`}
                   onClick={() => handleSelect(r.full_name)}
                   className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-hover transition-colors flex items-center justify-between ${
-                    task.repo === r.full_name ? "bg-accent/5 text-accent" : ""
+                    localRepo === r.full_name ? "bg-accent/5 text-accent" : ""
                   }`}
                 >
                   <span className="font-mono truncate">{r.full_name}</span>
