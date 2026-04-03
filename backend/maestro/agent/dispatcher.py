@@ -394,6 +394,8 @@ async def _execute_agent(
                 run.summary = result.get("last_text", "")[:500]
                 run.error = result.get("error") or ""
                 run.cost_usd = result.get("total_cost_usd", 0.0)
+                run.input_tokens = result.get("input_tokens", 0)
+                run.output_tokens = result.get("output_tokens", 0)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
                 print(f"[MAESTRO] Run {run_id} status updated to {run.status}")
