@@ -21,6 +21,21 @@ const STATUS_LABELS: Record<string, string> = {
   risk_profile: "Risk Profile", deploy: "Deploy", monitor: "Monitor",
 };
 
+const formatDuration = (ms: number) => {
+  if (ms === 0) return "0s";
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+};
+
 const STATUS_COLORS: Record<string, string> = {
   queued: "bg-gray-200 text-gray-800 border-gray-300",
   implement: "bg-blue-100 text-blue-800 border-blue-300",
@@ -84,18 +99,35 @@ export function TaskDetailPage({
     } catch {}
   };
 
+  // Calculate totals
+  const totalCost = runs.reduce((sum, run) => sum + (run.cost_usd || 0), 0);
+  const totalInputTokens = runs.reduce((sum, run) => sum + (run.input_tokens || 0), 0);
+  const totalOutputTokens = runs.reduce((sum, run) => sum + (run.output_tokens || 0), 0);
+
+  // Calculate total time (sum of all individual run durations)
+  const totalDuration = runs.reduce((sum, run) => {
+    if (run.started_at && run.finished_at) {
+      const start = new Date(run.started_at).getTime();
+      const end = new Date(run.finished_at).getTime();
+      return sum + (end - start);
+    }
+    return sum;
+  }, 0);
+
+
   return (
-    <div className="max-w-3xl">
-      {/* Back button */}
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-4 transition-colors">
+    <div className="flex gap-6 w-full">
+      <div className="flex-1 min-w-0">
+        {/* Back button */}
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-4 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
         </svg>
         Back to tasks
-      </button>
+        </button>
 
-      {/* Header */}
-      <div className="rounded-lg border border-border bg-surface p-5 mb-4">
+        {/* Header */}
+        <div className="rounded-lg border border-border bg-surface p-5 mb-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-mono text-muted">{task.identifier}</span>
           <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">{task.tracker_kind}</span>
@@ -177,8 +209,8 @@ export function TaskDetailPage({
         </div>
       </div>
 
-      {/* Activity Log */}
-      <div className="rounded-lg border border-border bg-surface overflow-hidden">
+        {/* Activity Log */}
+        <div className="rounded-lg border border-border bg-surface overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <h3 className="text-sm font-medium">Activity</h3>
         </div>
@@ -198,6 +230,83 @@ export function TaskDetailPage({
               ))}
             </div>
           )}
+        </div>
+        </div>
+      </div>
+
+      {/* Metrics Sidebar */}
+      <div className="w-72 flex-shrink-0">
+        <div className="sticky top-4">
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Task Metrics
+            </h3>
+
+            <div className="space-y-4">
+              <div className="bg-surface-hover/50 rounded-md p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
+                  </svg>
+                  <span className="text-xs font-medium text-muted">Total Cost</span>
+                </div>
+                <div className="font-mono text-lg font-semibold text-foreground">
+                  ${totalCost.toFixed(4)}
+                </div>
+              </div>
+
+              <div className="bg-surface-hover/50 rounded-md p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-xs font-medium text-muted">Total Tokens</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Input:</span>
+                    <span className="font-mono">{totalInputTokens.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Output:</span>
+                    <span className="font-mono">{totalOutputTokens.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1 border-t border-border">
+                    <span className="text-muted font-medium">Total:</span>
+                    <span className="font-mono font-semibold">{(totalInputTokens + totalOutputTokens).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-surface-hover/50 rounded-md p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span className="text-xs font-medium text-muted">Agent Runs</span>
+                </div>
+                <div className="font-mono text-lg font-semibold text-foreground">
+                  {runs.length}
+                </div>
+              </div>
+
+              <div className="bg-surface-hover/50 rounded-md p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs font-medium text-muted">Total Time</span>
+                </div>
+                <div className="font-mono text-lg font-semibold text-foreground">
+                  {formatDuration(totalDuration)}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -270,22 +379,32 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           {run.started_at && `Started ${new Date(run.started_at).toLocaleString()}`}
           {run.finished_at && ` — Finished ${new Date(run.finished_at).toLocaleTimeString()}`}
         </div>
-        {(run.cost_usd > 0 || run.input_tokens > 0 || run.output_tokens > 0) && (
-          <div className="text-xs text-muted mb-2 flex items-center gap-3">
-            {run.cost_usd > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="text-green-600">💰</span>
-                ${run.cost_usd.toFixed(4)}
-              </span>
-            )}
-            {(run.input_tokens > 0 || run.output_tokens > 0) && (
-              <span className="flex items-center gap-1">
-                <span className="text-blue-600">🪙</span>
-                {run.input_tokens.toLocaleString()}in / {run.output_tokens.toLocaleString()}out
-              </span>
-            )}
+        <div className="text-xs text-muted mb-2 flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.736 6.979C9.208 6.193 9.696 6 10 6s.792.193 1.264.979a1 1 0 001.715-1.029C12.279 4.784 11.232 4 10 4s-2.279.784-2.979 1.95c-.285.475-.507 1.043-.507 1.55 0 .502.169.926.507 1.4.338.473.841.8 1.429.8.588 0 1.091-.327 1.429-.8A1 1 0 0010.736 7.979C10.264 7.193 9.776 7 9.472 7s-.792.193-1.264.979a1 1 0 11-1.715-1.029C6.193 5.784 7.24 5 8.472 5s2.279.784 2.979 1.95z"/>
+            </svg>
+            <span className="font-mono">${(run.cost_usd || 0).toFixed(4)}</span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5">
+            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span className="font-mono text-xs">
+              {(run.input_tokens || 0).toLocaleString()}→{(run.output_tokens || 0).toLocaleString()}
+            </span>
+          </div>
+          {run.started_at && run.finished_at && (
+            <div className="flex items-center gap-1.5">
+              <svg className="w-3 h-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-mono text-xs">
+                {formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Live logs */}
         {logs.length > 0 && (
