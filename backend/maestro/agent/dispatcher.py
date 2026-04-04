@@ -68,10 +68,15 @@ async def dispatch_agent_for_status(
                 logger.info("Agent %s is disabled, skipping", agent_name)
                 return None
 
-        # Check API key
-        api_key_record = await crud.get_api_key(session, workspace_id, ApiKeyProvider.ANTHROPIC)
+        # Check API key — use provider from agent config, fallback to anthropic
+        provider = agent_config.provider if agent_config else "anthropic"
+        try:
+            provider_enum = ApiKeyProvider(provider)
+        except ValueError:
+            provider_enum = ApiKeyProvider.ANTHROPIC
+        api_key_record = await crud.get_api_key(session, workspace_id, provider_enum)
         if not api_key_record:
-            logger.warning("No Anthropic API key for workspace %d, skipping agent", workspace_id)
+            logger.warning("No %s API key for workspace %d, skipping agent", provider, workspace_id)
             return None
         from maestro.db.encryption import decrypt_token
         api_key = decrypt_token(api_key_record.encrypted_key)
@@ -187,6 +192,7 @@ async def dispatch_agent_for_status(
             run_id=run_id,
             plugin=plugin,
             api_key=api_key,
+            provider=provider,
             model=model,
             workspace_id=workspace_id,
             task_pipeline_id=task_pipeline_id,
@@ -229,6 +235,7 @@ async def _execute_agent(
     run_id: int,
     plugin,
     api_key: str,
+    provider: str,
     model: str,
     workspace_id: int,
     task_pipeline_id: int,
@@ -320,8 +327,21 @@ async def _execute_agent(
         if issue_description:
             prompt_parts.append(issue_description)
         if pr_url:
-            prompt_parts.append(f"\nPR: {pr_url}")
-            prompt_parts.append("Read the PR comments with `gh pr view --comments` to understand feedback.")
+            pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
+            prompt_parts.append(f"\n{'MR' if code_host == 'gitlab' else 'PR'}: {pr_url}")
+            if code_host == "gitlab":
+                # Extract and encode project path for glab API calls
+                gitlab_project_encoded = ""
+                if "/-/merge_requests/" in pr_url:
+                    project_path = pr_url.split("/-/merge_requests/")[0].split("://", 1)[1].split("/", 1)[1]
+                    gitlab_project_encoded = project_path.replace("/", "%2F")
+                prompt_parts.append("This is a GitLab repository. Use `glab` (NOT `gh`) for all MR operations.")
+                prompt_parts.append(f"MR number: {pr_num}")
+                if gitlab_project_encoded:
+                    prompt_parts.append(f"GitLab project (URL-encoded for API calls): {gitlab_project_encoded}")
+                prompt_parts.append("Post inline comments directly on the MR using the glab API as described in your system prompt.")
+            else:
+                prompt_parts.append("Post inline review comments directly on the PR using gh as described in your system prompt.")
         if repo:
             prompt_parts.append(f"Repository: {repo}")
 
@@ -375,6 +395,7 @@ async def _execute_agent(
             run_id=run_id,
             system_prompt=system_prompt,
             prompt=prompt,
+            provider=provider,
             model=model,
             workspace_path=workspace_path,
             allowed_tools=agent_cfg["tools"],
@@ -448,6 +469,77 @@ async def _execute_agent(
                 run.error = str(exc)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
+
+
+async def _post_review_comment(
+    pr_url: str,
+    code_host: str,
+    review_text: str,
+    run_id: int,
+) -> None:
+    """Post the review agent's findings as a comment on the MR/PR."""
+    import shutil
+
+    # Prefix with Maestro header
+    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}"
+
+    if code_host == "gitlab":
+        # Extract project path and MR number from URL
+        # e.g. https://gitlab.example.com/group/project/-/merge_requests/82
+        parts = pr_url.split("/-/merge_requests/")
+        if len(parts) != 2:
+            print(f"[MAESTRO] Cannot parse GitLab MR URL: {pr_url}")
+            return
+        mr_number = parts[1].rstrip("/").split("?")[0]
+        project_path = parts[0].split("://", 1)[1].split("/", 1)[1]  # strip host
+        encoded_project = project_path.replace("/", "%2F")
+
+        glab_path = shutil.which("glab")
+        if not glab_path:
+            print("[MAESTRO] glab not found, cannot post review comment")
+            return
+
+        proc = await asyncio.create_subprocess_exec(
+            glab_path, "api", "--method", "POST",
+            f"projects/{encoded_project}/merge_requests/{mr_number}/notes",
+            "-f", f"body={comment}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            print(f"[MAESTRO] Posted review comment to GitLab MR !{mr_number}")
+        else:
+            err = stderr.decode("utf-8", errors="replace")[:300]
+            print(f"[MAESTRO] Failed to post GitLab comment: {err}")
+    else:
+        # GitHub — use gh api
+        # e.g. https://github.com/owner/repo/pull/123
+        parts = pr_url.split("/pull/")
+        if len(parts) != 2:
+            print(f"[MAESTRO] Cannot parse GitHub PR URL: {pr_url}")
+            return
+        pr_number = parts[1].rstrip("/").split("?")[0]
+        repo_path = parts[0].split("github.com/", 1)[1]
+
+        gh_path = shutil.which("gh")
+        if not gh_path:
+            print("[MAESTRO] gh not found, cannot post review comment")
+            return
+
+        proc = await asyncio.create_subprocess_exec(
+            gh_path, "api",
+            f"repos/{repo_path}/issues/{pr_number}/comments",
+            "-f", f"body={comment}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            print(f"[MAESTRO] Posted review comment to GitHub PR #{pr_number}")
+        else:
+            err = stderr.decode("utf-8", errors="replace")[:300]
+            print(f"[MAESTRO] Failed to post GitHub comment: {err}")
 
 
 async def _auto_transition(
