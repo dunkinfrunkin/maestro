@@ -103,8 +103,6 @@ docker run -d --name maestro \
 | Variable | Required | Description |
 |---|---|---|
 | `MAESTRO_SECRET` | Yes | JWT signing secret. Generate: `openssl rand -hex 32` |
-
-> \* At least one of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required. You can also configure API keys per-workspace in **Settings > Models**.
 | `ANTHROPIC_API_KEY` | * | Claude API key — powers agents using Claude CLI |
 | `OPENAI_API_KEY` | * | OpenAI API key — powers agents using Codex CLI |
 | `MAESTRO_OIDC_ISSUER` | No | OIDC provider URL for SSO |
@@ -118,6 +116,8 @@ docker run -d --name maestro \
 | `POSTGRES_USER` | No | Database user (default: `maestro`) |
 | `POSTGRES_PASSWORD` | No | Database password (default: `maestro`) |
 | `PORT` | No | Port to expose (default: `3000`) |
+
+*At least one of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required. You can also configure API keys per-workspace in Settings > Models.*
 
 ## Connections
 
