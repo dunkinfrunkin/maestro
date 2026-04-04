@@ -17,6 +17,13 @@ const CodeMirrorEditor = dynamic(
 
 type Tab = "config" | "prompt";
 
+interface ConfigDraft {
+  provider: string;
+  model: string;
+  enabled: boolean;
+  autoApproveThreshold: string;
+}
+
 export function AgentDetailPage({
   agent,
   workspaceId,
@@ -28,11 +35,20 @@ export function AgentDetailPage({
 }) {
   const [tab, setTab] = useState<Tab>("config");
   const [config, setConfig] = useState<AgentConfigResponse | null>(null);
+  const [draft, setDraft] = useState<ConfigDraft | null>(null);
   const [defaultPrompt, setDefaultPrompt] = useState("");
   const [promptDraft, setPromptDraft] = useState("");
   const [promptDirty, setPromptDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const buildDraft = (cfg: AgentConfigResponse): ConfigDraft => ({
+    provider: cfg.provider || "anthropic",
+    model: cfg.model || "sonnet",
+    enabled: (cfg.extra_config?.enabled as boolean) ?? true,
+    autoApproveThreshold: (cfg.extra_config?.auto_approve_threshold as string) || "low",
+  });
 
   const load = useCallback(async () => {
     try {
@@ -41,8 +57,8 @@ export function AgentDetailPage({
         getDefaultPrompt(agent.type),
       ]);
       setConfig(cfg);
+      setDraft(buildDraft(cfg));
       setDefaultPrompt(dp);
-      // Use custom prompt from DB if set, otherwise default
       const currentPrompt = (cfg.extra_config?.custom_prompt as string) || dp;
       setPromptDraft(currentPrompt);
       setPromptDirty(false);
@@ -54,30 +70,51 @@ export function AgentDetailPage({
 
   useEffect(() => { load(); }, [load]);
 
-  const handleModelChange = async (model: string) => {
-    try {
-      const updated = await updateAgentConfig(workspaceId, agent.type, model);
-      setConfig(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
-    }
-  };
+  // Check if draft differs from saved config
+  const configDirty = config && draft ? (
+    draft.provider !== (config.provider || "anthropic") ||
+    draft.model !== (config.model || "sonnet") ||
+    draft.enabled !== ((config.extra_config?.enabled as boolean) ?? true) ||
+    draft.autoApproveThreshold !== ((config.extra_config?.auto_approve_threshold as string) || "low")
+  ) : false;
 
-  const handleExtraConfigChange = async (key: string, value: unknown) => {
+  // Get available models for current draft provider
+  const availableModels = config?.providers?.find(p => p.id === draft?.provider)?.models
+    || config?.available_models
+    || [];
+
+  const handleSaveConfig = async () => {
+    if (!draft) return;
+    setSaving(true);
+    setError(null);
+    setSaveSuccess(false);
     try {
-      const extra = { ...(config?.extra_config || {}), [key]: value };
-      const updated = await updateAgentConfig(workspaceId, agent.type, undefined, extra);
+      const extra = {
+        ...(config?.extra_config || {}),
+        enabled: draft.enabled,
+        auto_approve_threshold: draft.autoApproveThreshold,
+      };
+      const updated = await updateAgentConfig(workspaceId, agent.type, draft.provider, draft.model, extra);
       setConfig(updated);
+      setDraft(buildDraft(updated));
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleSavePrompt = async () => {
     setSaving(true);
     try {
-      await handleExtraConfigChange("custom_prompt", promptDraft);
+      const extra = { ...(config?.extra_config || {}), custom_prompt: promptDraft };
+      const updated = await updateAgentConfig(workspaceId, agent.type, config?.provider, undefined, extra);
+      setConfig(updated);
       setPromptDirty(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -124,6 +161,9 @@ export function AgentDetailPage({
             }`}
           >
             {t.label}
+            {t.id === "config" && configDirty && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-accent inline-block" />
+            )}
             {t.id === "prompt" && promptDirty && (
               <span className="ml-1 w-1.5 h-1.5 rounded-full bg-accent inline-block" />
             )}
@@ -136,20 +176,42 @@ export function AgentDetailPage({
       )}
 
       {/* Config tab */}
-      {tab === "config" && (
+      {tab === "config" && draft && (
         <div className="space-y-6">
+          {/* Provider selector */}
+          {config?.providers && config.providers.length > 1 && (
+            <div>
+              <div className="text-sm font-medium mb-2">Provider</div>
+              <div className="flex gap-2">
+                {config.providers.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      const defaultModel = p.models?.[0]?.id || "sonnet";
+                      setDraft({ ...draft, provider: p.id, model: defaultModel });
+                    }}
+                    className={`flex-1 rounded-md border px-3 py-2.5 text-center transition-colors ${
+                      draft.provider === p.id
+                        ? "border-accent bg-accent/5 font-medium"
+                        : "border-border hover:bg-surface-hover"
+                    }`}
+                  >
+                    <div className="text-xs font-medium">{p.name}</div>
+                    <div className="text-[10px] text-muted">{p.id === "anthropic" ? "Claude CLI" : "Codex CLI"}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="text-sm font-medium mb-2">Model</div>
             <div className="space-y-1.5">
-              {(config?.available_models || [
-                { id: "sonnet", name: "Claude Sonnet", description: "Best speed/intelligence balance" },
-                { id: "opus", name: "Claude Opus", description: "Most capable, best for complex tasks" },
-                { id: "haiku", name: "Claude Haiku", description: "Fastest, good for simple tasks" },
-              ]).map((m) => (
+              {availableModels.map((m) => (
                 <label
                   key={m.id}
                   className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${
-                    (config?.model || "sonnet") === m.id
+                    draft.model === m.id
                       ? "border-accent bg-accent/5"
                       : "border-border hover:bg-surface-hover"
                   }`}
@@ -157,8 +219,8 @@ export function AgentDetailPage({
                   <input
                     type="radio"
                     name="model"
-                    checked={(config?.model || "sonnet") === m.id}
-                    onChange={() => handleModelChange(m.id)}
+                    checked={draft.model === m.id}
+                    onChange={() => setDraft({ ...draft, model: m.id })}
                     className="accent-accent"
                   />
                   <div>
@@ -175,8 +237,8 @@ export function AgentDetailPage({
               <div className="text-sm font-medium mb-2">Auto-approve threshold</div>
               <div className="text-xs text-muted mb-2">PRs at or below this risk level will be auto-approved.</div>
               <select
-                value={(config?.extra_config?.auto_approve_threshold as string) || "low"}
-                onChange={(e) => handleExtraConfigChange("auto_approve_threshold", e.target.value)}
+                value={draft.autoApproveThreshold}
+                onChange={(e) => setDraft({ ...draft, autoApproveThreshold: e.target.value })}
                 className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground"
               >
                 <option value="low">Low — only auto-approve minimal risk</option>
@@ -192,10 +254,24 @@ export function AgentDetailPage({
               <div className="text-xs text-muted">Agent will be triggered when tasks move to this pipeline stage</div>
             </div>
             <button
-              onClick={() => handleExtraConfigChange("enabled", !(config?.extra_config?.enabled ?? true))}
-              className={`relative w-9 h-5 rounded-full transition-colors ${(config?.extra_config?.enabled ?? true) ? "bg-green-500" : "bg-gray-300"}`}
+              onClick={() => setDraft({ ...draft, enabled: !draft.enabled })}
+              className={`relative w-9 h-5 rounded-full transition-colors ${draft.enabled ? "bg-green-500" : "bg-gray-300"}`}
             >
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(config?.extra_config?.enabled ?? true) ? "translate-x-4" : ""}`} />
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${draft.enabled ? "translate-x-4" : ""}`} />
+            </button>
+          </div>
+
+          {/* Save button */}
+          <div className="flex items-center justify-between pt-2">
+            <div className="text-[10px] text-muted">
+              {saveSuccess ? "Saved" : configDirty ? "Unsaved changes" : "No changes"}
+            </div>
+            <button
+              onClick={handleSaveConfig}
+              disabled={!configDirty || saving}
+              className="px-6 py-2.5 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
+            >
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
@@ -238,9 +314,9 @@ export function AgentDetailPage({
             <button
               onClick={handleSavePrompt}
               disabled={!promptDirty || saving}
-              className="px-4 py-2 text-xs rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="px-6 py-2.5 text-sm rounded-md bg-accent text-background hover:opacity-90 transition-opacity disabled:opacity-40 font-medium"
             >
-              {saving ? "Saving..." : "Save Prompt"}
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>

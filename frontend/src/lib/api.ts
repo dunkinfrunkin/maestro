@@ -450,9 +450,11 @@ export async function deleteApiKey(workspaceId: number, provider: string): Promi
 
 export interface AgentConfigResponse {
   agent_type: string;
+  provider: string;
   model: string;
   active: boolean;
   available_models: { id: string; name: string; description: string }[];
+  providers: { id: string; name: string; models: { id: string; name: string; description: string }[] }[];
   extra_config: Record<string, unknown>;
 }
 
@@ -465,13 +467,14 @@ export async function getAgentConfig(workspaceId: number, agentType: string): Pr
 export async function updateAgentConfig(
   workspaceId: number,
   agentType: string,
+  provider?: string,
   model?: string,
   extraConfig?: Record<string, unknown>,
 ): Promise<AgentConfigResponse> {
   const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/agents/${agentType}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, extra_config: extraConfig }),
+    body: JSON.stringify({ provider, model, extra_config: extraConfig }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();

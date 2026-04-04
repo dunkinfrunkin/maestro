@@ -11,8 +11,26 @@ from maestro.db.engine import get_session
 from sqlalchemy import select
 
 from maestro.db.models import AgentRun, AgentType, ApiKeyProvider, User
-from maestro.agent.implementation import AVAILABLE_MODELS, DEFAULT_MODEL
+from maestro.agent.implementation import DEFAULT_MODEL
 from maestro.agent.plugin import registry
+
+PROVIDER_MODELS: dict[str, list[dict]] = {
+    "anthropic": [
+        {"id": "sonnet", "name": "Claude Sonnet", "description": "Best speed/intelligence balance"},
+        {"id": "opus", "name": "Claude Opus", "description": "Most capable, best for complex tasks"},
+        {"id": "haiku", "name": "Claude Haiku", "description": "Fastest, good for simple tasks"},
+    ],
+    "openai": [
+        {"id": "gpt-5.3-codex", "name": "GPT-5.3 Codex", "description": "Agentic coding model, state-of-the-art on SWE-Bench"},
+        {"id": "gpt-5.4", "name": "GPT-5.4", "description": "Latest frontier model, unified text and image"},
+        {"id": "o4-mini", "name": "o4-mini", "description": "Fast reasoning, Codex CLI default"},
+    ],
+}
+
+PROVIDER_DEFAULTS: dict[str, str] = {
+    "anthropic": "sonnet",
+    "openai": "gpt-5.3-codex",
+}
 
 router = APIRouter(prefix="/api/v1")
 
@@ -60,13 +78,16 @@ class ApiKeyStatus(BaseModel):
 
 class AgentConfigResponse(BaseModel):
     agent_type: str
+    provider: str
     model: str
-    active: bool  # has API key
+    active: bool  # has API key for the selected provider
     available_models: list[dict]
+    providers: list[dict]
     extra_config: dict = {}
 
 
 class AgentConfigUpdate(BaseModel):
+    provider: str | None = None
     model: str | None = None
     extra_config: dict | None = None
 
@@ -155,7 +176,12 @@ async def get_agent_config(
 
     async with get_session() as session:
         config = await crud.get_agent_config(session, workspace_id, at)
-        api_key = await crud.get_api_key(session, workspace_id, ApiKeyProvider.ANTHROPIC)
+        provider = config.provider if config else "anthropic"
+        try:
+            provider_enum = ApiKeyProvider(provider)
+        except ValueError:
+            provider_enum = ApiKeyProvider.ANTHROPIC
+        api_key = await crud.get_api_key(session, workspace_id, provider_enum)
 
     import json
     extra = {}
@@ -167,9 +193,11 @@ async def get_agent_config(
 
     return AgentConfigResponse(
         agent_type=agent_type,
-        model=config.model if config else DEFAULT_MODEL,
+        provider=provider,
+        model=config.model if config else PROVIDER_DEFAULTS.get(provider, DEFAULT_MODEL),
         active=api_key is not None,
-        available_models=AVAILABLE_MODELS,
+        available_models=PROVIDER_MODELS.get(provider, PROVIDER_MODELS["anthropic"]),
+        providers=[{"id": k, "name": k.title(), "models": v} for k, v in PROVIDER_MODELS.items()],
         extra_config=extra,
     )
 
@@ -188,16 +216,24 @@ async def update_agent_config(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid agent type: {agent_type}")
 
-    model = body.model or DEFAULT_MODEL
-    valid_models = [m["id"] for m in AVAILABLE_MODELS]
+    provider = body.provider or "anthropic"
+    if provider not in PROVIDER_MODELS:
+        raise HTTPException(status_code=400, detail=f"Invalid provider. Valid: {list(PROVIDER_MODELS.keys())}")
+
+    model = body.model or PROVIDER_DEFAULTS.get(provider, DEFAULT_MODEL)
+    valid_models = [m["id"] for m in PROVIDER_MODELS[provider]]
     if model not in valid_models:
-        raise HTTPException(status_code=400, detail=f"Invalid model. Valid: {valid_models}")
+        raise HTTPException(status_code=400, detail=f"Invalid model for {provider}. Valid: {valid_models}")
 
     extra_json = json.dumps(body.extra_config) if body.extra_config is not None else None
 
     async with get_session() as session:
-        config = await crud.set_agent_config(session, workspace_id, at, model, extra_json)
-        api_key = await crud.get_api_key(session, workspace_id, ApiKeyProvider.ANTHROPIC)
+        config = await crud.set_agent_config(session, workspace_id, at, model, extra_json, provider)
+        try:
+            provider_enum = ApiKeyProvider(provider)
+        except ValueError:
+            provider_enum = ApiKeyProvider.ANTHROPIC
+        api_key = await crud.get_api_key(session, workspace_id, provider_enum)
 
     extra = {}
     if config.extra_config:
@@ -208,9 +244,11 @@ async def update_agent_config(
 
     return AgentConfigResponse(
         agent_type=agent_type,
+        provider=config.provider,
         model=config.model,
         active=api_key is not None,
-        available_models=AVAILABLE_MODELS,
+        available_models=PROVIDER_MODELS.get(provider, PROVIDER_MODELS["anthropic"]),
+        providers=[{"id": k, "name": k.title(), "models": v} for k, v in PROVIDER_MODELS.items()],
         extra_config=extra,
     )
 

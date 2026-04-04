@@ -214,6 +214,7 @@ async def set_agent_config(
     agent_type: AgentType,
     model: str,
     extra_config: str | None = None,
+    provider: str | None = None,
 ) -> AgentConfig:
     result = await session.execute(
         select(AgentConfig).where(
@@ -224,6 +225,8 @@ async def set_agent_config(
     existing = result.scalar_one_or_none()
     if existing:
         existing.model = model
+        if provider is not None:
+            existing.provider = provider
         if extra_config is not None:
             existing.extra_config = extra_config
         await session.commit()
@@ -233,6 +236,7 @@ async def set_agent_config(
         config = AgentConfig(
             workspace_id=workspace_id,
             agent_type=agent_type,
+            provider=provider or "anthropic",
             model=model,
             extra_config=extra_config or "{}",
         )

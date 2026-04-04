@@ -68,10 +68,15 @@ async def dispatch_agent_for_status(
                 logger.info("Agent %s is disabled, skipping", agent_name)
                 return None
 
-        # Check API key
-        api_key_record = await crud.get_api_key(session, workspace_id, ApiKeyProvider.ANTHROPIC)
+        # Check API key — use provider from agent config, fallback to anthropic
+        provider = agent_config.provider if agent_config else "anthropic"
+        try:
+            provider_enum = ApiKeyProvider(provider)
+        except ValueError:
+            provider_enum = ApiKeyProvider.ANTHROPIC
+        api_key_record = await crud.get_api_key(session, workspace_id, provider_enum)
         if not api_key_record:
-            logger.warning("No Anthropic API key for workspace %d, skipping agent", workspace_id)
+            logger.warning("No %s API key for workspace %d, skipping agent", provider, workspace_id)
             return None
         from maestro.db.encryption import decrypt_token
         api_key = decrypt_token(api_key_record.encrypted_key)
@@ -187,6 +192,7 @@ async def dispatch_agent_for_status(
             run_id=run_id,
             plugin=plugin,
             api_key=api_key,
+            provider=provider,
             model=model,
             workspace_id=workspace_id,
             task_pipeline_id=task_pipeline_id,
@@ -229,6 +235,7 @@ async def _execute_agent(
     run_id: int,
     plugin,
     api_key: str,
+    provider: str,
     model: str,
     workspace_id: int,
     task_pipeline_id: int,
@@ -375,6 +382,7 @@ async def _execute_agent(
             run_id=run_id,
             system_prompt=system_prompt,
             prompt=prompt,
+            provider=provider,
             model=model,
             workspace_path=workspace_path,
             allowed_tools=agent_cfg["tools"],

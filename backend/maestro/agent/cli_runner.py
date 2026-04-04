@@ -31,16 +31,44 @@ async def _write_log(run_id: int, entry_type: str, content: str) -> None:
         logger.exception("Failed to write agent log entry")
 
 
+def _build_claude_cmd(prompt: str, model: str, tools_str: str, system_prompt: str) -> list[str]:
+    """Build command for Claude Code CLI."""
+    cmd = [
+        "claude",
+        "-p", prompt,
+        "--output-format", "stream-json",
+        "--model", model,
+        "--allowedTools", tools_str,
+        "--verbose",
+    ]
+    if system_prompt:
+        cmd.extend(["--system-prompt", system_prompt])
+    return cmd
+
+
+def _build_codex_cmd(prompt: str, model: str, system_prompt: str) -> list[str]:
+    """Build command for OpenAI Codex CLI."""
+    cmd = [
+        "codex",
+        "--model", model,
+        "--approval-mode", "full-auto",
+        "--quiet",
+        prompt,
+    ]
+    return cmd
+
+
 async def run_cli_with_logging(
     run_id: int,
     system_prompt: str,
     prompt: str,
+    provider: str,
     model: str,
     workspace_path: str,
     allowed_tools: list[str],
     api_key: str,
 ) -> dict[str, Any]:
-    """Run Claude Code CLI and stream log entries to the DB.
+    """Run CLI agent (Claude or Codex) and stream log entries to the DB.
 
     Returns dict with: status, error, total_cost_usd, input_tokens, output_tokens, messages, last_text, all_text, pr_url, review_verdict
     """
@@ -56,28 +84,23 @@ async def run_cli_with_logging(
     review_verdict = ""
 
     tools_str = ",".join(allowed_tools)
-    await _write_log(run_id, "status", f"Starting Claude Code CLI (model: {model}, tools: {tools_str})")
+    cli_name = "Codex CLI" if provider == "openai" else "Claude Code CLI"
+    await _write_log(run_id, "status", f"Starting {cli_name} (model: {model}, tools: {tools_str})")
 
-    cmd = [
-        "claude",
-        "-p", prompt,
-        "--output-format", "stream-json",
-        "--model", model,
-        "--allowedTools", tools_str,
-        "--verbose",
-    ]
+    if provider == "openai":
+        cmd = _build_codex_cmd(prompt, model, system_prompt)
+    else:
+        cmd = _build_claude_cmd(prompt, model, tools_str, system_prompt)
 
-    if system_prompt:
-        cmd.extend(["--system-prompt", system_prompt])
-
-    await _write_log(run_id, "status", f"$ claude -p '...' --model {model} --output-format stream-json")
+    await _write_log(run_id, "status", f"$ {cmd[0]} ... --model {model}")
 
     import os
 
-    env = {
-        **os.environ,
-        "ANTHROPIC_API_KEY": api_key,
-    }
+    env = {**os.environ}
+    if provider == "openai":
+        env["OPENAI_API_KEY"] = api_key
+    else:
+        env["ANTHROPIC_API_KEY"] = api_key
 
     try:
         proc = await asyncio.create_subprocess_exec(
