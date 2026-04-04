@@ -52,6 +52,14 @@ async def init_db() -> None:
     except Exception:
         pass  # fresh DB — type doesn't exist yet, create_all will handle it
 
+    try:
+        async with _engine.begin() as conn:
+            await conn.execute(sa.text(
+                "ALTER TYPE apikeyprovider ADD VALUE IF NOT EXISTS 'OPENAI'"
+            ))
+    except Exception:
+        pass  # fresh DB — create_all will handle it
+
     # Step 2: Create tables + run migrations
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -462,7 +462,8 @@ function ConnectionDetailModal({
 // ---------------------------------------------------------------------------
 
 const MODEL_PROVIDERS = [
-  { id: "anthropic", name: "Anthropic", desc: "Claude models", models: "Claude Sonnet, Opus, Haiku", placeholder: "sk-ant-...", icon: "A" },
+  { id: "anthropic", name: "Anthropic", desc: "Claude models (Claude CLI)", models: "Claude Sonnet, Opus, Haiku", placeholder: "sk-ant-...", icon: "A" },
+  { id: "openai", name: "OpenAI", desc: "OpenAI models (Codex CLI)", models: "o3, o4-mini, GPT-4.1", placeholder: "sk-...", icon: "O" },
 ];
 
 function ModelsTab({ workspaceId }: { workspaceId: number }) {
@@ -473,7 +474,13 @@ function ModelsTab({ workspaceId }: { workspaceId: number }) {
   const load = useCallback(async () => {
     try {
       const results: Record<string, ApiKeyStatus> = {};
-      for (const p of MODEL_PROVIDERS) { results[p.id] = await getApiKeyStatus(workspaceId, p.id); }
+      for (const p of MODEL_PROVIDERS) {
+        try {
+          results[p.id] = await getApiKeyStatus(workspaceId, p.id);
+        } catch {
+          results[p.id] = { provider: p.id, has_key: false, updated_at: null };
+        }
+      }
       setStatuses(results); setError(null);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed to load"); }
   }, [workspaceId]);

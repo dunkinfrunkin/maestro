@@ -168,6 +168,7 @@ class TaskPipelineRecord(Base):
 
 class ApiKeyProvider(str, enum.Enum):
     ANTHROPIC = "anthropic"
+    OPENAI = "openai"
 
 
 class ApiKey(Base):
