@@ -16,6 +16,16 @@ docker run -d --name maestro \
   ghcr.io/dunkinfrunkin/maestro:latest
 ```
 
+Or with OpenAI (Codex CLI):
+
+```bash
+docker run -d --name maestro \
+  -p 3000:3000 \
+  -e MAESTRO_SECRET=$(openssl rand -hex 32) \
+  -e OPENAI_API_KEY=sk-... \
+  ghcr.io/dunkinfrunkin/maestro:latest
+```
+
 Open http://localhost:3000.
 
 ## How It Works
@@ -29,7 +39,7 @@ Five dedicated agents, each with a single responsibility:
 | Agent | What it does |
 |---|---|
 | **Implement** | Reads your codebase, writes code, runs tests, opens a PR |
-| **Review** | Posts inline comments on specific lines, requests changes or approves |
+| **Review** | Posts inline comments on specific lines (GitHub PRs and GitLab MRs), requests changes or approves |
 | **Risk Profile** | Scores the PR across 7 dimensions, auto-approves low risk |
 | **Deploy** | Verifies CI checks, merges via squash |
 | **Monitor** | Watches Datadog and Splunk for 15 minutes post-deploy |
@@ -93,7 +103,10 @@ docker run -d --name maestro \
 | Variable | Required | Description |
 |---|---|---|
 | `MAESTRO_SECRET` | Yes | JWT signing secret. Generate: `openssl rand -hex 32` |
-| `ANTHROPIC_API_KEY` | Yes | Claude API key — powers all agents |
+
+> \* At least one of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required. You can also configure API keys per-workspace in **Settings > Models**.
+| `ANTHROPIC_API_KEY` | * | Claude API key — powers agents using Claude CLI |
+| `OPENAI_API_KEY` | * | OpenAI API key — powers agents using Codex CLI |
 | `MAESTRO_OIDC_ISSUER` | No | OIDC provider URL for SSO |
 | `MAESTRO_OIDC_CLIENT_ID` | No | OAuth client ID |
 | `MAESTRO_OIDC_CLIENT_SECRET` | No | OAuth client secret |
@@ -153,8 +166,8 @@ docker compose -f docker-compose.prod.yml up --build
 ## Stack
 
 - **Backend**: Python / FastAPI / PostgreSQL / SQLAlchemy
-- **Frontend**: Next.js 15 / TypeScript / Tailwind CSS
-- **Agents**: Claude Code CLI (configurable model per agent)
+- **Frontend**: Next.js 16 / TypeScript / Tailwind CSS
+- **Agents**: Claude Code CLI + OpenAI Codex CLI (configurable provider and model per agent)
 - **Auth**: OIDC/SSO (Okta, Google, Azure AD) or email-only
 - **Integrations**: GitHub, GitLab, Linear, Jira
 
