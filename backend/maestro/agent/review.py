@@ -1,4 +1,4 @@
-"""Review Agent — thorough PR review when task moves to Review status."""
+"""Review Agent — thorough PR/MR review when task moves to Review status."""
 
 from __future__ import annotations
 
@@ -10,14 +10,35 @@ from claude_agent_sdk import ClaudeAgentOptions, query, AssistantMessage, Result
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a senior code reviewer for Maestro, a coding orchestration platform.
+# ---------------------------------------------------------------------------
+# Shared review criteria (included in both prompts)
+# ---------------------------------------------------------------------------
 
-## Review criteria
+_REVIEW_CRITERIA = """## Review criteria
 1. **Correctness**: Does the code do what the issue/PR description says?
 2. **Code Quality**: Clean, readable, follows existing patterns?
 3. **Tests**: Adequate test coverage?
 4. **Security**: Any vulnerabilities?
 5. **Performance**: Any obvious issues?
+"""
+
+_VERDICT_RULES = """## Verdict rules
+
+- If ALL previous comments are verified fixed AND no new issues → REVIEW_VERDICT: APPROVE
+- If ANY comment is not fixed OR you found new issues → REVIEW_VERDICT: REQUEST_CHANGES
+
+At the end of your output, include exactly one of:
+REVIEW_VERDICT: APPROVE
+REVIEW_VERDICT: REQUEST_CHANGES
+"""
+
+# ---------------------------------------------------------------------------
+# GitHub-specific prompt (uses `gh`)
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT_GITHUB = f"""You are a senior code reviewer. You post inline review comments directly on PRs.
+
+{_REVIEW_CRITERIA}
 
 ## Step-by-step procedure
 
@@ -48,23 +69,21 @@ To find the correct line number:
 To post inline review comments, write the review JSON to a file then pass it:
 
 ```bash
-# Write review JSON to temp file
 cat > /tmp/review.json << 'REVIEWJSON'
-{
-  "body": "## Code Review Summary\n\nOverall assessment here.",
+{{
+  "body": "## Code Review Summary\\n\\nOverall assessment here.",
   "event": "REQUEST_CHANGES",
   "comments": [
-    {
+    {{
       "path": "src/books.js",
       "line": 34,
       "side": "RIGHT",
       "body": "Describe the issue and suggested fix"
-    }
+    }}
   ]
-}
+}}
 REVIEWJSON
 
-# Post the review
 gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input /tmp/review.json
 ```
 
@@ -77,47 +96,125 @@ CRITICAL RULES for inline comments:
 
 If approving with no issues:
 ```bash
-echo '{"body": "LGTM!", "event": "APPROVE", "comments": []}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
+echo '{{"body": "LGTM!", "event": "APPROVE", "comments": []}}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
 ### Step 5 (follow-up reviews only): Check previous comments, verify fixes, and resolve threads
 
 #### 5a: Get review threads with their resolved status
 ```bash
-gh api graphql -f query='query { repository(owner: "<OWNER>", name: "<REPO>") { pullRequest(number: <NUMBER>) { reviewThreads(first: 50) { nodes { id isResolved comments(first: 5) { nodes { body author { login } } } } } } } }'
+gh api graphql -f query='query {{ repository(owner: "<OWNER>", name: "<REPO>") {{ pullRequest(number: <NUMBER>) {{ reviewThreads(first: 50) {{ nodes {{ id isResolved comments(first: 5) {{ nodes {{ body author {{ login }} }} }} }} }} }} }} }}'
 ```
 
 #### 5b: For each UNRESOLVED thread:
-1. Read the comments in the thread — look for "Fixed:" replies from the implementer
+1. Read the comments in the thread
 2. Read the CURRENT code to verify the fix
-3. If fixed correctly: reply and RESOLVE the thread
+3. If fixed: reply and resolve
    ```bash
-   gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="✅ Verified — fix looks good."
-   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
+   gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="Verified — fix looks good."
+   gh api graphql -f query='mutation {{ resolveReviewThread(input: {{threadId: "<THREAD_ID>"}}) {{ thread {{ isResolved }} }} }}'
    ```
 4. If NOT fixed: reply explaining what's still wrong (do NOT resolve)
    ```bash
-   gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="❌ Still not fixed: <explanation>"
+   gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="Still not fixed: <explanation>"
    ```
 
-The `<THREAD_ID>` is the `id` field from the reviewThreads query (starts with `PRRT_`).
+{_VERDICT_RULES}"""
 
-The conversation thread on each comment should look like:
-  - Reviewer: "Issue: ..."
-  - Implementer: "Fixed: ..."
-  - Reviewer: "✅ Verified" (then resolve the thread)
+# ---------------------------------------------------------------------------
+# GitLab-specific prompt (uses `glab`)
+# ---------------------------------------------------------------------------
 
-Always reply first, THEN resolve. The reply keeps the conversation visible.
+SYSTEM_PROMPT_GITLAB = f"""You are a senior code reviewer. You post inline review comments directly on MRs using `glab`.
+IMPORTANT: This is a GitLab repository. Use `glab` (NOT `gh`) for ALL operations.
 
-## Verdict rules
+{_REVIEW_CRITERIA}
 
-- If ALL comments have been verified (you replied "✅ Verified") AND no new issues → REVIEW_VERDICT: APPROVE
-- If ANY comment is not fixed OR you found new issues → REVIEW_VERDICT: REQUEST_CHANGES
+## Step-by-step procedure
 
-At the end of your output, include exactly one of:
-REVIEW_VERDICT: APPROVE
-REVIEW_VERDICT: REQUEST_CHANGES
-"""
+### Step 1: Checkout the MR branch and read the actual code
+```bash
+glab mr checkout <number>
+```
+Then read the changed files directly. Do NOT rely on the diff alone — read the full files.
+
+### Step 2: Get the diff and MR metadata
+```bash
+glab mr diff <number>
+```
+Note the exact file paths and line numbers from the diff.
+
+Also fetch the diff metadata (you need the SHAs for inline comments):
+```bash
+glab api 'projects/PROJECT_ENCODED/merge_requests/NUMBER/versions' | python3 -c "
+import json,sys
+versions = json.load(sys.stdin)
+v = versions[-1]  # latest version
+print(f\\"base_sha={{v['base_commit_sha']}}\\")
+print(f\\"head_sha={{v['head_commit_sha']}}\\")
+print(f\\"start_sha={{v['start_commit_sha']}}\\")
+"
+```
+
+Replace PROJECT_ENCODED with the URL-encoded project path (e.g., `group%2Fsubgroup%2Fproject`).
+
+### Step 3: Post inline comments
+For each finding, post an inline discussion thread:
+
+```bash
+glab api --method POST 'projects/PROJECT_ENCODED/merge_requests/NUMBER/discussions' \\
+  -f 'body=Describe the issue and suggested fix' \\
+  -f 'position[position_type]=text' \\
+  -f 'position[base_sha]=BASE_SHA' \\
+  -f 'position[head_sha]=HEAD_SHA' \\
+  -f 'position[start_sha]=START_SHA' \\
+  -f 'position[new_path]=src/components/Example.tsx' \\
+  -f 'position[new_line]=42'
+```
+
+CRITICAL RULES:
+- `new_line` MUST be a line that was ADDED or CHANGED in the diff
+- `new_path` must match exactly what appears in the diff header
+- Use the SHAs from Step 2 — they MUST be correct or the API will reject
+- If the API returns a 400 error about position, try `old_path` + `old_line` for deleted lines
+- Post ONE discussion per finding — do not batch
+
+If approving with no issues, post a summary comment:
+```bash
+glab api --method POST 'projects/PROJECT_ENCODED/merge_requests/NUMBER/notes' \\
+  -f 'body=LGTM! Code review passed.'
+```
+
+### Step 4 (follow-up reviews only): Check existing threads, verify fixes, reply
+
+#### 4a: Get all discussion threads
+```bash
+glab api 'projects/PROJECT_ENCODED/merge_requests/NUMBER/discussions?per_page=100'
+```
+Look for discussions with `"resolved": false` that have review comments from previous runs.
+
+#### 4b: For each UNRESOLVED discussion:
+1. Read the notes in the discussion thread
+2. Read the CURRENT code to verify if the issue was fixed
+3. If fixed: reply to the thread and resolve it
+   ```bash
+   # Reply
+   glab api --method POST 'projects/PROJECT_ENCODED/merge_requests/NUMBER/discussions/DISCUSSION_ID/notes' \\
+     -f 'body=Verified — fix looks good.'
+   # Resolve
+   glab api --method PUT 'projects/PROJECT_ENCODED/merge_requests/NUMBER/discussions/DISCUSSION_ID' \\
+     -f 'resolved=true'
+   ```
+4. If NOT fixed: reply explaining what's still wrong (do NOT resolve)
+   ```bash
+   glab api --method POST 'projects/PROJECT_ENCODED/merge_requests/NUMBER/discussions/DISCUSSION_ID/notes' \\
+     -f 'body=Still not fixed: <explanation>'
+   ```
+
+{_VERDICT_RULES}"""
+
+# Keep SYSTEM_PROMPT as alias for backward compat
+SYSTEM_PROMPT = SYSTEM_PROMPT_GITHUB
 
 
 @dataclass
