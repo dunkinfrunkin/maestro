@@ -379,10 +379,50 @@ async def _execute_agent(
                 f"\nOnly APPROVE if ALL comments are resolved and no new issues."
             )
         elif plugin.name == "review":
-            prompt_parts.append(
-                "\nThis is the first review. Be thorough. Post inline comments on specific lines."
-                "\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
-            )
+            pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
+            if is_gitlab and pr_url and "/-/merge_requests/" in pr_url:
+                project_path = pr_url.split("/-/merge_requests/")[0].split("://", 1)[1].split("/", 1)[1]
+                encoded = project_path.replace("/", "%2F")
+                prompt_parts.append(
+                    f"\n## REVIEW INSTRUCTIONS — YOU MUST POST INLINE COMMENTS"
+                    f"\n"
+                    f"\n1. Checkout: `glab mr checkout {pr_num}`"
+                    f"\n2. Get SHAs: `glab api 'projects/{encoded}/merge_requests/{pr_num}' | jq -r '.diff_refs'`"
+                    f"\n3. For EACH finding, post an INLINE comment with position params:"
+                    f"\n```"
+                    f"\nglab api --method POST 'projects/{encoded}/merge_requests/{pr_num}/discussions' \\"
+                    f"\n  -f 'body=YOUR FINDING HERE' \\"
+                    f"\n  -f 'position[position_type]=text' \\"
+                    f"\n  -f 'position[base_sha]=BASE_SHA_HERE' \\"
+                    f"\n  -f 'position[head_sha]=HEAD_SHA_HERE' \\"
+                    f"\n  -f 'position[start_sha]=START_SHA_HERE' \\"
+                    f"\n  -f 'position[new_path]=path/to/file.tsx' \\"
+                    f"\n  -f 'position[new_line]=LINE_NUMBER'"
+                    f"\n```"
+                    f"\nCRITICAL: You MUST include ALL position fields. Without them the comment is NOT inline."
+                    f"\nnew_line MUST be a line ADDED or CHANGED in the diff (shown with + prefix)."
+                    f"\n"
+                    f"\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
+                )
+            elif not is_gitlab and repo:
+                prompt_parts.append(
+                    f"\n## REVIEW INSTRUCTIONS — YOU MUST POST INLINE COMMENTS"
+                    f"\nWrite review JSON to /tmp/review.json with inline comments, then post:"
+                    f"\n```"
+                    f"\ncat > /tmp/review.json << 'REVIEWJSON'"
+                    f'\n{{"body":"Summary","event":"REQUEST_CHANGES","comments":[{{"path":"file.tsx","line":42,"side":"RIGHT","body":"finding"}}]}}'
+                    f"\nREVIEWJSON"
+                    f"\ngh api repos/{repo}/pulls/{pr_num}/reviews -X POST --input /tmp/review.json"
+                    f"\n```"
+                    f"\nline MUST be a line ADDED or CHANGED in the diff."
+                    f"\n"
+                    f"\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
+                )
+            else:
+                prompt_parts.append(
+                    "\nThis is the first review. Be thorough."
+                    "\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
+                )
 
         prompt_parts.append("\nProceed with your task.")
         prompt = "\n".join(prompt_parts)
