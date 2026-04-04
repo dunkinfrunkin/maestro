@@ -514,7 +514,7 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
               {logs.map((log) => (
                 <div
                   key={log.id}
-                  className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono ${
+                  className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono break-words overflow-hidden ${
                     log.entry_type === "error" ? "bg-red-50 text-red-700" :
                     log.entry_type === "tool_use" ? "text-blue-700" :
                     log.entry_type === "tool_result" ? "text-gray-500 text-[10px] pl-6" :
@@ -533,12 +533,12 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
         )}
 
         {run.summary && !isLive && (
-          <div className="text-xs bg-background rounded-md border border-border p-2 mt-2">
+          <div className="text-xs bg-background rounded-md border border-border p-2 mt-2 break-words overflow-hidden">
             {run.summary}
           </div>
         )}
         {run.error && (
-          <div className="text-xs bg-red-50 text-red-700 rounded-md border border-red-200 p-2 mt-2">
+          <div className="text-xs bg-red-50 text-red-700 rounded-md border border-red-200 p-2 mt-2 break-words overflow-hidden">
             {run.error}
           </div>
         )}
