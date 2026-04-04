@@ -395,77 +395,22 @@ export function TaskDetailPage({
 }
 
 function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: UnifiedTask }) {
-  const [showModal, setShowModal] = useState(false);
-
   return (
-    <>
-      <div className="rounded-lg border border-border bg-surface overflow-hidden mt-4">
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="text-sm font-medium flex items-center gap-2">
-            <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Execution Trace
-          </h3>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-surface-hover"
-            title="Expand trace view"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            Expand
-          </button>
-        </div>
-        <div className="p-5">
-          <div className="overflow-x-auto">
-            <div className="min-w-[1200px]">
-              <ExecutionTraceChart runs={runs} isCompact={true} />
-            </div>
-          </div>
+    <div className="rounded-lg border border-border bg-surface overflow-hidden mt-4">
+      <div className="px-5 py-3 border-b border-border">
+        <h3 className="text-sm font-medium flex items-center gap-2">
+          <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Execution Trace
+        </h3>
+      </div>
+      <div className="p-5">
+        <div className="overflow-x-auto">
+          <ExecutionTraceChart runs={runs} />
         </div>
       </div>
-
-      {/* Expanded Modal */}
-      {showModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="bg-surface border border-border rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-xl"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-background">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Execution Trace
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-surface-hover transition-colors text-muted hover:text-foreground"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-              <div className="overflow-x-auto">
-                <div className="min-w-[1400px]">
-                  <ExecutionTraceChart runs={runs} isCompact={false} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
