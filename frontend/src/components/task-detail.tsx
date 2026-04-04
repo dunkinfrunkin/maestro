@@ -507,6 +507,18 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           )}
         </div>
 
+        {/* Agent output (markdown) */}
+        {run.summary && !isLive && (
+          <div className="text-xs bg-background rounded-md border border-border p-3 mb-2 break-words overflow-hidden prose prose-xs prose-stone max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.summary}</ReactMarkdown>
+          </div>
+        )}
+        {run.error && (
+          <div className="text-xs bg-red-50 text-red-700 rounded-md border border-red-200 p-3 mb-2 break-words overflow-hidden">
+            {run.error}
+          </div>
+        )}
+
         {/* Live logs */}
         {logs.length > 0 && (
           <div className="rounded-md border border-border bg-background overflow-hidden">
@@ -532,16 +544,6 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           </div>
         )}
 
-        {run.summary && !isLive && (
-          <div className="text-xs bg-background rounded-md border border-border p-2 mt-2 break-words overflow-hidden">
-            {run.summary}
-          </div>
-        )}
-        {run.error && (
-          <div className="text-xs bg-red-50 text-red-700 rounded-md border border-red-200 p-2 mt-2 break-words overflow-hidden">
-            {run.error}
-          </div>
-        )}
         {run.cost_usd > 0 && (
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
