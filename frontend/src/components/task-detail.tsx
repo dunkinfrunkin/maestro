@@ -507,6 +507,18 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           )}
         </div>
 
+        {/* Agent output (markdown) */}
+        {run.summary && !isLive && (
+          <div className="text-xs bg-background rounded-md border border-border p-3 mb-2 break-words overflow-hidden prose prose-xs prose-stone max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.summary}</ReactMarkdown>
+          </div>
+        )}
+        {run.error && (
+          <div className="text-xs bg-red-50 text-red-700 rounded-md border border-red-200 p-3 mb-2 break-words overflow-hidden">
+            {run.error}
+          </div>
+        )}
+
         {/* Live logs */}
         {logs.length > 0 && (
           <div className="rounded-md border border-border bg-background overflow-hidden">
@@ -514,7 +526,7 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
               {logs.map((log) => (
                 <div
                   key={log.id}
-                  className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono ${
+                  className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono break-all overflow-hidden ${
                     log.entry_type === "error" ? "bg-red-50 text-red-700" :
                     log.entry_type === "tool_use" ? "text-blue-700" :
                     log.entry_type === "tool_result" ? "text-gray-500 text-[10px] pl-6" :
@@ -532,16 +544,6 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
           </div>
         )}
 
-        {run.summary && !isLive && (
-          <div className="text-xs bg-background rounded-md border border-border p-2 mt-2">
-            {run.summary}
-          </div>
-        )}
-        {run.error && (
-          <div className="text-xs bg-red-50 text-red-700 rounded-md border border-red-200 p-2 mt-2">
-            {run.error}
-          </div>
-        )}
         {run.cost_usd > 0 && (
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
