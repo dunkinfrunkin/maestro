@@ -452,7 +452,7 @@ async def _execute_agent(
                     if result["status"] == "completed"
                     else AgentRunStatus.FAILED
                 )
-                run.summary = result.get("last_text", "")[:500]
+                run.summary = result.get("last_text", "")
                 run.error = result.get("error") or ""
                 run.cost_usd = result.get("total_cost_usd", 0.0)
                 run.input_tokens = result.get("input_tokens", 0)
