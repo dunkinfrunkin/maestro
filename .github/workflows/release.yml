@@ -44,6 +44,7 @@ jobs:
             --generate-notes
 
       - name: Update Homebrew formula
+        if: env.HOMEBREW_TAP_TOKEN != ''
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -117,11 +118,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -129,3 +133,5 @@ jobs:
           tags: |
             ghcr.io/dunkinfrunkin/maestro:${{ github.ref_name }}
             ghcr.io/dunkinfrunkin/maestro:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

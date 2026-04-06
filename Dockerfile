@@ -2,7 +2,7 @@
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --maxsockets 5
+RUN npm ci --maxsockets 3
 COPY frontend/ .
 ENV NEXT_PUBLIC_API_URL=""
 RUN npm run build
