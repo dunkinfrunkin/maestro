@@ -46,7 +46,7 @@ jobs:
             --generate-notes
 
       - name: Update Homebrew formula
-        if: env.HOMEBREW_TAP_TOKEN != ''
+        continue-on-error: true
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION_NUM="${VERSION#v}"
