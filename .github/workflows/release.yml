@@ -9,7 +9,7 @@ permissions:
   packages: write
 
 jobs:
-  release:
+  cli:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +18,6 @@ jobs:
         with:
           go-version: '1.23'
 
-      # Build CLI binaries
       - name: Build CLI binaries
         run: |
           cd cli
@@ -32,7 +31,6 @@ jobs:
             done
           done
 
-      # Create GitHub release with CLI binaries
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,28 +43,6 @@ jobs:
             --title "${{ github.ref_name }}" \
             --generate-notes
 
-      # Build and push Docker image
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/dunkinfrunkin/maestro:${{ github.ref_name }}
-            ghcr.io/dunkinfrunkin/maestro:latest
-
-      # Update Homebrew formula
       - name: Update Homebrew formula
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -121,7 +97,6 @@ jobs:
           end
           FORMULA
 
-          # Remove leading whitespace from heredoc
           sed -i 's/^          //' Formula/maestro.rb
 
           git config user.name "github-actions[bot]"
@@ -129,3 +104,28 @@ jobs:
           git add Formula/maestro.rb
           git commit -m "Update maestro to ${VERSION_NUM}"
           git push
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/dunkinfrunkin/maestro:${{ github.ref_name }}
+            ghcr.io/dunkinfrunkin/maestro:latest
