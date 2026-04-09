@@ -46,6 +46,8 @@ async def get_task_runs(
             "cost_usd": r.cost_usd,
             "input_tokens": r.input_tokens,
             "output_tokens": r.output_tokens,
+            "peak_memory_mb": r.peak_memory_mb,
+            "avg_cpu_percent": r.avg_cpu_percent,
             "started_at": r.started_at.isoformat() if r.started_at else None,
             "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             "created_at": r.created_at.isoformat() if r.created_at else None,

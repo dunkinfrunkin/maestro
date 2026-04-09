@@ -51,6 +51,8 @@ class RunResult:
     total_cost_usd: float = 0.0
     input_tokens: int = 0
     output_tokens: int = 0
+    peak_memory_mb: float = 0.0
+    avg_cpu_percent: float = 0.0
     messages: list[dict[str, Any]] = field(default_factory=list)
     last_text: str = ""
     all_text: str = ""
@@ -64,6 +66,8 @@ class RunResult:
             "total_cost_usd": self.total_cost_usd,
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
+            "peak_memory_mb": self.peak_memory_mb,
+            "avg_cpu_percent": self.avg_cpu_percent,
             "messages": self.messages,
             "last_text": self.last_text,
             "all_text": self.all_text,
@@ -93,6 +97,61 @@ def _detect_review_verdict(text: str) -> str | None:
             verdict = line.split("REVIEW_VERDICT:", 1)[1].strip().upper()
             return re.sub(r'[^A-Z_]', '', verdict)
     return None
+
+
+async def _sample_resources(proc: asyncio.subprocess.Process, result: RunResult) -> None:
+    """Sample CPU and memory of the subprocess every 5 seconds until it exits."""
+    import psutil
+    try:
+        ps = psutil.Process(proc.pid)
+    except (psutil.NoSuchProcess, ProcessLookupError):
+        print(f"[MAESTRO-SAMPLER] Process {proc.pid} not found for sampling")
+        return
+
+    cpu_samples: list[float] = []
+    peak_mem = 0.0
+    # Initial cpu_percent call to start measurement (first call always returns 0)
+    try:
+        ps.cpu_percent()
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        pass
+
+    while proc.returncode is None:
+        try:
+            # Collect memory from main process + all children
+            mem_mb = 0.0
+            try:
+                mem_mb = ps.memory_info().rss / (1024 * 1024)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            for child in ps.children(recursive=True):
+                try:
+                    mem_mb += child.memory_info().rss / (1024 * 1024)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            if mem_mb > 0:
+                peak_mem = max(peak_mem, mem_mb)
+
+            # Collect CPU from main process + all children
+            cpu = 0.0
+            try:
+                cpu = ps.cpu_percent(interval=None)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            for child in ps.children(recursive=True):
+                try:
+                    cpu += child.cpu_percent(interval=None)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            if cpu > 0:
+                cpu_samples.append(cpu)
+        except (psutil.NoSuchProcess, ProcessLookupError):
+            break
+
+        await asyncio.sleep(5)
+
+    result.peak_memory_mb = round(peak_mem, 1)
+    result.avg_cpu_percent = round(sum(cpu_samples) / len(cpu_samples), 1) if cpu_samples else 0.0
 
 
 async def _write_log(run_id: int, entry_type: str, content: str) -> None:
@@ -380,6 +439,7 @@ async def run_cli_with_logging(
 
         print(f"[MAESTRO-CLI] Run {run_id} started, PID={proc.pid}")
         _active_processes[run_id] = (proc, result)
+        sampler_task = asyncio.create_task(_sample_resources(proc, result))
 
         # Stream stdout line by line — JSONL for both Claude and Codex
         async for raw_line in proc.stdout:
@@ -422,5 +482,11 @@ async def run_cli_with_logging(
         traceback.print_exc()
 
     _active_processes.pop(run_id, None)
-    print(f"[MAESTRO-CLI] Run {run_id} returning: status={result.status}, pr_url={result.pr_url}")
+    # Wait for resource sampler to finish
+    try:
+        sampler_task.cancel()
+        await sampler_task
+    except (asyncio.CancelledError, NameError):
+        pass
+    print(f"[MAESTRO-CLI] Run {run_id} returning: status={result.status}, mem={result.peak_memory_mb}MB, cpu={result.avg_cpu_percent}%")
     return result.to_dict()

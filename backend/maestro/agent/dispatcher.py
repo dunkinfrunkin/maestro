@@ -458,6 +458,8 @@ async def _execute_agent(
                 run.cost_usd = result.get("total_cost_usd", 0.0)
                 run.input_tokens = result.get("input_tokens", 0)
                 run.output_tokens = result.get("output_tokens", 0)
+                run.peak_memory_mb = result.get("peak_memory_mb", 0.0)
+                run.avg_cpu_percent = result.get("avg_cpu_percent", 0.0)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
                 print(f"[MAESTRO] Run {run_id} status updated to {run.status}")
