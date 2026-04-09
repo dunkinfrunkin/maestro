@@ -43,12 +43,12 @@ class GitHubIssueTracker(IssueTracker):
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
+    async def fetch_candidate_issues(self, max_results: int = 100, user_email: str = "") -> list[Issue]:
         if self._repo:
             return await self._fetch_repo_issues(self._repo, state="open", max_results=max_results)
         return await self._fetch_all_issues(state="open", max_results=max_results)
 
-    async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
+    async def fetch_issues_by_states(self, states: list[str], user_email: str = "") -> list[Issue]:
         all_issues: list[Issue] = []
         for state in states:
             gh_state = _map_state_to_github(state)
