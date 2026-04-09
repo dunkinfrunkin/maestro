@@ -14,6 +14,7 @@ import {
   updateTaskStatus,
   fetchRepos,
   updateTaskRepo,
+  killAgentRun,
 } from "@/lib/api";
 import { ExecutionTraceChart } from "./execution-trace-chart";
 
@@ -222,6 +223,12 @@ export function TaskDetailPage({
                     key={run.id}
                     run={run}
                     onRerun={() => handleStatusChange(run.agent_type === "implementation" ? "implement" : run.agent_type === "risk_profile" ? "risk_profile" : run.agent_type)}
+                    onKill={async () => {
+                      try {
+                        await killAgentRun(run.id);
+                        loadRuns();
+                      } catch {}
+                    }}
                   />
                 ))}
               </div>
@@ -421,7 +428,7 @@ function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: Unifie
   );
 }
 
-function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void }) {
+function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: () => void; onKill: () => void }) {
   const [logs, setLogs] = useState<AgentLogEntry[]>([]);
   const lastLogIdRef = useRef(0);
   const isLive = run.status === "running" || run.status === "pending";
@@ -470,47 +477,67 @@ function RunEntry({ run, onRerun }: { run: AgentRunResponse; onRerun: () => void
               {run.status}
             </span>
           </div>
-          {(run.status === "completed" || run.status === "failed") && (
-            <button
-              onClick={onRerun}
-              className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground transition-colors"
-              title="Re-run this agent"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-              </svg>
-              Re-run
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {(run.status === "running" || run.status === "pending") && (
+              <button
+                onClick={onKill}
+                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-400 transition-colors"
+                title="Stop this agent"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-2.5 h-2.5">
+                  <rect x="3" y="3" width="10" height="10" rx="1" />
+                </svg>
+                Stop
+              </button>
+            )}
+            {(run.status === "completed" || run.status === "failed") && (
+              <button
+                onClick={onRerun}
+                className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground transition-colors"
+                title="Re-run this agent"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                </svg>
+                Re-run
+              </button>
+            )}
+          </div>
         </div>
         <div className="text-xs text-muted mb-2">
           {run.started_at && `Started ${new Date(run.started_at).toLocaleString()}`}
           {run.finished_at && ` — Finished ${new Date(run.finished_at).toLocaleTimeString()}`}
         </div>
         <div className="text-xs text-muted mb-2 flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.736 6.979C9.208 6.193 9.696 6 10 6s.792.193 1.264.979a1 1 0 001.715-1.029C12.279 4.784 11.232 4 10 4s-2.279.784-2.979 1.95c-.285.475-.507 1.043-.507 1.55 0 .502.169.926.507 1.4.338.473.841.8 1.429.8.588 0 1.091-.327 1.429-.8A1 1 0 0010.736 7.979C10.264 7.193 9.776 7 9.472 7s-.792.193-1.264.979a1 1 0 11-1.715-1.029C6.193 5.784 7.24 5 8.472 5s2.279.784 2.979 1.95z"/>
-            </svg>
-            <span className="font-mono">${(run.cost_usd || 0).toFixed(4)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <span className="font-mono text-xs">
-              {(run.input_tokens || 0).toLocaleString()}→{(run.output_tokens || 0).toLocaleString()}
-            </span>
-          </div>
-          {run.started_at && run.finished_at && (
-            <div className="flex items-center gap-1.5">
-              <svg className="w-3 h-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-mono text-xs">
-                {formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())}
-              </span>
-            </div>
+          {run.error === "Killed by user" && !run.cost_usd && !run.input_tokens ? (
+            <span className="text-red-600 text-[10px]">Stopped before stats were reported</span>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.736 6.979C9.208 6.193 9.696 6 10 6s.792.193 1.264.979a1 1 0 001.715-1.029C12.279 4.784 11.232 4 10 4s-2.279.784-2.979 1.95c-.285.475-.507 1.043-.507 1.55 0 .502.169.926.507 1.4.338.473.841.8 1.429.8.588 0 1.091-.327 1.429-.8A1 1 0 0010.736 7.979C10.264 7.193 9.776 7 9.472 7s-.792.193-1.264.979a1 1 0 11-1.715-1.029C6.193 5.784 7.24 5 8.472 5s2.279.784 2.979 1.95z"/>
+                </svg>
+                <span className="font-mono">${(run.cost_usd || 0).toFixed(4)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span className="font-mono text-xs">
+                  {(run.input_tokens || 0).toLocaleString()}→{(run.output_tokens || 0).toLocaleString()}
+                </span>
+              </div>
+              {run.started_at && run.finished_at && (
+                <div className="flex items-center gap-1.5">
+                  <svg className="w-3 h-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-mono text-xs">
+                    {formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
 
