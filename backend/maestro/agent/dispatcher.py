@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -169,6 +170,29 @@ async def dispatch_agent_for_status(
 
         model = agent_config.model if agent_config else "sonnet"
 
+        # Determine code host type for prompt adaptation
+        code_host = ""
+        if clone_conn:
+            code_host = clone_conn.kind.value  # "github" or "gitlab"
+
+        extra = extra if agent_config else {}
+
+        # Serialize job context for worker queue
+        payload = json.dumps({
+            "provider": provider,
+            "model": model,
+            "issue_title": issue_title,
+            "issue_description": issue_description,
+            "issue_url": issue_url,
+            "pr_url": pr_url,
+            "pr_number": pr_number,
+            "repo": repo,
+            "clone_url": clone_url,
+            "code_host": code_host,
+            "extra_config": extra,
+            "plugin_name": agent_name,
+        })
+
         # Create agent run record
         run = AgentRun(
             workspace_id=workspace_id,
@@ -177,38 +201,40 @@ async def dispatch_agent_for_status(
             status=AgentRunStatus.PENDING,
             model=model,
             triggered_by=triggered_by,
+            job_payload=payload,
         )
         session.add(run)
         await session.commit()
         await session.refresh(run)
         run_id = run.id
 
-    # Determine code host type for prompt adaptation
-    code_host = ""
-    if clone_conn:
-        code_host = clone_conn.kind.value  # "github" or "gitlab"
-
-    # Dispatch in background
-    asyncio.create_task(
-        _execute_agent(
-            run_id=run_id,
-            plugin=plugin,
-            api_key=api_key,
-            provider=provider,
-            model=model,
-            workspace_id=workspace_id,
-            task_pipeline_id=task_pipeline_id,
-            issue_title=issue_title,
-            issue_description=issue_description,
-            issue_url=issue_url,
-            pr_url=pr_url,
-            pr_number=pr_number,
-            repo=repo,
-            clone_url=clone_url,
-            code_host=code_host,
-            extra_config=extra if agent_config else {},
+    # Dispatch based on worker mode
+    worker_mode = os.environ.get("MAESTRO_WORKER_MODE", "inline")
+    if worker_mode == "queue":
+        # Workers will pick up the PENDING job from the DB
+        print(f"[MAESTRO] Run {run_id} enqueued for worker (mode=queue)")
+    else:
+        # Inline mode: execute in-process (current behavior)
+        asyncio.create_task(
+            _execute_agent(
+                run_id=run_id,
+                plugin=plugin,
+                api_key=api_key,
+                provider=provider,
+                model=model,
+                workspace_id=workspace_id,
+                task_pipeline_id=task_pipeline_id,
+                issue_title=issue_title,
+                issue_description=issue_description,
+                issue_url=issue_url,
+                pr_url=pr_url,
+                pr_number=pr_number,
+                repo=repo,
+                clone_url=clone_url,
+                code_host=code_host,
+                extra_config=extra,
+            )
         )
-    )
 
     return run_id
 

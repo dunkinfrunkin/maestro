@@ -88,6 +88,10 @@ async def init_db() -> None:
         await conn.execute(sa.text(
             "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS avg_cpu_percent FLOAT NOT NULL DEFAULT 0.0"
         ))
+        # Add job_payload column to agent_runs (worker queue)
+        await conn.execute(sa.text(
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS job_payload TEXT NOT NULL DEFAULT '{}'"
+        ))
         # Migrate old model IDs to CLI aliases
         await conn.execute(sa.text(
             "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"

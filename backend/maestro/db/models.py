@@ -252,6 +252,7 @@ class AgentRun(Base):
     output_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
     peak_memory_mb: Mapped[float] = mapped_column(nullable=False, default=0.0)
     avg_cpu_percent: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    job_payload: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
