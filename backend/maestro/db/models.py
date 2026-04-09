@@ -244,6 +244,7 @@ class AgentRun(Base):
     agent_type: Mapped[AgentType] = mapped_column(Enum(AgentType), nullable=False)
     status: Mapped[AgentRunStatus] = mapped_column(Enum(AgentRunStatus), nullable=False, default=AgentRunStatus.PENDING)
     model: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    triggered_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     cost_usd: Mapped[float] = mapped_column(nullable=False, default=0.0)

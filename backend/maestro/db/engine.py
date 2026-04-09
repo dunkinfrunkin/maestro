@@ -77,6 +77,10 @@ async def init_db() -> None:
         await conn.execute(sa.text(
             "ALTER TABLE agent_configs ADD COLUMN IF NOT EXISTS provider VARCHAR(50) NOT NULL DEFAULT 'anthropic'"
         ))
+        # Add triggered_by column to agent_runs
+        await conn.execute(sa.text(
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) NOT NULL DEFAULT ''"
+        ))
         # Migrate old model IDs to CLI aliases
         await conn.execute(sa.text(
             "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"

@@ -437,7 +437,7 @@ async def list_tasks(
 
 
 @router.put("/tasks/{external_ref:path}/status")
-async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> dict:
+async def update_task_status(external_ref: str, body: PipelineStatusUpdate, user: User = Depends(get_current_user)) -> dict:
     """Set or update a task's pipeline status. Dispatches agent if applicable."""
     import logging as _log
     _log.getLogger(__name__).info(
@@ -480,6 +480,7 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate) -> d
             issue_title=body.issue_title,
             issue_description=body.issue_description,
             issue_url=body.issue_url,
+            triggered_by=user.name or user.email,
         )
 
     return {

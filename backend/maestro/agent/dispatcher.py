@@ -40,6 +40,7 @@ async def dispatch_agent_for_status(
     issue_title: str = "",
     issue_description: str = "",
     issue_url: str = "",
+    triggered_by: str = "",
 ) -> int | None:
     """Dispatch the appropriate agent for a pipeline status change.
 
@@ -175,6 +176,7 @@ async def dispatch_agent_for_status(
             agent_type=AgentType(agent_name),
             status=AgentRunStatus.PENDING,
             model=model,
+            triggered_by=triggered_by,
         )
         session.add(run)
         await session.commit()
