@@ -422,6 +422,12 @@ export async function fetchExecutions(workspaceId: number, params?: {
   return res.json();
 }
 
+export async function killAgentRun(runId: number): Promise<{ status: string; run_id: number }> {
+  const res = await authFetch(`${API_BASE}/api/v1/agent-runs/${runId}/kill`, { method: "POST" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export interface AgentLogEntry {
   id: number;
   entry_type: string;

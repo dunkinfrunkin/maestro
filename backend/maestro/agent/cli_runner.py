@@ -17,6 +17,27 @@ logger = logging.getLogger(__name__)
 
 _pr_pattern = re.compile(r"https://(?:github\.com/[^\s\"']+/pull/\d+|[^\s\"']+/-/merge_requests/\d+)")
 
+# Registry of active processes: run_id → (process, RunResult)
+_active_processes: dict[int, tuple[asyncio.subprocess.Process, "RunResult"]] = {}
+
+
+async def kill_run(run_id: int) -> dict[str, Any] | None:
+    """Kill a running agent process and return partial results."""
+    entry = _active_processes.get(run_id)
+    if not entry:
+        return None
+    proc, result = entry
+    try:
+        proc.kill()
+        await proc.wait()
+    except ProcessLookupError:
+        pass
+    result.status = "failed"
+    result.error = "Manually killed by user"
+    await _write_log(run_id, "status", "Agent killed by user")
+    _active_processes.pop(run_id, None)
+    return result.to_dict()
+
 
 # ---------------------------------------------------------------------------
 # Shared result accumulator — provider parsers mutate this
@@ -358,6 +379,7 @@ async def run_cli_with_logging(
         )
 
         print(f"[MAESTRO-CLI] Run {run_id} started, PID={proc.pid}")
+        _active_processes[run_id] = (proc, result)
 
         # Stream stdout line by line — JSONL for both Claude and Codex
         async for raw_line in proc.stdout:
@@ -399,5 +421,6 @@ async def run_cli_with_logging(
         import traceback
         traceback.print_exc()
 
+    _active_processes.pop(run_id, None)
     print(f"[MAESTRO-CLI] Run {run_id} returning: status={result.status}, pr_url={result.pr_url}")
     return result.to_dict()

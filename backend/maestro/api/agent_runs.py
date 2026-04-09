@@ -145,6 +145,37 @@ async def list_executions(
     }
 
 
+@router.post("/agent-runs/{run_id}/kill")
+async def kill_agent_run(
+    run_id: int,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Kill a running agent process."""
+    from maestro.agent.cli_runner import kill_run
+    from datetime import datetime, timezone
+
+    partial = await kill_run(run_id)
+
+    # Update DB record regardless of whether process was found
+    async with get_session() as session:
+        run = await session.get(AgentRun, run_id)
+        if run and run.status.value in ("running", "pending"):
+            run.status = "FAILED"
+            run.error = "Killed by user"
+            run.finished_at = datetime.now(timezone.utc)
+            if partial:
+                run.cost_usd = partial.get("total_cost_usd", run.cost_usd)
+                run.input_tokens = partial.get("input_tokens", run.input_tokens)
+                run.output_tokens = partial.get("output_tokens", run.output_tokens)
+                run.summary = partial.get("last_text", run.summary)
+            await session.commit()
+            return {"status": "killed", "run_id": run_id}
+
+    if partial:
+        return {"status": "killed", "run_id": run_id}
+    return {"status": "not_found", "run_id": run_id}
+
+
 @router.get("/agent-runs/{run_id}/logs")
 async def get_run_logs(
     run_id: int,
