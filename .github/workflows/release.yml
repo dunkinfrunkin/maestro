@@ -47,6 +47,8 @@ jobs:
 
       - name: Update Homebrew formula
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION_NUM="${VERSION#v}"
@@ -56,35 +58,27 @@ jobs:
           SHA_LINUX_ARM64=$(shasum -a 256 cli/dist/maestro_linux_arm64.tar.gz | awk '{print $1}')
           SHA_LINUX_AMD64=$(shasum -a 256 cli/dist/maestro_linux_amd64.tar.gz | awk '{print $1}')
 
-          GH_TOKEN="${HOMEBREW_TAP_TOKEN}" gh repo clone dunkinfrunkin/homebrew-tap /tmp/homebrew-tap
-          cd /tmp/homebrew-tap
-
-          cat > Formula/maestro.rb << FORMULA
+          FORMULA=$(cat <<'RUBY'
           class Maestro < Formula
             desc "Autonomous coding agent orchestration for engineering teams"
             homepage "https://github.com/dunkinfrunkin/maestro"
-            version "${VERSION_NUM}"
             license "MIT"
 
             on_macos do
               on_arm do
                 url "https://github.com/dunkinfrunkin/maestro/releases/download/v#{version}/maestro_darwin_arm64.tar.gz"
-                sha256 "${SHA_DARWIN_ARM64}"
               end
               on_intel do
                 url "https://github.com/dunkinfrunkin/maestro/releases/download/v#{version}/maestro_darwin_amd64.tar.gz"
-                sha256 "${SHA_DARWIN_AMD64}"
               end
             end
 
             on_linux do
               on_arm do
                 url "https://github.com/dunkinfrunkin/maestro/releases/download/v#{version}/maestro_linux_arm64.tar.gz"
-                sha256 "${SHA_LINUX_ARM64}"
               end
               on_intel do
                 url "https://github.com/dunkinfrunkin/maestro/releases/download/v#{version}/maestro_linux_amd64.tar.gz"
-                sha256 "${SHA_LINUX_AMD64}"
               end
             end
 
@@ -96,16 +90,28 @@ jobs:
               assert_match "maestro", shell_output("#{bin}/maestro --help")
             end
           end
-          FORMULA
+          RUBY
+          )
 
-          sed -i 's/^          //' Formula/maestro.rb
+          # Strip leading indentation
+          FORMULA=$(echo "$FORMULA" | sed 's/^          //')
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/maestro.rb
-          git commit -m "Update maestro to ${VERSION_NUM}"
-          GH_TOKEN="${HOMEBREW_TAP_TOKEN}" gh auth setup-git
-          git push
+          # Inject version and SHAs
+          FORMULA=$(echo "$FORMULA" | sed "s/license \"MIT\"/version \"${VERSION_NUM}\"\n  license \"MIT\"/")
+          FORMULA=$(echo "$FORMULA" | sed "s|maestro_darwin_arm64.tar.gz\"|maestro_darwin_arm64.tar.gz\"\n        sha256 \"${SHA_DARWIN_ARM64}\"|")
+          FORMULA=$(echo "$FORMULA" | sed "s|maestro_darwin_amd64.tar.gz\"|maestro_darwin_amd64.tar.gz\"\n        sha256 \"${SHA_DARWIN_AMD64}\"|")
+          FORMULA=$(echo "$FORMULA" | sed "s|maestro_linux_arm64.tar.gz\"|maestro_linux_arm64.tar.gz\"\n        sha256 \"${SHA_LINUX_ARM64}\"|")
+          FORMULA=$(echo "$FORMULA" | sed "s|maestro_linux_amd64.tar.gz\"|maestro_linux_amd64.tar.gz\"\n        sha256 \"${SHA_LINUX_AMD64}\"|")
+
+          # Get current file SHA
+          FILE_SHA=$(gh api repos/dunkinfrunkin/homebrew-tap/contents/Formula/maestro.rb --jq '.sha')
+
+          # Update via GitHub API (no git clone needed)
+          echo "$FORMULA" | gh api repos/dunkinfrunkin/homebrew-tap/contents/Formula/maestro.rb \
+            -X PUT \
+            -f message="Update maestro to ${VERSION_NUM}" \
+            -f content="$(echo "$FORMULA" | base64)" \
+            -f sha="$FILE_SHA"
 
   docker:
     runs-on: ubuntu-latest
