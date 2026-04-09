@@ -389,6 +389,39 @@ export async function fetchActiveRuns(workspaceId: number): Promise<AgentRunResp
   return res.json();
 }
 
+export interface ExecutionEntry {
+  id: number;
+  agent_type: string;
+  status: string;
+  model: string;
+  summary: string;
+  error: string;
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string | null;
+  triggered_by: string;
+  task_ref: string;
+  pipeline_status: string;
+  repo: string;
+}
+
+export async function fetchExecutions(workspaceId: number, params?: {
+  status?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<{ total: number; executions: ExecutionEntry[] }> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  qs.set("offset", String(params?.offset ?? 0));
+  qs.set("limit", String(params?.limit ?? 50));
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/executions?${qs.toString()}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export interface AgentLogEntry {
   id: number;
   entry_type: string;

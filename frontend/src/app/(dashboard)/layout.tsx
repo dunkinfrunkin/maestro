@@ -34,6 +34,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   const pageTitle = pathname.startsWith("/tasks")
     ? "Tasks"
+    : pathname.startsWith("/executions")
+    ? "Executions"
     : pathname.startsWith("/agents")
     ? "Agents"
     : pathname.startsWith("/settings")
