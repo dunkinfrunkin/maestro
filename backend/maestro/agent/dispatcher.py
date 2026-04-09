@@ -262,38 +262,37 @@ async def _execute_agent(
             run.started_at = datetime.now(timezone.utc)
             await session.commit()
 
-    # Set API key as env var
-    import os
-    os.environ["ANTHROPIC_API_KEY"] = api_key
-
-    # Create workspace directory
-    workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
-
-    # Clone repo if available
-    from maestro.agent.sdk_runner import _write_log
-    if clone_url:
-        # Log repo name but not the token-embedded URL
-        await _write_log(run_id, "status", f"Cloning repository: {repo}")
-        proc = await asyncio.create_subprocess_exec(
-            "git", "clone", "--depth", "1", clone_url, f"{workspace_path}/repo",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode == 0:
-            workspace_path = f"{workspace_path}/repo"
-            await _write_log(run_id, "status", "Repository cloned successfully")
-        else:
-            # Sanitize error output to avoid leaking tokens
-            err_msg = stderr.decode(errors="replace")[:300] if stderr else "Unknown error"
-            err_msg = _sanitize_clone_error(err_msg)
-            await _write_log(run_id, "error", f"Clone failed: {err_msg}")
-    elif repo:
-        await _write_log(run_id, "error", f"Repository '{repo}' found but could not build clone URL — check connection settings")
-    else:
-        await _write_log(run_id, "status", "No repository configured — working in empty workspace")
-
     try:
+        # Set API key as env var
+        import os
+        os.environ["ANTHROPIC_API_KEY"] = api_key
+
+        # Create workspace directory
+        workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
+
+        # Clone repo if available
+        from maestro.agent.sdk_runner import _write_log
+        if clone_url:
+            # Log repo name but not the token-embedded URL
+            await _write_log(run_id, "status", f"Cloning repository: {repo}")
+            proc = await asyncio.create_subprocess_exec(
+                "git", "clone", "--depth", "1", clone_url, f"{workspace_path}/repo",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode == 0:
+                workspace_path = f"{workspace_path}/repo"
+                await _write_log(run_id, "status", "Repository cloned successfully")
+            else:
+                # Sanitize error output to avoid leaking tokens
+                err_msg = stderr.decode(errors="replace")[:300] if stderr else "Unknown error"
+                err_msg = _sanitize_clone_error(err_msg)
+                await _write_log(run_id, "error", f"Clone failed: {err_msg}")
+        elif repo:
+            await _write_log(run_id, "error", f"Repository '{repo}' found but could not build clone URL — check connection settings")
+        else:
+            await _write_log(run_id, "status", "No repository configured — working in empty workspace")
         # Get system prompt from the agent module
         agent_cfg = AGENT_CONFIGS.get(plugin.name, {"tools": ["Read", "Bash"]})
 

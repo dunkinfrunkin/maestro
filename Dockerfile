@@ -17,13 +17,18 @@ RUN touch README.md && uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
 # ── Stage 3: Final image ──
 FROM python:3.12-slim
 
-# Install nginx and node
+# Install nginx, node, git
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     curl \
+    git \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# Install CLI agent tools
+RUN npm install -g @anthropic-ai/claude-code @openai/codex 2>/dev/null || \
+    npm install -g @anthropic-ai/claude-code || true
 
 # Backend — copy venv and source
 WORKDIR /app/backend
