@@ -359,6 +359,8 @@ export interface AgentRunResponse {
   cost_usd: number;
   input_tokens: number;
   output_tokens: number;
+  peak_memory_mb: number;
+  avg_cpu_percent: number;
   started_at: string | null;
   finished_at: string | null;
   created_at: string | null;

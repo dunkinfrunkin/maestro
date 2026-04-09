@@ -109,9 +109,13 @@ export function TaskDetailPage({
 
   useEffect(() => {
     loadRuns();
-    const interval = setInterval(loadRuns, 3000);
-    return () => clearInterval(interval);
-  }, [loadRuns]);
+    // Only poll if there are active runs
+    const hasActive = runs.some(r => r.status === "running" || r.status === "pending");
+    if (hasActive) {
+      const interval = setInterval(loadRuns, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [loadRuns, runs]);
 
   // Extract repo from identifier (e.g., "owner/repo#123" → "owner/repo")
   const repo = task.identifier.includes("#")
@@ -141,6 +145,8 @@ export function TaskDetailPage({
   const totalCost = runs.reduce((sum, run) => sum + (run.cost_usd || 0), 0);
   const totalInputTokens = runs.reduce((sum, run) => sum + (run.input_tokens || 0), 0);
   const totalOutputTokens = runs.reduce((sum, run) => sum + (run.output_tokens || 0), 0);
+  const peakMemory = Math.max(...runs.map(r => r.peak_memory_mb || 0), 0);
+  const avgCpu = runs.length > 0 ? runs.reduce((sum, r) => sum + (r.avg_cpu_percent || 0), 0) / runs.filter(r => r.avg_cpu_percent > 0).length || 0 : 0;
 
   // Calculate total time (sum of all individual run durations)
   const totalDuration = runs.reduce((sum, run) => {
@@ -399,6 +405,34 @@ export function TaskDetailPage({
                   {formatDuration(totalDuration)}
                 </div>
               </div>
+
+              {peakMemory > 0 && (
+                <div className="bg-surface-hover/50 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs font-medium text-muted">Peak Memory</span>
+                  </div>
+                  <div className="font-mono text-lg font-semibold text-foreground">
+                    {peakMemory.toFixed(0)} MB
+                  </div>
+                </div>
+              )}
+
+              {avgCpu > 0 && (
+                <div className="bg-surface-hover/50 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="text-xs font-medium text-muted">Avg CPU</span>
+                  </div>
+                  <div className="font-mono text-lg font-semibold text-foreground">
+                    {avgCpu.toFixed(0)}%
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -430,10 +464,21 @@ function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: Unifie
 
 function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: () => void; onKill: () => void }) {
   const [logs, setLogs] = useState<AgentLogEntry[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
   const lastLogIdRef = useRef(0);
   const isLive = run.status === "running" || run.status === "pending";
+  const logsLoaded = useRef(false);
+
+  // Auto-show logs for live runs, hide for completed
+  useEffect(() => {
+    if (isLive) setShowLogs(true);
+  }, [isLive]);
 
   useEffect(() => {
+    // Only fetch logs if visible (live or user expanded)
+    if (!showLogs && !isLive) return;
+    if (logsLoaded.current && !isLive) return; // Already loaded for completed run
+
     lastLogIdRef.current = 0;
     setLogs([]);
     const load = async () => {
@@ -443,6 +488,7 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           setLogs((prev) => [...prev, ...newLogs]);
           lastLogIdRef.current = newLogs[newLogs.length - 1].id;
         }
+        if (!isLive) logsLoaded.current = true;
       } catch {}
     };
     load();
@@ -450,7 +496,7 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
       const interval = setInterval(load, 2000);
       return () => clearInterval(interval);
     }
-  }, [run.id, isLive]);
+  }, [run.id, isLive, showLogs]);
 
   const logTypeIcons: Record<string, string> = {
     tool_use: "wrench",
@@ -537,6 +583,22 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
                   </span>
                 </div>
               )}
+              {(run.peak_memory_mb > 0 || run.avg_cpu_percent > 0) && (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span className="font-mono text-xs">{run.peak_memory_mb.toFixed(0)}MB</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="font-mono text-xs">{run.avg_cpu_percent.toFixed(0)}% CPU</span>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
@@ -553,10 +615,45 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           </div>
         )}
 
-        {/* Live logs */}
-        {logs.length > 0 && (
-          <div className="rounded-md border border-border bg-background overflow-hidden">
-            <div className="max-h-[500px] overflow-y-auto">
+        {/* Logs */}
+        {isLive ? (
+          logs.length > 0 && (
+            <div className="rounded-md border border-border bg-background overflow-hidden">
+              <div className="max-h-[500px] overflow-y-auto">
+                {logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono break-all overflow-hidden ${
+                      log.entry_type === "error" ? "bg-red-50 text-red-700" :
+                      log.entry_type === "tool_use" ? "text-blue-700" :
+                      log.entry_type === "tool_result" ? "text-gray-500 text-[10px] pl-6" :
+                      log.entry_type === "status" ? "text-muted italic" :
+                      "text-foreground"
+                    }`}
+                  >
+                    <span className="text-[10px] text-muted mr-2">
+                      {log.created_at ? new Date(log.created_at).toLocaleTimeString() : ""}
+                    </span>
+                    {log.content}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        ) : (
+          <button
+            onClick={() => setShowLogs(!showLogs)}
+            className="flex items-center gap-1.5 text-[10px] text-muted hover:text-foreground transition-colors px-2 py-1 rounded border border-border hover:bg-surface-hover"
+          >
+            <svg className={`w-2.5 h-2.5 transition-transform ${showLogs ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            {showLogs ? "Hide logs" : "View logs"}
+          </button>
+        )}
+        {showLogs && !isLive && logs.length > 0 && (
+          <div className="rounded-md border border-border bg-background overflow-hidden mt-1">
+            <div className="max-h-[300px] overflow-y-auto">
               {logs.map((log) => (
                 <div
                   key={log.id}
