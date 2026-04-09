@@ -26,12 +26,15 @@ class IssueTracker(ABC):
     """
 
     @abstractmethod
-    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
-        """Fetch active issues eligible for pipeline dispatch."""
+    async def fetch_candidate_issues(self, max_results: int = 100, user_email: str = "") -> list[Issue]:
+        """Fetch active issues eligible for pipeline dispatch.
+
+        If user_email is provided, filter to issues assigned to that user.
+        """
         ...
 
     @abstractmethod
-    async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
+    async def fetch_issues_by_states(self, states: list[str], user_email: str = "") -> list[Issue]:
         """Fetch issues in the given states (e.g., terminal states for cleanup)."""
         ...
 

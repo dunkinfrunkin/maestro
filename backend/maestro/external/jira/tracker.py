@@ -104,33 +104,33 @@ class JiraIssueTracker(IssueTracker):
         keys = ", ".join(self._project_keys)
         return f"project in ({keys})"
 
-    def _base_clauses(self) -> list[str]:
+    def _base_clauses(self, user_email: str = "") -> list[str]:
         """Collect non-empty base JQL clauses (project + assignee).
 
-        Uses currentUser() for assignee filtering — this resolves to whoever
-        owns the API token, which is the correct behavior since each user
-        connects with their own Jira credentials.
+        If user_email is provided, filters by that user's assignments.
+        Otherwise falls back to assignee_email from the connection config.
         """
         clauses = []
         project = self._project_clause()
         if project:
             clauses.append(project)
-        if self._assignee_email:
-            clauses.append("assignee = currentUser()")
+        email = user_email or self._assignee_email
+        if email:
+            clauses.append(f'assignee = "{_escape_jql(email)}"')
         return clauses
 
-    async def fetch_candidate_issues(self, max_results: int = 100) -> list[Issue]:
+    async def fetch_candidate_issues(self, max_results: int = 100, user_email: str = "") -> list[Issue]:
         status_clause = _jql_status_in(self._active_statuses)
-        clauses = self._base_clauses()
+        clauses = self._base_clauses(user_email)
         clauses.append(status_clause)
         jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql, max_results=max_results)
 
-    async def fetch_issues_by_states(self, states: list[str]) -> list[Issue]:
+    async def fetch_issues_by_states(self, states: list[str], user_email: str = "") -> list[Issue]:
         if not states:
             return []
         status_clause = _jql_status_in(states)
-        clauses = self._base_clauses()
+        clauses = self._base_clauses(user_email)
         clauses.append(status_clause)
         jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql)
