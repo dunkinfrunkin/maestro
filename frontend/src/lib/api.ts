@@ -430,6 +430,56 @@ export async function killAgentRun(runId: number): Promise<{ status: string; run
   return res.json();
 }
 
+export interface CentcomRun {
+  id: number;
+  agent_type: string;
+  status: string;
+  model: string;
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  peak_memory_mb: number;
+  avg_cpu_percent: number;
+  triggered_by: string;
+  task_ref: string;
+  repo: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface CentcomMetrics {
+  total_runs: number;
+  total_cost: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_runtime_seconds: number;
+  peak_memory_mb: number;
+  avg_cpu_percent: number;
+  tasks_completed: number;
+  status_counts: Record<string, number>;
+  active_runs: CentcomRun[];
+  recent_runs: CentcomRun[];
+  workers: {
+    id: string;
+    hostname: string;
+    concurrency: number;
+    active_jobs: number;
+    cpu_percent: number;
+    memory_used_mb: number;
+    memory_total_mb: number;
+    cpu_count: number;
+    estimated_capacity: number;
+    started_at: string | null;
+    last_heartbeat: string | null;
+  }[];
+}
+
+export async function fetchCentcomMetrics(workspaceId: number): Promise<CentcomMetrics> {
+  const res = await authFetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/centcom`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export interface AgentLogEntry {
   id: number;
   entry_type: string;

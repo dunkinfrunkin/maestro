@@ -260,6 +260,28 @@ class AgentRun(Base):
     )
 
 
+class WorkerHeartbeat(Base):
+    """Tracks active worker processes via heartbeat."""
+    __tablename__ = "worker_heartbeats"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)  # uuid
+    hostname: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    concurrency: Mapped[int] = mapped_column(nullable=False, default=3)
+    active_jobs: Mapped[int] = mapped_column(nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="online")
+    cpu_percent: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    memory_used_mb: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    memory_total_mb: Mapped[float] = mapped_column(nullable=False, default=0.0)
+    cpu_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    estimated_capacity: Mapped[int] = mapped_column(nullable=False, default=0)
+    last_heartbeat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class AgentRunLog(Base):
     """Individual log entries for an agent run — streamed in real-time."""
     __tablename__ = "agent_run_logs"

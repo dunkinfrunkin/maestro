@@ -92,6 +92,17 @@ async def init_db() -> None:
         await conn.execute(sa.text(
             "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS job_payload TEXT NOT NULL DEFAULT '{}'"
         ))
+        # Add worker heartbeat resource columns
+        for col, typ, default in [
+            ("cpu_percent", "FLOAT", "0.0"),
+            ("memory_used_mb", "FLOAT", "0.0"),
+            ("memory_total_mb", "FLOAT", "0.0"),
+            ("cpu_count", "INTEGER", "0"),
+            ("estimated_capacity", "INTEGER", "0"),
+        ]:
+            await conn.execute(sa.text(
+                f"ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS {col} {typ} NOT NULL DEFAULT {default}"
+            ))
         # Migrate old model IDs to CLI aliases
         await conn.execute(sa.text(
             "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"

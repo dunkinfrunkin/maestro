@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import select, func as sqlfunc
 
 from maestro.auth import get_current_user
 from maestro.db.engine import get_session
-from maestro.db.models import AgentRun, AgentRunLog, TaskPipelineRecord, User
+from maestro.db.models import AgentRun, AgentRunLog, AgentRunStatus, TaskPipelineRecord, User, WorkerHeartbeat
 
 router = APIRouter(prefix="/api/v1")
 
@@ -176,6 +178,150 @@ async def kill_agent_run(
     if partial:
         return {"status": "killed", "run_id": run_id}
     return {"status": "not_found", "run_id": run_id}
+
+
+@router.get("/workspaces/{workspace_id}/centcom")
+async def get_centcom_metrics(
+    workspace_id: int,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Aggregate metrics for CENTCOM dashboard."""
+    async with get_session() as session:
+        base = select(AgentRun).where(AgentRun.workspace_id == workspace_id)
+
+        # Total runs by status
+        status_counts = {}
+        for status in AgentRunStatus:
+            count = (await session.execute(
+                select(sqlfunc.count(AgentRun.id))
+                .where(AgentRun.workspace_id == workspace_id, AgentRun.status == status)
+            )).scalar() or 0
+            status_counts[status.value] = count
+
+        # Aggregates
+        agg = (await session.execute(
+            select(
+                sqlfunc.count(AgentRun.id).label("total_runs"),
+                sqlfunc.coalesce(sqlfunc.sum(AgentRun.cost_usd), 0).label("total_cost"),
+                sqlfunc.coalesce(sqlfunc.sum(AgentRun.input_tokens), 0).label("total_input_tokens"),
+                sqlfunc.coalesce(sqlfunc.sum(AgentRun.output_tokens), 0).label("total_output_tokens"),
+                sqlfunc.coalesce(sqlfunc.max(AgentRun.peak_memory_mb), 0).label("peak_memory_mb"),
+                sqlfunc.coalesce(sqlfunc.avg(AgentRun.avg_cpu_percent), 0).label("avg_cpu_percent"),
+            ).where(AgentRun.workspace_id == workspace_id)
+        )).one()
+
+        # Total runtime (sum of finished - started for completed runs)
+        runtime_rows = (await session.execute(
+            select(AgentRun.started_at, AgentRun.finished_at)
+            .where(
+                AgentRun.workspace_id == workspace_id,
+                AgentRun.started_at.isnot(None),
+                AgentRun.finished_at.isnot(None),
+            )
+        )).all()
+        total_runtime_s = sum(
+            (r.finished_at - r.started_at).total_seconds()
+            for r in runtime_rows
+            if r.started_at and r.finished_at
+        )
+
+        # Total unique tasks that have completed
+        tasks_completed = (await session.execute(
+            select(sqlfunc.count(sqlfunc.distinct(AgentRun.task_pipeline_id)))
+            .where(
+                AgentRun.workspace_id == workspace_id,
+                AgentRun.status == AgentRunStatus.COMPLETED,
+            )
+        )).scalar() or 0
+
+        # Active runs (for the live list)
+        active_result = await session.execute(
+            select(AgentRun, TaskPipelineRecord)
+            .join(TaskPipelineRecord, TaskPipelineRecord.id == AgentRun.task_pipeline_id)
+            .where(
+                AgentRun.workspace_id == workspace_id,
+                AgentRun.status.in_(["PENDING", "RUNNING"]),
+            )
+            .order_by(AgentRun.created_at.desc())
+            .limit(10)
+        )
+        active_rows = active_result.all()
+
+        # Recent completed (last 5)
+        recent_result = await session.execute(
+            select(AgentRun, TaskPipelineRecord)
+            .join(TaskPipelineRecord, TaskPipelineRecord.id == AgentRun.task_pipeline_id)
+            .where(
+                AgentRun.workspace_id == workspace_id,
+                AgentRun.status.in_(["COMPLETED", "FAILED"]),
+            )
+            .order_by(AgentRun.finished_at.desc())
+            .limit(5)
+        )
+        recent_rows = recent_result.all()
+
+    def _run_dict(run, task):
+        return {
+            "id": run.id,
+            "agent_type": run.agent_type.value if run.agent_type else "",
+            "status": run.status.value if run.status else "",
+            "model": run.model,
+            "cost_usd": run.cost_usd,
+            "input_tokens": run.input_tokens,
+            "output_tokens": run.output_tokens,
+            "peak_memory_mb": run.peak_memory_mb,
+            "avg_cpu_percent": run.avg_cpu_percent,
+            "triggered_by": run.triggered_by or "",
+            "task_ref": task.external_ref,
+            "repo": task.repo or "",
+            "started_at": run.started_at.isoformat() if run.started_at else None,
+            "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        }
+
+    return {
+        "total_runs": agg.total_runs,
+        "total_cost": float(agg.total_cost),
+        "total_input_tokens": int(agg.total_input_tokens),
+        "total_output_tokens": int(agg.total_output_tokens),
+        "total_runtime_seconds": total_runtime_s,
+        "peak_memory_mb": float(agg.peak_memory_mb),
+        "avg_cpu_percent": float(agg.avg_cpu_percent),
+        "tasks_completed": tasks_completed,
+        "status_counts": status_counts,
+        "active_runs": [_run_dict(r, t) for r, t in active_rows],
+        "recent_runs": [_run_dict(r, t) for r, t in recent_rows],
+        "workers": await _get_workers(),
+    }
+
+
+async def _get_workers() -> list[dict]:
+    """Get active workers (heartbeat within last 30s)."""
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=30)
+    async with get_session() as session:
+        result = await session.execute(
+            select(WorkerHeartbeat).where(
+                WorkerHeartbeat.last_heartbeat >= cutoff,
+                WorkerHeartbeat.status == "online",
+            )
+        )
+        workers = result.scalars().all()
+    return [
+        {
+            "id": w.id,
+            "hostname": w.hostname,
+            "concurrency": w.concurrency,
+            "active_jobs": w.active_jobs,
+            "cpu_percent": w.cpu_percent,
+            "memory_used_mb": w.memory_used_mb,
+            "memory_total_mb": w.memory_total_mb,
+            "cpu_count": w.cpu_count,
+            "estimated_capacity": w.estimated_capacity,
+            "started_at": w.started_at.isoformat() if w.started_at else None,
+            "last_heartbeat": w.last_heartbeat.isoformat() if w.last_heartbeat else None,
+        }
+        for w in workers
+    ]
 
 
 @router.get("/agent-runs/{run_id}/logs")
