@@ -258,6 +258,68 @@ AGENT_CONFIGS = {
     },
 }
 
+# Which .agents/ files each agent reads for context
+AGENT_CONTEXT_FILES = {
+    "implementation": [
+        "SPECIFICATION.md",
+        "ARCHITECTURE.md",
+        "DATABASE.md",
+        "STYLE_GUIDE.md",
+        "SECURITY.md",
+        "COMPLIANCE.md",
+    ],
+    "review": [
+        "SPECIFICATION.md",
+        "ARCHITECTURE.md",
+        "STYLE_GUIDE.md",
+        "SECURITY.md",
+        "COMPLIANCE.md",
+    ],
+    "risk_profile": [
+        "ARCHITECTURE.md",
+        "COMPLIANCE.md",
+        "DATABASE.md",
+        "SECURITY.md",
+        "RUNBOOK.md",
+    ],
+    "deployment": [
+        "DEPLOY.md",
+        "RUNBOOK.md",
+    ],
+    "monitor": [
+        "MONITORING.md",
+        "RUNBOOK.md",
+    ],
+}
+
+
+def _load_agent_context(workspace_path: str, agent_name: str) -> str:
+    """Load .agents/ files relevant to this agent type. Returns context string or empty."""
+    agents_dir = Path(workspace_path) / ".agents"
+    if not agents_dir.is_dir():
+        return ""
+
+    files = AGENT_CONTEXT_FILES.get(agent_name, [])
+    if not files:
+        return ""
+
+    sections = []
+    for filename in files:
+        filepath = agents_dir / filename
+        if filepath.is_file():
+            try:
+                content = filepath.read_text(encoding="utf-8").strip()
+                if content and "<!-- FILL:" not in content[:200]:
+                    # Skip files that haven't been populated yet
+                    sections.append(f"## {filename}\n\n{content}")
+            except Exception:
+                pass
+
+    if not sections:
+        return ""
+
+    return "# Repository Context (.agents/)\n\n" + "\n\n---\n\n".join(sections) + "\n\n---\n\n"
+
 
 async def _execute_agent(
     run_id: int,
@@ -350,7 +412,15 @@ async def _execute_agent(
         max_iterations = extra_config.get("max_review_iterations", 3)
 
         # Build prompt with context
-        prompt_parts = [f"## Issue: {issue_title}"]
+        # Load .agents/ context files if they exist
+        agent_context = _load_agent_context(workspace_path, plugin.name)
+        if agent_context:
+            await _write_log(run_id, "status", f"Loaded .agents/ context for {plugin.name}")
+
+        prompt_parts = []
+        if agent_context:
+            prompt_parts.append(agent_context)
+        prompt_parts.append(f"## Issue: {issue_title}")
         if issue_description:
             prompt_parts.append(issue_description)
         if pr_url:
@@ -750,24 +820,33 @@ async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
 def _extract_verdict(result: dict) -> str:
     """Extract review verdict from agent output."""
     import re
-    # Use all_text to search across all messages, not just the last one
+
+    # Also check the review_verdict field from cli_runner (most reliable)
+    cli_verdict = (result.get("review_verdict") or "").strip().upper()
+    if cli_verdict in ("APPROVE", "REQUEST_CHANGES"):
+        print(f"[MAESTRO] Verdict from cli_runner: {cli_verdict}")
+        return cli_verdict
+
+    # Search all_text for REVIEW_VERDICT: marker
     all_text = result.get("all_text", "") or result.get("last_text", "")
-    clean = re.sub(r'[*`_~]', '', all_text)
+    clean = re.sub(r'[*`~]', '', all_text)  # Don't strip underscores — needed for REVIEW_VERDICT
     for line in clean.split("\n"):
         line = line.strip()
         if "REVIEW_VERDICT:" in line:
             verdict = line.split("REVIEW_VERDICT:", 1)[1].strip().upper()
-            # Clean any trailing markdown or punctuation
             verdict = re.sub(r'[^A-Z_]', '', verdict)
             if verdict in ("APPROVE", "REQUEST_CHANGES"):
+                print(f"[MAESTRO] Verdict from text: {verdict}")
                 return verdict
-    # Fallback: look for keywords in cleaned text
+
+    # Fallback: look for REQUEST_CHANGES first (safer default)
     upper = clean.upper()
     if "REQUEST_CHANGES" in upper or "REQUEST CHANGES" in upper:
         return "REQUEST_CHANGES"
-    if "APPROVE" in upper:
-        return "APPROVE"
-    return "APPROVE"  # default to approve if unclear
+
+    # Default to REQUEST_CHANGES if unclear — safer than auto-approving
+    print("[MAESTRO] No clear verdict found, defaulting to REQUEST_CHANGES")
+    return "REQUEST_CHANGES"
 
 
 # ---------------------------------------------------------------------------
