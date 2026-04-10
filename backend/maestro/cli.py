@@ -14,275 +14,326 @@ import uvicorn
 # .agents/ template files
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# AI tool instructions (prepended to each file for Claude/Cursor)
+# ---------------------------------------------------------------------------
+
+_AI_INSTRUCTIONS = """\
+<!--
+╔══════════════════════════════════════════════════════════════════════╗
+║  INSTRUCTIONS FOR AI TOOLS (Claude, Cursor, Copilot, Codex, etc.) ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  This file is part of the Maestro agent harness. It provides         ║
+║  structured context that AI agents read before executing tasks.       ║
+║                                                                      ║
+║  TO POPULATE THIS FILE:                                              ║
+║  1. Read the existing codebase thoroughly before writing anything     ║
+║  2. Replace each <!-- FILL: ... --> comment with real content         ║
+║  3. Be specific — reference actual file paths, function names,       ║
+║     table names, and conventions found in the code                   ║
+║  4. Remove sections that don't apply to this project                 ║
+║  5. Keep it concise — agents read this before every task             ║
+║  6. Update when the codebase changes significantly                   ║
+║                                                                      ║
+║  DO NOT:                                                             ║
+║  - Leave placeholder text or generic examples                        ║
+║  - Include information derivable from reading the code directly      ║
+║  - Add aspirational content ("we should...") — only current state    ║
+║  - Duplicate information across files                                ║
+║                                                                      ║
+║  WHICH AGENTS READ THIS FILE:                                        ║
+║  See the header below for the agent matrix (P/I/R/X/Q/D/M)          ║
+╚══════════════════════════════════════════════════════════════════════╝
+-->
+
+"""
+
 AGENTS_TEMPLATES: dict[str, str] = {
-    "STYLE_GUIDE.md": """\
-# Style Guide
+    "SPECIFICATION.md": _AI_INSTRUCTIONS + """\
+# Specification
 
-> Coding conventions and patterns for this repository.
-> Agents and contributors use this to write consistent code.
+> **Agents: Planner (produces) · Implementer · Reviewer · QA (validates against)**
 
-## Language & Framework
-<!-- e.g. TypeScript / React / Next.js, Python / FastAPI, Go / Chi -->
+Detailed technical specification with acceptance criteria. The Planner agent produces
+this from issue descriptions; other agents validate their work against it.
 
+## Feature: <!-- FILL: feature name -->
 
-## Naming Conventions
-<!-- e.g. camelCase for variables, PascalCase for components, snake_case for API routes -->
+### Problem Statement
+<!-- FILL: What problem does this solve? Why now? Who is affected? -->
 
-### Files & Directories
-<!-- e.g. kebab-case for files, PascalCase for component files -->
+### Proposed Solution
+<!-- FILL: High-level approach. What changes, what doesn\'t. -->
 
-### Variables & Functions
-<!-- e.g. descriptive names, no abbreviations, boolean prefixes (is/has/should) -->
+### Acceptance Criteria
+- [ ] <!-- FILL: criterion 1 -->
+- [ ] <!-- FILL: criterion 2 -->
 
-### Components / Classes
-<!-- e.g. PascalCase, noun-based, suffix patterns (Service, Controller, Hook) -->
+### Out of Scope
+<!-- FILL: What this change explicitly does NOT include -->
 
-## Code Style
-<!-- e.g. max line length, indentation, imports ordering -->
-
-### Formatting
-<!-- e.g. Prettier config, Black, gofmt -->
-
-### Imports
-<!-- e.g. external first, then internal, group by type -->
-
-## Patterns to Follow
-<!-- e.g. prefer composition over inheritance, use hooks not HOCs -->
-
-## Patterns to Avoid
-<!-- e.g. no any types, no console.log in production, no magic numbers -->
-
-## Error Handling
-<!-- e.g. always use typed errors, never swallow exceptions -->
-
-## Comments
-<!-- e.g. only when "why" not "what", no TODO without ticket reference -->
+### Dependencies & Risks
+<!-- FILL: Other systems this depends on. What could go wrong? -->
 """,
-    "ARCHITECTURE.md": """\
+    "ARCHITECTURE.md": _AI_INSTRUCTIONS + """\
 # Architecture
 
-> High-level system design and directory structure.
-> Helps agents understand where things live and how they connect.
+> **Agents: Planner · Implementer · Reviewer · Risk**
+
+System architecture, service boundaries, data flow, and infrastructure.
 
 ## Overview
-<!-- Brief description of what this application does -->
+<!-- FILL: One paragraph describing what this application does. -->
 
 ## Directory Structure
-```
-├── src/
-│   ├── ...
-```
-<!-- Describe key directories and their purpose -->
+<!-- FILL: Run `find . -type d -maxdepth 3` and document what matters. -->
 
-## Key Components
-<!-- List the main modules/services and what they do -->
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-|           |          |         |
+## Service Boundaries
+| Service / Module | Responsibility | Communicates With |
+|------------------|---------------|-------------------|
+| <!-- FILL -->    |               |                   |
 
 ## Data Flow
-<!-- How does a request flow through the system? -->
-<!-- e.g. Client → API Route → Service → Database -->
+<!-- FILL: Trace a typical request. Name actual files and functions. -->
 
-## External Services
-<!-- List APIs, databases, queues, etc. this app talks to -->
-
-| Service | Purpose | Docs |
-|---------|---------|------|
-|         |         |      |
-
-## Environment Variables
-<!-- Key env vars the app needs to run -->
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-|          |          |             |
+## External Dependencies
+| System | Protocol | Purpose | Failure Mode |
+|--------|----------|---------|--------------|
+| <!-- FILL --> | | | |
 
 ## Key Design Decisions
-<!-- Important architectural choices and why they were made -->
+<!-- FILL: Architectural choices and WHY. Include dates if known. -->
 """,
-    "DATABASE.md": """\
+    "DATABASE.md": _AI_INSTRUCTIONS + """\
 # Database
 
-> Schema overview, key relationships, and data patterns.
-> Agents reference this before writing any data-touching code.
+> **Agents: Planner · Implementer · Risk**
 
-## Database Type
-<!-- e.g. PostgreSQL, MySQL, SQLite, MongoDB -->
+Schema definitions, migrations, relationships, and indexing strategy.
 
-## ORM / Query Layer
-<!-- e.g. SQLAlchemy, Prisma, TypeORM, raw SQL -->
+## Engine & ORM
+<!-- FILL: e.g. "PostgreSQL 16 via SQLAlchemy 2.0 (async)" -->
 
 ## Schema Overview
-<!-- List main tables/collections and their purpose -->
+| Table | Purpose | Key Columns | Relationships |
+|-------|---------|-------------|---------------|
+| <!-- FILL --> | | | |
 
-| Table | Purpose | Key Columns |
-|-------|---------|-------------|
-|       |         |             |
+## Migration Strategy
+<!-- FILL: How schema changes are applied. -->
 
-## Relationships
-<!-- Key foreign keys, joins, and data dependencies -->
-
-## Migrations
-<!-- How are schema changes managed? -->
-<!-- e.g. Alembic, Prisma Migrate, manual SQL, create_all -->
-
-## Indexes
-<!-- Important indexes and why they exist -->
-
-## Seed Data
-<!-- How to populate the database for development -->
+## Indexing
+<!-- FILL: List indexes and WHY each exists. -->
 
 ## Conventions
-<!-- e.g. always use UUIDs, soft deletes, timestamps on every table -->
-
-## Common Queries
-<!-- Patterns for the most frequent data access operations -->
+<!-- FILL: e.g. "All tables have created_at/updated_at", "Use Text not VARCHAR" -->
 """,
-    "API.md": """\
-# API Conventions
+    "API_CONTRACTS.md": _AI_INSTRUCTIONS + """\
+# API Contracts
 
-> Standards for API endpoints, request/response formats, and error handling.
-> Agents follow these when creating or modifying endpoints.
+> **Agents: Planner · QA (validates against)**
 
-## Base URL
-<!-- e.g. /api/v1 -->
+API endpoints, request/response shapes, and error codes.
+
+## Base URL & Versioning
+<!-- FILL: e.g. "/api/v1", versioned via URL path -->
 
 ## Authentication
-<!-- e.g. Bearer token, API key header, session cookie -->
+<!-- FILL: e.g. "Bearer JWT in Authorization header" -->
 
-## Request Format
-<!-- e.g. JSON body, Content-Type headers, query params conventions -->
-
-## Response Format
-<!-- Standard response envelope, if any -->
+## Error Format
 ```json
-{
-  "data": {},
-  "error": null
-}
+{"detail": "Human-readable error message"}
 ```
 
-## Error Handling
-<!-- Standard error response format -->
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Resource not found"
-  }
-}
-```
+## Conventions
+<!-- FILL: Naming, pagination, filtering patterns. -->
 
-## Status Codes
-<!-- Which status codes to use and when -->
-
-| Code | When to Use |
-|------|-------------|
-| 200  |             |
-| 201  |             |
-| 400  |             |
-| 401  |             |
-| 404  |             |
-| 500  |             |
-
-## Pagination
-<!-- e.g. cursor-based, offset/limit, page/per_page -->
-
-## Naming
-<!-- e.g. plural nouns for collections, kebab-case paths -->
-
-## Versioning
-<!-- How API versions are managed -->
+## Key Endpoints
+<!-- FILL: Document conventions, not exhaustive listing. Link to OpenAPI if available. -->
 """,
-    "TESTING.md": """\
-# Testing
+    "STYLE_GUIDE.md": _AI_INSTRUCTIONS + """\
+# Style Guide
 
-> How to write and run tests in this repository.
-> Agents use this to write correct tests that follow project patterns.
+> **Agents: Implementer · Reviewer**
 
-## Test Framework
-<!-- e.g. pytest, vitest, jest, go test -->
+Code conventions, naming patterns, formatting rules, lint configuration.
+
+## Language & Framework
+<!-- FILL: e.g. "TypeScript 5 / React 19 / Next.js 16" -->
+
+## Formatting
+<!-- FILL: Tool and config. e.g. "Prettier with .prettierrc" -->
+
+## Naming Conventions
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Files | <!-- FILL --> | <!-- FILL --> |
+| Components | <!-- FILL --> | <!-- FILL --> |
+| Functions | <!-- FILL --> | <!-- FILL --> |
+| Variables | <!-- FILL --> | <!-- FILL --> |
+| Constants | <!-- FILL --> | <!-- FILL --> |
+| DB columns | <!-- FILL --> | <!-- FILL --> |
+
+## Import Order
+<!-- FILL: e.g. "1. stdlib, 2. third-party, 3. internal" -->
+
+## Patterns to Follow
+<!-- FILL: What this codebase does consistently. -->
+
+## Patterns to Avoid
+<!-- FILL: Anti-patterns agents must never introduce. -->
+""",
+    "SECURITY.md": _AI_INSTRUCTIONS + """\
+# Security
+
+> **Agents: Implementer · Reviewer · Risk**
+
+Auth patterns, secrets handling, OWASP compliance, threat model.
+
+## Authentication
+<!-- FILL: How users authenticate. -->
+
+## Authorization
+<!-- FILL: How permissions are enforced. -->
+
+## Secrets Management
+<!-- FILL: Where secrets live, how accessed. Never log secrets. -->
+
+## Input Validation
+<!-- FILL: e.g. "Pydantic models for all API bodies", "Parameterized SQL only" -->
+
+## OWASP Checklist
+- [ ] Injection — <!-- FILL -->
+- [ ] Broken Auth — <!-- FILL -->
+- [ ] Sensitive Data Exposure — <!-- FILL -->
+- [ ] XSS — <!-- FILL -->
+- [ ] CSRF — <!-- FILL -->
+""",
+    "COMPLIANCE.md": _AI_INSTRUCTIONS + """\
+# Compliance
+
+> **Agents: Implementer · Reviewer · Risk**
+
+Regulatory requirements, data residency, PII handling, audit rules.
+
+## Regulatory Framework
+<!-- FILL: e.g. "GDPR", "SOC 2", "HIPAA", or "None currently" -->
+
+## PII Handling
+<!-- FILL: What is PII here and how it\'s protected. -->
+
+## Data Residency
+<!-- FILL: Where data must be stored geographically. -->
+
+## Audit Trail
+<!-- FILL: What actions are logged for audit. -->
+
+## Data Retention
+<!-- FILL: How long different data types are kept. -->
+""",
+    "TEST_STRATEGY.md": _AI_INSTRUCTIONS + """\
+# Test Strategy
+
+> **Agents: QA (primary)**
+
+Testing philosophy, coverage targets, test types, fixture conventions.
+
+## Framework
+<!-- FILL: e.g. "pytest", "vitest", "Playwright" -->
 
 ## Running Tests
 ```bash
-# Run all tests
-
-# Run a specific test file
-
-# Run with coverage
+# FILL: exact commands
 ```
 
-## Test Structure
-<!-- Where do tests live? -->
-<!-- e.g. alongside source files, in a tests/ directory, __tests__/ -->
+## Test Types
+| Type | Location | Coverage Target | When to Write |
+|------|----------|----------------|---------------|
+| Unit | <!-- FILL --> | <!-- FILL --> | <!-- FILL --> |
+| Integration | <!-- FILL --> | <!-- FILL --> | <!-- FILL --> |
+| E2E | <!-- FILL --> | <!-- FILL --> | <!-- FILL --> |
 
-## Naming Conventions
-<!-- e.g. test_<function_name>, describe/it blocks, *.test.ts -->
+## What to Test / What NOT to Test
+<!-- FILL: Concrete guidance. -->
 
-## Patterns
-<!-- e.g. Arrange-Act-Assert, Given-When-Then -->
-
-### Unit Tests
-<!-- What to mock, what not to mock -->
-
-### Integration Tests
-<!-- How to set up test databases, fixtures -->
-
-### E2E Tests
-<!-- If applicable, how to run end-to-end tests -->
-
-## Fixtures / Helpers
-<!-- Common test utilities, factories, builders -->
-
-## What to Test
-<!-- e.g. all public functions, API endpoints, edge cases -->
-
-## What NOT to Test
-<!-- e.g. third-party libraries, generated code, trivial getters -->
-
-## CI
-<!-- How tests run in CI, any required env vars -->
+## Fixtures & Helpers
+<!-- FILL: Common test utilities available. -->
 """,
-    "DEPENDENCIES.md": """\
-# Dependencies
+    "RUNBOOK.md": _AI_INSTRUCTIONS + """\
+# Runbook
 
-> Key libraries, why they were chosen, and what to avoid.
-> Agents check this before adding new packages.
+> **Agents: Risk · Deploy · Monitor**
 
-## Package Manager
-<!-- e.g. npm, pnpm, yarn, pip/uv, go modules -->
+Operational procedures, incident response, escalation paths.
 
-## Key Dependencies
+## Health Checks
+<!-- FILL: How to verify the system is healthy. -->
 
-| Package | Purpose | Why This One |
-|---------|---------|--------------|
-|         |         |              |
+## Common Issues
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| <!-- FILL --> | | |
 
-## Dev Dependencies
+## Incident Response
+<!-- FILL: Step-by-step procedure. -->
 
-| Package | Purpose |
-|---------|---------|
-|         |         |
+## Escalation
+<!-- FILL: Who to contact and when. -->
 
-## Rules
-<!-- Guidelines for adding new dependencies -->
+## Rollback Procedure
+<!-- FILL: How to roll back a bad deploy. -->
+""",
+    "DEPLOY.md": _AI_INSTRUCTIONS + """\
+# Deploy
 
-- [ ] Check if an existing dependency already solves the problem
-- [ ] Prefer well-maintained packages with active communities
-- [ ] No packages with known vulnerabilities
-- [ ] Pin major versions
+> **Agents: Deploy (primary)**
 
-## Do NOT Add
-<!-- Packages or categories that should be avoided -->
-<!-- e.g. no lodash (use native), no moment.js (use date-fns) -->
+Deploy strategies, environments, rollout configs, feature flags.
 
-## Updating
-<!-- How to update dependencies, any special considerations -->
+## Environments
+| Environment | URL | Purpose | Deploy Trigger |
+|-------------|-----|---------|---------------|
+| <!-- FILL --> | | | |
+
+## Deploy Process
+<!-- FILL: Step-by-step. -->
+
+## CI/CD Pipeline
+<!-- FILL: What checks must pass. How deploy is triggered. -->
+
+## Feature Flags
+<!-- FILL: How feature flags work, if applicable. -->
+
+## Required Secrets
+<!-- FILL: Secret names needed for deploy (not values). -->
+""",
+    "MONITORING.md": _AI_INSTRUCTIONS + """\
+# Monitoring
+
+> **Agents: Monitor (primary)**
+
+Dashboards, alert thresholds, SLOs, baseline metrics.
+
+## Key Metrics
+| Metric | Baseline | Alert Threshold | Dashboard |
+|--------|----------|----------------|-----------|
+| <!-- FILL --> | | | |
+
+## SLOs
+<!-- FILL: e.g. "99.9% uptime", "p95 < 300ms" -->
+
+## Dashboards
+<!-- FILL: Where to find them. -->
+
+## Alerting
+<!-- FILL: How alerts work and who gets them. -->
+
+## Post-Deploy Monitoring
+<!-- FILL: What to watch after a deploy. -->
 """,
 }
-
 
 # ---------------------------------------------------------------------------
 # Config management
