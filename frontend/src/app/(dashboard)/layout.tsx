@@ -40,7 +40,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     ? "Agents"
     : pathname.startsWith("/settings")
     ? "Settings"
-    : "Operations";
+    : "CENTCOM";
 
   return (
     <div className="flex h-screen font-[family-name:var(--font-geist-sans)]">
