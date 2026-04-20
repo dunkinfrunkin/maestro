@@ -4,8 +4,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var serverURL string
-
 var rootCmd = &cobra.Command{
 	Use:   "maestro",
 	Short: "Autonomous coding agent orchestration for engineering teams",
@@ -13,15 +11,14 @@ var rootCmd = &cobra.Command{
 risk-assess, deploy, and monitor code changes — triggered from your
 issue tracker.
 
-  maestro login --server https://maestro.yourcompany.com
-  maestro status
-  maestro tasks
-  maestro run <task-id>`,
+  maestro app                    Start the full application (Docker)
+  maestro serve                  Start the API server (Docker)
+  maestro worker                 Start a worker process (Docker)
+  maestro init                   Initialize ~/.maestro/config.yaml
+  maestro repo init              Scaffold .agents/ templates`,
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "", "Maestro server URL")
-
 	rootCmd.AddCommand(versionCmd)
 }
 
