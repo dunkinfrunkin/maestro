@@ -30,7 +30,11 @@ func imageTag() string {
 		return img
 	}
 	if Version != "dev" {
-		return "ghcr.io/dunkinfrunkin/maestro:v" + Version
+		tag := Version
+		if tag[0] != 'v' {
+			tag = "v" + tag
+		}
+		return "ghcr.io/dunkinfrunkin/maestro:" + tag
 	}
 	return defaultImage
 }
