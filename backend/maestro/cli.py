@@ -473,10 +473,12 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     """Start the Maestro server."""
     config = _load_all_config(getattr(args, "env_file", None))
     os.environ["MAESTRO_WORKFLOW"] = args.workflow
+    host = args.host or _get_nested(config, "server.host") or "127.0.0.1"
+    port = args.port or _get_nested(config, "server.port") or 8000
     uvicorn.run(
         "maestro.app:app",
-        host=args.host,
-        port=args.port,
+        host=host,
+        port=int(port),
         reload=args.reload,
     )
 
@@ -488,8 +490,8 @@ def _cmd_app(args: argparse.Namespace) -> None:
 
     config = _load_all_config(getattr(args, "env_file", None))
     os.environ["MAESTRO_WORKFLOW"] = args.workflow
-    backend_port = str(args.backend_port)
-    frontend_port = str(args.frontend_port)
+    backend_port = str(args.backend_port or _get_nested(config, "server.port") or 8000)
+    frontend_port = str(args.frontend_port or _get_nested(config, "frontend.port") or 3000)
     os.environ.setdefault("NEXT_PUBLIC_API_URL", f"http://localhost:{backend_port}")
 
     procs: list[subprocess.Popen] = []
@@ -551,11 +553,13 @@ def _cmd_app(args: argparse.Namespace) -> None:
 def _cmd_worker(args: argparse.Namespace) -> None:
     """Start the Maestro worker process."""
     config = _load_all_config(getattr(args, "env_file", None))
+    concurrency = args.concurrency or _get_nested(config, "worker.concurrency") or 3
+    poll_interval = args.poll_interval or _get_nested(config, "worker.poll_interval") or 2.0
     import asyncio
     from maestro.agent.worker import run_worker
     asyncio.run(run_worker(
-        concurrency=args.concurrency,
-        poll_interval=args.poll_interval,
+        concurrency=int(concurrency),
+        poll_interval=float(poll_interval),
     ))
 
 
@@ -605,23 +609,23 @@ def main(argv: list[str] | None = None) -> None:
     # maestro serve
     serve_parser = subparsers.add_parser("serve", help="Start the Maestro server")
     serve_parser.add_argument("--env-file", help="Path to .env file to load")
-    serve_parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
-    serve_parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    serve_parser.add_argument("--host", default=None, help="Bind host (default: config or 127.0.0.1)")
+    serve_parser.add_argument("--port", type=int, default=None, help="Bind port (default: config or 8000)")
     serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     serve_parser.add_argument("--workflow", default="WORKFLOW.md", help="Path to WORKFLOW.md")
 
     # maestro app
     app_parser = subparsers.add_parser("app", help="Start backend + frontend for local development")
     app_parser.add_argument("--env-file", help="Path to .env file to load")
-    app_parser.add_argument("--frontend-port", type=int, default=3000, help="Frontend port (default: 3000)")
-    app_parser.add_argument("--backend-port", type=int, default=8000, help="Backend port (default: 8000)")
+    app_parser.add_argument("--frontend-port", type=int, default=None, help="Frontend port (default: config or 3000)")
+    app_parser.add_argument("--backend-port", type=int, default=None, help="Backend port (default: config or 8000)")
     app_parser.add_argument("--workflow", default="WORKFLOW.md", help="Path to WORKFLOW.md")
 
     # maestro worker
     worker_parser = subparsers.add_parser("worker", help="Start the agent worker process")
     worker_parser.add_argument("--env-file", help="Path to .env file to load")
-    worker_parser.add_argument("--concurrency", type=int, default=3, help="Max concurrent agent jobs (default: 3)")
-    worker_parser.add_argument("--poll-interval", type=float, default=2.0, help="Seconds between job polls (default: 2)")
+    worker_parser.add_argument("--concurrency", type=int, default=None, help="Max concurrent agent jobs (default: config or 3)")
+    worker_parser.add_argument("--poll-interval", type=float, default=None, help="Seconds between job polls (default: config or 2.0)")
 
     # maestro repo init
     repo_parser = subparsers.add_parser("repo", help="Repository agent configuration")
