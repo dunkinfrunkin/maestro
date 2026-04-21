@@ -220,6 +220,7 @@ table tr:hover td {
 .docusaurus-mermaid-container svg {
   height: auto;
   display: block;
+  margin: 0 auto;
 }
 
 .docusaurus-mermaid-container foreignObject {
