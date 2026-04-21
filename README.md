@@ -4,9 +4,17 @@ Autonomous coding agent orchestration for engineering teams.
 
 Maestro manages a pipeline of AI agents that implement, review, risk-assess, deploy, and monitor code changes — triggered from your issue tracker.
 
-## Quick Start
+## Install
 
-Pull and run:
+### Homebrew (recommended for end users)
+
+```bash
+brew install dunkinfrunkin/tap/maestro
+```
+
+This installs the Go CLI which wraps Docker. Commands like `maestro app`, `maestro serve`, and `maestro worker` pull and run the Docker image automatically.
+
+### Docker
 
 ```bash
 docker run -d --name maestro \
@@ -134,21 +142,83 @@ Configure connections from **Settings > Connections** in the dashboard.
 
 ## Development
 
+### Prerequisites
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- Node.js 22+
+- Docker (for PostgreSQL)
+
+### Setup
+
 ```bash
-# Start postgres
+# 1. Start PostgreSQL
 docker compose up -d
 
-# Backend
+# 2. Install the Maestro CLI locally
 cd backend
 cp .env.example .env.local   # fill in your keys
 set -a && source .env.local && set +a
 uv sync
-uv run uvicorn maestro.app:app --reload --port 8000
+uv pip install -e .
 
-# Frontend
-cd frontend
-npm install
-NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
+# 3. Install frontend dependencies
+cd ../frontend
+npm ci
+```
+
+### Running locally
+
+The `maestro` CLI is now available from the backend virtualenv:
+
+```bash
+# Start everything (backend + frontend)
+maestro app
+
+# Or start services individually
+maestro serve --reload          # API only on :8000
+maestro worker                  # Agent job worker
+maestro worker --concurrency 5  # Worker with custom concurrency
+```
+
+If `maestro` is not found in your PATH, either activate the venv or create a symlink:
+
+```bash
+# Option A: activate the venv
+cd backend && source .venv/bin/activate
+
+# Option B: symlink to a directory in your PATH
+ln -sf $(pwd)/backend/.venv/bin/maestro /opt/homebrew/bin/maestro
+```
+
+### Configuration
+
+`maestro init` generates `~/.maestro/config.yaml` with defaults:
+
+```bash
+maestro init
+```
+
+The CLI reads ports, worker settings, and credentials from this file. Priority: CLI flags > config.yaml > environment variables > defaults.
+
+### Scaffold agent context for a repo
+
+```bash
+maestro repo init /path/to/your/repo
+```
+
+This creates an `.agents/` directory with 11 template files that AI agents read before executing tasks.
+
+### Makefile
+
+All common commands are available via `make`:
+
+```bash
+make setup      # Start postgres + install all deps
+make app        # Start backend + frontend
+make serve      # API server only (with reload)
+make worker     # Agent worker process
+make help       # Show all targets
 ```
 
 Dashboard at http://localhost:3000, API at http://localhost:8000.
