@@ -73,15 +73,24 @@ Use GitHub or GitLab as the codebase, and Jira or Linear as the tracker.
 
 Once connected, Maestro automatically syncs issues and you can queue tasks from the dashboard.
 
-## What happens next
+## Run your first task
 
-Once queued, five agents take over in sequence:
+1. Select a repository from the dashboard and click **New Task**
+2. Enter a title and description — for example:
+   - **Title:** `Add health check endpoint`
+   - **Description:** `Create a GET /health route that returns {"status": "ok"}`
+3. Click **Queue Task**
+4. Move the task to **Implement** to kick off the pipeline
+
+Once in Implement, five agents take over in sequence:
 
 1. **Implementation** — reads your codebase, writes code, runs tests, opens a PR
 2. **Review** — posts inline comments on specific lines, requests changes or approves
 3. **Risk Profile** — scores the PR across seven dimensions, auto-approves if low risk
 4. **Deployment** — verifies CI checks, merges via squash
 5. **Monitor** — watches metrics and logs for 15 minutes post-deploy
+
+You can watch each stage in real time from the task detail page.
 
 See [Pipeline](/docs/pipeline) for how each stage works, or [Agents](/docs/agents) for agent-specific configuration.
 
