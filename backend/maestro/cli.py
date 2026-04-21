@@ -472,7 +472,6 @@ def _cmd_init(args: argparse.Namespace) -> None:
 def _cmd_serve(args: argparse.Namespace) -> None:
     """Start the Maestro server."""
     config = _load_all_config(getattr(args, "env_file", None))
-    os.environ["MAESTRO_WORKFLOW"] = args.workflow
     host = args.host or _get_nested(config, "server.host") or "127.0.0.1"
     port = args.port or _get_nested(config, "server.port") or 8000
     uvicorn.run(
@@ -489,7 +488,6 @@ def _cmd_app(args: argparse.Namespace) -> None:
     import signal
 
     config = _load_all_config(getattr(args, "env_file", None))
-    os.environ["MAESTRO_WORKFLOW"] = args.workflow
     backend_port = str(args.backend_port or _get_nested(config, "server.port") or 8000)
     frontend_port = str(args.frontend_port or _get_nested(config, "frontend.port") or 3000)
     os.environ.setdefault("NEXT_PUBLIC_API_URL", f"http://localhost:{backend_port}")
@@ -612,14 +610,12 @@ def main(argv: list[str] | None = None) -> None:
     serve_parser.add_argument("--host", default=None, help="Bind host (default: config or 127.0.0.1)")
     serve_parser.add_argument("--port", type=int, default=None, help="Bind port (default: config or 8000)")
     serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    serve_parser.add_argument("--workflow", default="WORKFLOW.md", help="Path to WORKFLOW.md")
 
     # maestro app
     app_parser = subparsers.add_parser("app", help="Start backend + frontend for local development")
     app_parser.add_argument("--env-file", help="Path to .env file to load")
     app_parser.add_argument("--frontend-port", type=int, default=None, help="Frontend port (default: config or 3000)")
     app_parser.add_argument("--backend-port", type=int, default=None, help="Backend port (default: config or 8000)")
-    app_parser.add_argument("--workflow", default="WORKFLOW.md", help="Path to WORKFLOW.md")
 
     # maestro worker
     worker_parser = subparsers.add_parser("worker", help="Start the agent worker process")

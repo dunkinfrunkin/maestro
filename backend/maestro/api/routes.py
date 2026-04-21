@@ -10,16 +10,15 @@ router = APIRouter(prefix="/api/v1")
 
 
 def _get_orchestrator(request: Request):
-    orch = request.app.state.orchestrator
-    if orch is None:
-        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
-    return orch
+    return getattr(request.app.state, "orchestrator", None)
 
 
 @router.get("/state")
 async def get_state(request: Request) -> OrchestratorState:
     """Current system state: running agents, retry queue, aggregate totals."""
     orch = _get_orchestrator(request)
+    if orch is None:
+        return OrchestratorState()
     return orch.state.to_api_state()
 
 
@@ -27,6 +26,8 @@ async def get_state(request: Request) -> OrchestratorState:
 async def get_config(request: Request) -> dict:
     """Current service configuration (secrets redacted)."""
     orch = _get_orchestrator(request)
+    if orch is None:
+        return {}
     cfg = orch.config
     return {
         "tracker": {
@@ -59,6 +60,8 @@ async def get_config(request: Request) -> dict:
 async def refresh(request: Request) -> dict:
     """Queue an immediate poll/reconciliation cycle."""
     orch = _get_orchestrator(request)
+    if orch is None:
+        return {"status": "no_orchestrator"}
     orch.trigger_refresh()
     return {"status": "queued"}
 
@@ -67,6 +70,8 @@ async def refresh(request: Request) -> dict:
 async def get_issue(issue_identifier: str, request: Request) -> dict:
     """Issue-specific details."""
     orch = _get_orchestrator(request)
+    if orch is None:
+        raise HTTPException(status_code=404, detail="Issue not found")
     api_state = orch.state.to_api_state()
 
     running_match = None

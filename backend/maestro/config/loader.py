@@ -21,10 +21,10 @@ class ConfigLoader:
 
     def __init__(
         self,
-        workflow_path: str | Path,
+        workflow_path: str | Path | None = None,
         overrides: dict[str, Any] | None = None,
     ) -> None:
-        self._path = Path(workflow_path).resolve()
+        self._path = Path(workflow_path).resolve() if workflow_path else None
         self._overrides = overrides or {}
         self._workflow: WorkflowDefinition | None = None
         self._config: ServiceConfig | None = None
@@ -47,6 +47,10 @@ class ConfigLoader:
 
     def load(self) -> ServiceConfig:
         """(Re-)parse WORKFLOW.md and build config. Raises on first load failure."""
+        if self._path is None:
+            self._config = ServiceConfig()
+            logger.info("No workflow file — using default config")
+            return self._config
         try:
             wf = parse_workflow(self._path)
             cfg = build_service_config(wf, self._overrides)
@@ -66,7 +70,7 @@ class ConfigLoader:
 
     async def start_watching(self) -> None:
         """Start a background task that watches WORKFLOW.md for changes."""
-        if self._watch_task is not None:
+        if self._watch_task is not None or self._path is None:
             return
         self._watch_task = asyncio.create_task(self._watch_loop())
 
