@@ -14,12 +14,12 @@ Maestro has a few core components that work together. Understanding how they fit
 
 ```mermaid
 graph LR
-  USR["User"] -- |creates issue| --> EXT["Trackers"]
-  EXT -- |syncs| --> CC["CENTCOM"]
-  CC -- |dispatches| --> AL["Agentic Loop"]
-  AL -- |PRs| --> EXT
-  AL -- |approved| --> DP["Deploy"]
-  DP -- |status| --> EXT
+  USR["User"] --creates issue--> EXT["Trackers"]
+  EXT --syncs--> CC["CENTCOM"]
+  CC --dispatches--> AL["Agentic Loop"]
+  AL --PRs--> EXT
+  AL --approved--> DP["Deploy"]
+  DP --status--> EXT
 
   style USR fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style EXT fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -41,9 +41,9 @@ graph LR
 
 ```mermaid
 graph TB
-  I["Issue created in tracker"] -- |auto-sync| --> T["Appears in CENTCOM"]
-  T -- |assign repo| --> A["Assigned to repo"]
-  A -- |move to Implement| --> P["Pipeline starts"]
+  I["Issue created in tracker"] --auto-sync--> T["Appears in CENTCOM"]
+  T --assign repo--> A["Assigned to repo"]
+  A --move to Implement--> P["Pipeline starts"]
 
   style I fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style T fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -65,15 +65,15 @@ The core of Maestro — agents implement, review, and iterate until the code is 
 graph TB
   subgraph LOOP ["agentic loop"]
     direction TB
-    IA["Implement"] -- |opens PR| --> CB[("Codebase")]
-    IA -- |ready| --> RA["Review"]
-    RA -- |changes needed| --> IA
-    RA -- |comments| --> CB
-    RA -- |approved| --> RP["Risk Profile"]
-    RP -- |issues found| --> IA
+    IA["Implement"] --opens PR--> CB[("Codebase")]
+    IA --ready--> RA["Review"]
+    RA --changes needed--> IA
+    RA --comments--> CB
+    RA --approved--> RP["Risk Profile"]
+    RP --issues found--> IA
   end
 
-  RP -- |assessment| --> OUT["Human Gate"]
+  RP --assessment--> OUT["Human Gate"]
 
   style LOOP fill:none,stroke:#b45309,stroke-width:2px,stroke-dasharray:10 5,color:#b45309
   style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -99,15 +99,15 @@ CENTCOM is the brain. Workers are the muscle. Scale workers horizontally.
 
 ```mermaid
 graph TB
-  CC["CENTCOM"] -- |dispatch| --> W1["Worker 1"]
-  CC -- |dispatch| --> W2["Worker 2"]
-  CC -- |dispatch| --> W3["Worker N"]
-  W1 -- |runs| --> A1["Agent"]
-  W2 -- |runs| --> A2["Agent"]
-  W3 -- |runs| --> A3["Agent"]
-  W1 -. |heartbeat| .-> CC
-  W2 -. |heartbeat| .-> CC
-  W3 -. |heartbeat| .-> CC
+  CC["CENTCOM"] --dispatch--> W1["Worker 1"]
+  CC --dispatch--> W2["Worker 2"]
+  CC --dispatch--> W3["Worker N"]
+  W1 --runs--> A1["Agent"]
+  W2 --runs--> A2["Agent"]
+  W3 --runs--> A3["Agent"]
+  W1 -.heartbeat.-> CC
+  W2 -.heartbeat.-> CC
+  W3 -.heartbeat.-> CC
 
   style CC fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style W1 fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
@@ -136,13 +136,13 @@ After approval, the task exits through deployment and monitoring.
 
 ```mermaid
 graph TB
-  HG{{"Human Gate"}} -- |approved| --> DA["Deploy staging"]
-  DA -- |test| --> QA["QA Agent"]
-  QA -- |issues| --> BACK["Back to Loop"]
-  QA -- |pass| --> DA2["Deploy prod"]
-  DA2 -- |15 min| --> MA["Monitor"]
-  MA -- |anomaly| --> BACK
-  MA -- |clear| --> DONE["Done"]
+  HG{{"Human Gate"}} --approved--> DA["Deploy staging"]
+  DA --test--> QA["QA Agent"]
+  QA --issues--> BACK["Back to Loop"]
+  QA --pass--> DA2["Deploy prod"]
+  DA2 --15 min--> MA["Monitor"]
+  MA --anomaly--> BACK
+  MA --clear--> DONE["Done"]
 
   style HG fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
   style DA fill:#ebe5d9,stroke:#d4cab8,stroke-width:2px,color:#8a7e6b
