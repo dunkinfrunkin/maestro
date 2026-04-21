@@ -209,6 +209,18 @@ maestro repo init /path/to/your/repo
 
 This creates an `.agents/` directory with 11 template files that AI agents read before executing tasks.
 
+### Makefile
+
+All common commands are available via `make`:
+
+```bash
+make setup      # Start postgres + install all deps
+make app        # Start backend + frontend
+make serve      # API server only (with reload)
+make worker     # Agent worker process
+make help       # Show all targets
+```
+
 Dashboard at http://localhost:3000, API at http://localhost:8000.
 
 ## Docker Compose (production)
