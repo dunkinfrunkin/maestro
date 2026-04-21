@@ -20,6 +20,11 @@ const config: Config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
 
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -101,6 +106,26 @@ const config: Config = {
         },
       ],
       copyright: `MIT License \u00b7 \u00a9 ${new Date().getFullYear()} Frank Chan`,
+    },
+    mermaid: {
+      theme: {light: 'base'},
+      options: {
+        themeVariables: {
+          primaryColor: '#ebe5d9',
+          primaryTextColor: '#2c2416',
+          primaryBorderColor: '#d4cab8',
+          lineColor: '#8a7e6b',
+          secondaryColor: '#f5f0e8',
+          tertiaryColor: '#f5f0e8',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: '14px',
+          nodeBorder: '#d4cab8',
+          mainBkg: '#ebe5d9',
+          clusterBkg: '#f5f0e8',
+          clusterBorder: '#d4cab8',
+          edgeLabelBackground: '#f5f0e8',
+        },
+      },
     },
     prism: {
       theme: prismThemes.dracula,
