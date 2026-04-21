@@ -43,17 +43,35 @@ This pulls the Docker image and starts the full stack — backend, frontend, and
 
 Dashboard opens at [localhost:3000](http://localhost:3000).
 
-## Create your first task
+## Connect your integrations
 
-1. Open the dashboard at [localhost:3000](http://localhost:3000)
-2. Go to **Settings > Connections** and add your GitHub or GitLab connection
-3. Select a repository and click **New Task**
-4. Enter a title and description — for example:
-   - **Title:** `Add health check endpoint`
-   - **Description:** `Create a GET /health route that returns {"status": "ok"}`
-5. Click **Queue Task**
+Maestro needs two things to work: a **codebase** (where agents write code) and a **tracker** (where tasks come from).
 
-The task enters the pipeline and flows through each stage automatically. Watch it happen in real time from the task detail page.
+Open the dashboard at [localhost:3000](http://localhost:3000) and go to **Settings > Connections**.
+
+### Option A: GitHub for both
+
+GitHub serves as both codebase and tracker — agents open PRs and pull tasks from GitHub Issues.
+
+1. Add a **GitHub** connection with a personal access token or GitHub App
+2. Select the repositories you want Maestro to work on
+
+### Option B: Separate codebase + tracker
+
+Use GitHub or GitLab as the codebase, and Jira or Linear as the tracker.
+
+1. Add a **GitHub** or **GitLab** connection for your codebase
+2. Add a **Jira** or **Linear** connection for your issue tracker
+3. Link them to the same workspace
+
+| Integration | Role | What Maestro does with it |
+|---|---|---|
+| **GitHub** | Codebase + Tracker | Opens PRs, posts reviews, reads issues |
+| **GitLab** | Codebase + Tracker | Opens MRs, posts discussions, reads issues |
+| **Linear** | Tracker only | Syncs issues, updates status |
+| **Jira** | Tracker only | Syncs issues, updates status |
+
+Once connected, Maestro automatically syncs issues and you can queue tasks from the dashboard.
 
 ## What happens next
 
