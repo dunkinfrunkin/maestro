@@ -81,11 +81,9 @@ Once connected, Maestro automatically syncs issues and you can queue tasks from 
 
 ## Run your first task
 
-1. Select a repository from the dashboard and click **New Task**
-2. Enter a title and description — for example:
-   - **Title:** `Add health check endpoint`
-   - **Description:** `Create a GET /health route that returns {"status": "ok"}`
-3. Click **Queue Task**
+1. Create an issue in your tracker (GitHub Issues, Linear, Jira, or GitLab)
+2. The issue syncs automatically and appears in the Maestro **Tasks** page
+3. Assign a repository to the task
 4. Move the task to **Implement** to kick off the pipeline
 
 Once in Implement, five agents take over in sequence:
