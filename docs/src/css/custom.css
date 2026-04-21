@@ -203,6 +203,114 @@ table tr:hover td {
 }
 
 /* ------------------------------------------------------------------ */
+/* Mermaid diagrams                                                    */
+/* ------------------------------------------------------------------ */
+
+.docusaurus-mermaid-container {
+  cursor: zoom-in;
+  overflow: visible;
+  margin: 1.5rem 0;
+}
+
+.docusaurus-mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+  min-height: 200px;
+}
+
+.docusaurus-mermaid-container .nodeLabel {
+  font-size: 14px !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.4 !important;
+  padding: 8px 12px !important;
+}
+
+.docusaurus-mermaid-container .node rect,
+.docusaurus-mermaid-container .node polygon,
+.docusaurus-mermaid-container .node circle,
+.docusaurus-mermaid-container .node .label-container {
+  rx: 10 !important;
+  ry: 10 !important;
+}
+
+.docusaurus-mermaid-container .edgeLabel {
+  font-size: 12px !important;
+  background: var(--ma-bg) !important;
+  padding: 2px 6px !important;
+}
+
+/* Fullscreen modal */
+.mermaid-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 36, 22, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 2rem;
+}
+
+.mermaid-modal-content {
+  background: var(--ma-bg, #f5f0e8);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  cursor: default;
+  position: relative;
+}
+
+.mermaid-modal-content svg {
+  width: 100%;
+  height: auto;
+  min-width: 700px;
+}
+
+.mermaid-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #8a7e6b;
+  cursor: pointer;
+}
+
+.mermaid-zoom-controls {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mermaid-zoom-controls button {
+  background: #ebe5d9;
+  border: 1px solid #d4cab8;
+  border-radius: 6px;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.1rem;
+  color: #2c2416;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mermaid-zoom-controls button:hover {
+  background: #e0d9cb;
+}
+
+/* ------------------------------------------------------------------ */
 /* TOC (right sidebar)                                                 */
 /* ------------------------------------------------------------------ */
 

@@ -8,18 +8,18 @@ sidebar_label: Concepts
 
 Maestro has a few core components that work together. Understanding how they fit will help you configure and deploy effectively.
 
-## System overview
+*Click any diagram to expand and zoom.*
 
-Five components, one flow:
+## System overview
 
 ```mermaid
 graph LR
-  USR["User"] -. "creates issue" .-> EXT["Trackers & Code Hosts<br/>GitHub · GitLab · Linear · Jira"]
-  EXT -. "syncs issues" .-> CC["CENTCOM<br/>orchestrator + API"]
-  CC -. "dispatches" .-> AL["Agentic Loop<br/>implement · review · risk"]
-  AL -. "PRs, comments,<br/>CI checks" .-> EXT
-  AL -. "approved" .-> DP["Exit<br/>deploy · monitor · done"]
-  DP -. "status update" .-> EXT
+  USR["User"] -. "creates issue" .-> EXT["Trackers &<br/>Code Hosts"]
+  EXT -. "syncs" .-> CC["CENTCOM"]
+  CC -. "dispatches" .-> AL["Agentic<br/>Loop"]
+  AL -. "PRs &<br/>comments" .-> EXT
+  AL -. "approved" .-> DP["Deploy &<br/>Monitor"]
+  DP -. "status" .-> EXT
 
   style USR fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style EXT fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -32,7 +32,7 @@ graph LR
   linkStyle 2 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
   linkStyle 3 stroke:#b45309,stroke-width:2px,stroke-dasharray:8 5
   linkStyle 4 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
-  linkStyle 5 stroke:#2c2416,stroke-width:1.5px,stroke-dasharray:5 3
+  linkStyle 5 stroke:#d4cab8,stroke-width:1.5px,stroke-dasharray:5 3
 ```
 
 ---
@@ -41,9 +41,9 @@ graph LR
 
 ```mermaid
 graph TB
-  I["Issue created in tracker<br/>GitHub Issues · Linear · Jira · GitLab"] -. "auto-sync" .-> T["Task appears in CENTCOM<br/>Tasks page"]
-  T -. "user assigns repo" .-> A["Task assigned to repository"]
-  A -. "user moves to Implement" .-> P["Pipeline starts<br/>dispatched to worker"]
+  I["Issue created<br/>in tracker"] -. "auto-sync" .-> T["Appears in<br/>CENTCOM"]
+  T -. "assign repo" .-> A["Assigned to<br/>repository"]
+  A -. "move to Implement" .-> P["Pipeline starts"]
 
   style I fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style T fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -65,15 +65,15 @@ The core of Maestro — agents implement, review, and iterate until the code is 
 graph TB
   subgraph LOOP ["agentic loop"]
     direction TB
-    IA["implementation agent"] -- "opens PR,<br/>pushes code" --> CB[("codebase<br/>remote source")]
-    IA -- "ready for review" --> RA["review agent"]
-    RA -- "request changes" --> IA
-    RA -. "review MR,<br/>post comments" .-> CB
-    RA -- "approved" --> RP["risk profile agent"]
-    RP -. "issue found:<br/>comment on diff" .-> IA
+    IA["Implement"] -- "opens PR" --> CB[("Codebase")]
+    IA -- "ready" --> RA["Review"]
+    RA -- "changes needed" --> IA
+    RA -. "comments" .-> CB
+    RA -- "approved" --> RP["Risk Profile"]
+    RP -. "issues found" .-> IA
   end
 
-  RP -- "risk assessment" --> OUT["human gate / auto-approve"]
+  RP -- "assessment" --> OUT["Human Gate /<br/>Auto-approve"]
 
   style LOOP fill:none,stroke:#b45309,stroke-width:2px,stroke-dasharray:10 5,color:#b45309
   style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -95,16 +95,16 @@ graph TB
 
 ## CENTCOM and workers
 
-CENTCOM is the brain. Workers are the muscle. Workers can be scaled horizontally.
+CENTCOM is the brain. Workers are the muscle. Scale workers horizontally.
 
 ```mermaid
 graph TB
-  CC["CENTCOM<br/>API + orchestrator + dashboard"] -. "dispatches jobs<br/>via PostgreSQL queue" .-> W1["Worker 1"]
-  CC -. "dispatches" .-> W2["Worker 2"]
-  CC -. "dispatches" .-> W3["Worker N..."]
-  W1 -. "runs agents" .-> A1["Claude / Codex"]
-  W2 -. "runs agents" .-> A2["Claude / Codex"]
-  W3 -. "runs agents" .-> A3["Claude / Codex"]
+  CC["CENTCOM"] -. "dispatch via<br/>Postgres queue" .-> W1["Worker 1"]
+  CC -.-> W2["Worker 2"]
+  CC -.-> W3["Worker N"]
+  W1 -. "runs" .-> A1["Agent"]
+  W2 -. "runs" .-> A2["Agent"]
+  W3 -. "runs" .-> A3["Agent"]
   W1 -. "heartbeat" .-> CC
   W2 -. "heartbeat" .-> CC
   W3 -. "heartbeat" .-> CC
@@ -132,17 +132,17 @@ graph TB
 
 ## Exit: deploy and monitor
 
-After the agentic loop approves, the task exits through deployment and monitoring.
+After approval, the task exits through deployment and monitoring.
 
 ```mermaid
 graph TB
-  HG{{"human gate<br/>approve & merge"}} -. "approved" .-> DA["deploy agent<br/>lower envs"]
-  DA -. "test in staging" .-> QA["QA agent<br/>verify staging"]
-  QA -. "issues found" .-> BACK["back to agentic loop"]
-  QA -. "all clear" .-> DA2["deploy agent<br/>prod"]
-  DA2 -. "watch 15 min" .-> MA["monitor agent"]
-  MA -. "anomaly detected" .-> BACK
-  MA -. "all clear" .-> DONE["done"]
+  HG{{"Human Gate"}} -. "approved" .-> DA["Deploy<br/>staging"]
+  DA -. "test" .-> QA["QA Agent"]
+  QA -. "issues" .-> BACK["Back to<br/>Loop"]
+  QA -. "pass" .-> DA2["Deploy<br/>prod"]
+  DA2 -. "15 min" .-> MA["Monitor"]
+  MA -. "anomaly" .-> BACK
+  MA -. "clear" .-> DONE["Done"]
 
   style HG fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
   style DA fill:#ebe5d9,stroke:#d4cab8,stroke-width:2px,color:#8a7e6b

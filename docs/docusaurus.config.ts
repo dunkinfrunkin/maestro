@@ -24,6 +24,7 @@ const config: Config = {
     mermaid: true,
   },
   themes: ['@docusaurus/theme-mermaid'],
+  clientModules: ['./src/mermaidZoom.js'],
 
   i18n: {
     defaultLocale: 'en',
