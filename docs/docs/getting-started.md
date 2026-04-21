@@ -35,13 +35,19 @@ See [Configuration](/docs/configuration) for all options.
 
 ## Start
 
+Start the app and worker in two terminals:
+
 ```bash
+# Terminal 1 — dashboard + API
 maestro app
 ```
 
-This pulls the Docker image and starts the full stack — backend, frontend, and nginx — on port 3000.
+```bash
+# Terminal 2 — agent worker (processes tasks)
+maestro worker
+```
 
-Dashboard opens at [localhost:3000](http://localhost:3000).
+Dashboard opens at [localhost:3000](http://localhost:3000). The worker picks up tasks and runs agents.
 
 ## Connect your integrations
 
