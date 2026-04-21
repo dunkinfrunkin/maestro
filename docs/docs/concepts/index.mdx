@@ -14,11 +14,11 @@ Maestro has a few core components that work together. Understanding how they fit
 
 ```mermaid
 graph LR
-  USR["User"] -. "creates issue" .-> EXT["Trackers &<br/>Code Hosts"]
+  USR["User"] -. "creates issue" .-> EXT["Trackers"]
   EXT -. "syncs" .-> CC["CENTCOM"]
-  CC -. "dispatches" .-> AL["Agentic<br/>Loop"]
-  AL -. "PRs &<br/>comments" .-> EXT
-  AL -. "approved" .-> DP["Deploy &<br/>Monitor"]
+  CC -. "dispatches" .-> AL["Agentic Loop"]
+  AL -. "PRs" .-> EXT
+  AL -. "approved" .-> DP["Deploy"]
   DP -. "status" .-> EXT
 
   style USR fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -41,8 +41,8 @@ graph LR
 
 ```mermaid
 graph TB
-  I["Issue created<br/>in tracker"] -. "auto-sync" .-> T["Appears in<br/>CENTCOM"]
-  T -. "assign repo" .-> A["Assigned to<br/>repository"]
+  I["Issue created in tracker"] -. "auto-sync" .-> T["Appears in CENTCOM"]
+  T -. "assign repo" .-> A["Assigned to repo"]
   A -. "move to Implement" .-> P["Pipeline starts"]
 
   style I fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -73,7 +73,7 @@ graph TB
     RP -. "issues found" .-> IA
   end
 
-  RP -- "assessment" --> OUT["Human Gate /<br/>Auto-approve"]
+  RP -- "assessment" --> OUT["Human Gate"]
 
   style LOOP fill:none,stroke:#b45309,stroke-width:2px,stroke-dasharray:10 5,color:#b45309
   style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -99,9 +99,9 @@ CENTCOM is the brain. Workers are the muscle. Scale workers horizontally.
 
 ```mermaid
 graph TB
-  CC["CENTCOM"] -. "dispatch via<br/>Postgres queue" .-> W1["Worker 1"]
-  CC -.-> W2["Worker 2"]
-  CC -.-> W3["Worker N"]
+  CC["CENTCOM"] -. "dispatch" .-> W1["Worker 1"]
+  CC -. "dispatch" .-> W2["Worker 2"]
+  CC -. "dispatch" .-> W3["Worker N"]
   W1 -. "runs" .-> A1["Agent"]
   W2 -. "runs" .-> A2["Agent"]
   W3 -. "runs" .-> A3["Agent"]
@@ -136,10 +136,10 @@ After approval, the task exits through deployment and monitoring.
 
 ```mermaid
 graph TB
-  HG{{"Human Gate"}} -. "approved" .-> DA["Deploy<br/>staging"]
+  HG{{"Human Gate"}} -. "approved" .-> DA["Deploy staging"]
   DA -. "test" .-> QA["QA Agent"]
-  QA -. "issues" .-> BACK["Back to<br/>Loop"]
-  QA -. "pass" .-> DA2["Deploy<br/>prod"]
+  QA -. "issues" .-> BACK["Back to Loop"]
+  QA -. "pass" .-> DA2["Deploy prod"]
   DA2 -. "15 min" .-> MA["Monitor"]
   MA -. "anomaly" .-> BACK
   MA -. "clear" .-> DONE["Done"]

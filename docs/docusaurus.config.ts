@@ -112,6 +112,12 @@ const config: Config = {
       theme: {light: 'base'},
       options: {
         securityLevel: 'loose',
+        flowchart: {
+          nodeSpacing: 30,
+          rankSpacing: 50,
+          padding: 15,
+          useMaxWidth: true,
+        },
         themeVariables: {
           primaryColor: '#ebe5d9',
           primaryTextColor: '#2c2416',
