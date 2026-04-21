@@ -236,13 +236,13 @@ table tr:hover td {
 
 .docusaurus-mermaid-container .edgeLabel {
   font-size: 12px !important;
-  background: transparent !important;
+  background: var(--ma-surface) !important;
   padding: 2px 6px !important;
 }
 
 .docusaurus-mermaid-container .edgeLabel rect,
 .docusaurus-mermaid-container .labelBkg {
-  fill: transparent !important;
+  fill: var(--ma-surface) !important;
   stroke: none !important;
 }
 
