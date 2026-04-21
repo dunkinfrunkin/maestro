@@ -132,7 +132,7 @@ const config: Config = {
           mainBkg: '#ebe5d9',
           clusterBkg: '#f5f0e8',
           clusterBorder: '#d4cab8',
-          edgeLabelBackground: '#f5f0e8',
+          edgeLabelBackground: 'transparent',
         },
       },
     },
