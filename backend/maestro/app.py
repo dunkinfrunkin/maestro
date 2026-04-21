@@ -15,14 +15,16 @@ from maestro.api.auth import router as auth_router
 from maestro.api.routes import router as api_router
 from maestro.api.tasks import router as tasks_router
 from maestro.api.workspaces import router as workspaces_router
+from maestro.config.loader import ConfigLoader
 from maestro.db.engine import close_db, init_db
+from maestro.orchestrator.engine import Orchestrator
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start DB on startup, stop on shutdown."""
+    """Start DB + orchestrator on startup, stop on shutdown."""
     try:
         await init_db()
         logger.info("Database initialized")
@@ -32,10 +34,20 @@ async def lifespan(app: FastAPI):
     from maestro.agent.plugin import init_plugins
     init_plugins()
 
-    app.state.orchestrator = None
+    orchestrator = None
+    try:
+        loader = ConfigLoader()
+        orchestrator = Orchestrator(config_loader=loader)
+        await orchestrator.start()
+    except Exception:
+        logger.exception("Failed to start orchestrator")
+
+    app.state.orchestrator = orchestrator
 
     yield
 
+    if orchestrator:
+        await orchestrator.stop()
     await close_db()
 
 

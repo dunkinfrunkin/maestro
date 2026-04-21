@@ -36,7 +36,7 @@ class Orchestrator:
     def __init__(
         self,
         config_loader: ConfigLoader,
-        tracker: TrackerClient,
+        tracker: TrackerClient | None = None,
     ) -> None:
         self._loader = config_loader
         self._tracker = tracker
@@ -118,6 +118,8 @@ class Orchestrator:
 
     async def _startup_cleanup(self) -> None:
         """Query terminal-state issues and remove corresponding workspaces."""
+        if not self._tracker:
+            return
         cfg = self.config
         try:
             terminal_issues = await self._tracker.fetch_issues_by_states(cfg.tracker.terminal_states)
@@ -183,12 +185,12 @@ class Orchestrator:
 
     def _validate_dispatch(self) -> bool:
         """Preflight validation before dispatching."""
+        if not self._tracker:
+            return False
         cfg = self.config
         if not cfg.tracker.api_key:
-            logger.warning("Dispatch skipped: missing tracker API key")
             return False
         if not cfg.tracker.project_slug:
-            logger.warning("Dispatch skipped: missing project slug")
             return False
         return True
 
@@ -373,7 +375,7 @@ class Orchestrator:
 
     async def _reconcile(self) -> None:
         """Reconcile running issues: stall detection + state refresh."""
-        if not self._state.running:
+        if not self._tracker or not self._state.running:
             return
 
         cfg = self.config
