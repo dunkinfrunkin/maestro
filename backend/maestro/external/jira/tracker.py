@@ -54,6 +54,8 @@ class JiraIssueTracker(IssueTracker):
         api_version: str = "3",
         timeout_ms: int = 30000,
     ) -> None:
+        if not api_token:
+            raise ValueError("Jira API token is required — set tracker.api_key in WORKFLOW.md")
         self._base_url = base_url.rstrip("/")
         self._assignee_email = assignee_email
         # Support comma-separated project keys: "ENG,PLATFORM,INFRA"

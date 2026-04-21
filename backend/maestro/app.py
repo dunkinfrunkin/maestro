@@ -48,17 +48,20 @@ async def lifespan(app: FastAPI):
             loader.load()
             cfg = loader.config
 
-            tracker = LinearClient(
-                api_key=cfg.tracker.api_key,
-                project_slug=cfg.tracker.project_slug,
-                active_states=cfg.tracker.active_states,
-                terminal_states=cfg.tracker.terminal_states,
-                endpoint=cfg.tracker.endpoint,
-            )
+            if not cfg.tracker.api_key:
+                logger.warning("No tracker API key configured — running in API-only mode")
+            else:
+                tracker = LinearClient(
+                    api_key=cfg.tracker.api_key,
+                    project_slug=cfg.tracker.project_slug,
+                    active_states=cfg.tracker.active_states,
+                    terminal_states=cfg.tracker.terminal_states,
+                    endpoint=cfg.tracker.endpoint,
+                )
 
-            orchestrator = Orchestrator(config_loader=loader, tracker=tracker)
-            await orchestrator.start()
-            logger.info("Orchestrator started with workflow: %s", workflow_path)
+                orchestrator = Orchestrator(config_loader=loader, tracker=tracker)
+                await orchestrator.start()
+                logger.info("Orchestrator started with workflow: %s", workflow_path)
         except Exception:
             logger.exception("Failed to start orchestrator — running in API-only mode")
             orchestrator = None

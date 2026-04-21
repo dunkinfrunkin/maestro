@@ -28,6 +28,8 @@ class GitHubIssueTracker(IssueTracker):
         endpoint: str = "https://api.github.com",
         timeout_ms: int = 30000,
     ) -> None:
+        if not token:
+            raise ValueError("GitHub token is required — set tracker.api_key in WORKFLOW.md")
         self._repo = repo  # optional "owner/repo" filter
         self._endpoint = endpoint.rstrip("/")
         self._http = httpx.AsyncClient(
