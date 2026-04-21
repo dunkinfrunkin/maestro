@@ -110,6 +110,7 @@ const config: Config = {
     mermaid: {
       theme: {light: 'base'},
       options: {
+        securityLevel: 'loose',
         themeVariables: {
           primaryColor: '#ebe5d9',
           primaryTextColor: '#2c2416',
