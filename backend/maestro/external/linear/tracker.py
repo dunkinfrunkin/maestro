@@ -106,8 +106,6 @@ class LinearIssueTracker(IssueTracker):
         endpoint: str = "https://api.linear.app/graphql",
         timeout_ms: int = 30000,
     ) -> None:
-        if not api_key:
-            raise ValueError("Linear API key is required — set tracker.api_key in WORKFLOW.md")
         self._api_key = api_key
         self._project_slug = project_slug
         self._active_states = active_states

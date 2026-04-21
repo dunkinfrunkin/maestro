@@ -40,8 +40,6 @@ class GitLabIssueTracker(IssueTracker):
         endpoint: str = "https://gitlab.com",
         timeout_ms: int = 30000,
     ) -> None:
-        if not token:
-            raise ValueError("GitLab token is required — set tracker.api_key in WORKFLOW.md")
         self._endpoint = endpoint.rstrip("/")
         self._group = group
         self._group_path = quote(group, safe="") if group else ""
