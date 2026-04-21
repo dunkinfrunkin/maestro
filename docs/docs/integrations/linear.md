@@ -5,7 +5,7 @@ title: Linear
 
 # Linear
 
-Linear is a tracker-only integration — Maestro syncs issues from Linear and updates their status as tasks move through the pipeline.
+Linear is a tracker-only integration - Maestro syncs issues from Linear and updates their status as tasks move through the pipeline.
 
 You still need a separate **GitHub** or **GitLab** connection as the codebase.
 

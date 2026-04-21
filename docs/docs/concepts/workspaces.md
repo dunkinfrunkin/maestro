@@ -9,10 +9,10 @@ A workspace is a multi-tenant container that groups connections, agent configura
 
 ## What a workspace contains
 
-- **Connections** — GitHub, GitLab, Linear, Jira credentials
-- **Agent configs** — per-agent model selection, custom prompts, enabled/disabled state
-- **API keys** — Anthropic and OpenAI keys scoped to this workspace
-- **Tasks** — all issues synced from connected trackers
+- **Connections** - GitHub, GitLab, Linear, Jira credentials
+- **Agent configs** - per-agent model selection, custom prompts, enabled/disabled state
+- **API keys** - Anthropic and OpenAI keys scoped to this workspace
+- **Tasks** - all issues synced from connected trackers
 
 ## Why workspaces
 
@@ -28,5 +28,5 @@ Create and manage workspaces from the dashboard. Each workspace has members with
 
 | Role | Permissions |
 |---|---|
-| **Owner** | Full access — connections, agents, members, settings |
+| **Owner** | Full access - connections, agents, members, settings |
 | **Member** | View tasks, trigger runs, view agent logs |

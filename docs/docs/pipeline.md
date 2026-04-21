@@ -66,9 +66,9 @@ After review approval, the Risk Profile Agent scores the change.
 
 Each dimension is scored 1-5. The overall risk level is `LOW`, `MEDIUM`, or `HIGH`.
 
-- **LOW** — auto-approved for merge
-- **MEDIUM** — requires one human approval
-- **HIGH** — requires explicit human sign-off
+- **LOW** - auto-approved for merge
+- **MEDIUM** - requires one human approval
+- **HIGH** - requires explicit human sign-off
 
 The auto-approve threshold is configurable per workspace.
 
@@ -94,7 +94,7 @@ The Monitor Agent watches for post-deploy regressions.
 
 At any point, a task can transition to:
 
-- **failed** — unrecoverable error during any stage
-- **blocked** — human intervention required (high-risk PR, CI failure, etc.)
+- **failed** - unrecoverable error during any stage
+- **blocked** - human intervention required (high-risk PR, CI failure, etc.)
 
 All transitions are logged in the task activity feed and visible in the dashboard.

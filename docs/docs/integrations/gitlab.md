@@ -5,7 +5,7 @@ title: GitLab
 
 # GitLab
 
-GitLab serves as both codebase and tracker — agents open MRs, post discussions, and pull tasks from GitLab Issues.
+GitLab serves as both codebase and tracker - agents open MRs, post discussions, and pull tasks from GitLab Issues.
 
 ## Token
 

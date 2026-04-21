@@ -14,8 +14,8 @@ GitHub and GitLab can serve as both. Linear and Jira are tracker-only.
 |---|---|---|---|
 | **GitHub** | Yes | Yes | Opens PRs, posts inline reviews, reads issues, checks CI |
 | **GitLab** | Yes | Yes | Opens MRs, posts discussions, reads issues, checks pipelines |
-| **Linear** | — | Yes | Syncs issues, updates status |
-| **Jira** | — | Yes | Syncs issues from Cloud or Server, updates status |
+| **Linear** | - | Yes | Syncs issues, updates status |
+| **Jira** | - | Yes | Syncs issues from Cloud or Server, updates status |
 
 All connections are configured in **Settings > Connections** from the dashboard.
 

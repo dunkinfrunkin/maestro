@@ -5,7 +5,7 @@ title: Jira
 
 # Jira
 
-Jira is a tracker-only integration — works with both Jira Cloud and Jira Server/Data Center.
+Jira is a tracker-only integration - works with both Jira Cloud and Jira Server/Data Center.
 
 You still need a separate **GitHub** or **GitLab** connection as the codebase.
 
@@ -21,7 +21,7 @@ You still need a separate **GitHub** or **GitLab** connection as the codebase.
 2. Click **Add Connection** and select **Jira**
 3. Set the **Base URL** (e.g. `https://yourcompany.atlassian.net` for Cloud, or `https://jira.internal.company.com` for Server)
 4. Paste your API token (and email for Cloud)
-5. Set the **Project Key** (e.g. `ENG`) — supports comma-separated keys for multiple projects (`ENG,PLATFORM,INFRA`)
+5. Set the **Project Key** (e.g. `ENG`) - supports comma-separated keys for multiple projects (`ENG,PLATFORM,INFRA`)
 
 ## What happens
 

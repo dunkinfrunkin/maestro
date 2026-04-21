@@ -15,7 +15,7 @@ Create a `.env` file in the backend directory:
 # Database
 DATABASE_URL=postgresql://maestro:maestro@localhost:5432/maestro
 
-# LLM provider (required — at least one)
+# LLM provider (required - at least one)
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Tracker integrations (optional)
@@ -71,7 +71,7 @@ Each project has its own agent prompts, risk thresholds, and connection settings
 |---|---|
 | API key | Linear API key |
 | Team ID | Linear team identifier |
-| Project ID | Optional — sync a specific Linear project |
+| Project ID | Optional - sync a specific Linear project |
 
 ## Agent prompts
 
@@ -94,5 +94,5 @@ Each agent can use a different model. Configure per-agent in the dashboard or vi
 | Implementation | `claude-sonnet-4-6` | Needs strong coding ability |
 | Review | `claude-sonnet-4-6` | Needs to reason about code quality |
 | Risk Profile | `claude-haiku-4-5` | Lighter task, faster model works well |
-| Deployment | None | No LLM needed — uses `gh` CLI directly |
+| Deployment | None | No LLM needed - uses `gh` CLI directly |
 | Monitor | `claude-haiku-4-5` | Reads logs and metrics |

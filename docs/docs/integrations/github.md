@@ -5,7 +5,7 @@ title: GitHub
 
 # GitHub
 
-GitHub serves as both codebase and tracker — agents open PRs, post inline reviews, and pull tasks from GitHub Issues.
+GitHub serves as both codebase and tracker - agents open PRs, post inline reviews, and pull tasks from GitHub Issues.
 
 ## Token
 

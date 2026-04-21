@@ -13,7 +13,7 @@ Writes code to fulfill task requirements.
 
 **What it does:**
 1. Reads the task description and linked issues
-2. Explores the project codebase — structure, conventions, patterns
+2. Explores the project codebase - structure, conventions, patterns
 3. Writes the implementation (new files, modified files, tests)
 4. Runs the test suite
 5. Creates a branch and opens a pull request

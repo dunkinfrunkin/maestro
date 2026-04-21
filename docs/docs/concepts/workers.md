@@ -11,7 +11,7 @@ Workers are the processes that actually run agents. They pick up jobs dispatched
 
 - Poll the PostgreSQL job queue for dispatched tasks (`SELECT FOR UPDATE SKIP LOCKED`)
 - Run agent processes (Claude Code CLI or OpenAI Codex CLI) in cloned repo workspaces
-- Report results back — token usage, success/failure, logs
+- Report results back - token usage, success/failure, logs
 - Send heartbeats so CENTCOM knows they're alive
 
 ## How to run
@@ -32,7 +32,7 @@ Workers can run anywhere that has Docker (for the agent CLIs) and network access
 | **Horizontal scale** | Multiple `worker` replicas sharing the same DB | High throughput |
 | **Cloud VMs** | Workers on dedicated VMs close to your code host | Large repos, low latency |
 
-Workers are stateless — you can scale them up/down or restart them without losing work. In-flight jobs are gracefully drained on shutdown.
+Workers are stateless - you can scale them up/down or restart them without losing work. In-flight jobs are gracefully drained on shutdown.
 
 ## Concurrency
 

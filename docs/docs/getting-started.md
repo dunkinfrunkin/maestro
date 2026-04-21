@@ -38,12 +38,12 @@ See [Configuration](/docs/configuration) for all options.
 Start the app and worker in two terminals:
 
 ```bash
-# Terminal 1 — dashboard + API
+# Terminal 1 - dashboard + API
 maestro app
 ```
 
 ```bash
-# Terminal 2 — agent worker (processes tasks)
+# Terminal 2 - agent worker (processes tasks)
 maestro worker
 ```
 
@@ -57,7 +57,7 @@ Open the dashboard at [localhost:3000](http://localhost:3000) and go to **Settin
 
 ### Option A: GitHub for both
 
-GitHub serves as both codebase and tracker — agents open PRs and pull tasks from GitHub Issues.
+GitHub serves as both codebase and tracker - agents open PRs and pull tasks from GitHub Issues.
 
 1. Add a **GitHub** connection with a personal access token or GitHub App
 2. Select the repositories you want Maestro to work on
@@ -88,11 +88,11 @@ Once connected, Maestro automatically syncs issues and you can queue tasks from 
 
 Once in Implement, five agents take over in sequence:
 
-1. **Implementation** — reads your codebase, writes code, runs tests, opens a PR
-2. **Review** — posts inline comments on specific lines, requests changes or approves
-3. **Risk Profile** — scores the PR across seven dimensions, auto-approves if low risk
-4. **Deployment** — verifies CI checks, merges via squash
-5. **Monitor** — watches metrics and logs for 15 minutes post-deploy
+1. **Implementation** - reads your codebase, writes code, runs tests, opens a PR
+2. **Review** - posts inline comments on specific lines, requests changes or approves
+3. **Risk Profile** - scores the PR across seven dimensions, auto-approves if low risk
+4. **Deployment** - verifies CI checks, merges via squash
+5. **Monitor** - watches metrics and logs for 15 minutes post-deploy
 
 You can watch each stage in real time from the task detail page.
 

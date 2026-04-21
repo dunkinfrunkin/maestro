@@ -12,7 +12,7 @@ A task is a unit of work that flows through the Maestro pipeline. Tasks originat
 1. An issue is created in your tracker (GitHub Issues, Linear, Jira, GitLab)
 2. Maestro syncs it and it appears on the **Tasks** page
 3. You assign a repository and move it to **Implement**
-4. The pipeline takes over — implement → review → risk → deploy → monitor
+4. The pipeline takes over - implement → review → risk → deploy → monitor
 5. The task reaches **Done** or **Failed**
 
 ## Pipeline states

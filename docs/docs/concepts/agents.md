@@ -5,7 +5,7 @@ title: Agents
 
 # Agents
 
-Agents are the AI processes that do the actual work — writing code, reviewing PRs, assessing risk, deploying, and monitoring. Each agent is a specialized subprocess that runs inside a worker.
+Agents are the AI processes that do the actual work - writing code, reviewing PRs, assessing risk, deploying, and monitoring. Each agent is a specialized subprocess that runs inside a worker.
 
 ## The five agents
 
@@ -19,9 +19,9 @@ Agents are the AI processes that do the actual work — writing code, reviewing 
 
 ## How they run
 
-Each agent runs as a **Claude Code CLI** or **OpenAI Codex CLI** subprocess in a cloned copy of the repository. The worker manages the lifecycle — spawning, streaming output, handling timeouts, and collecting results.
+Each agent runs as a **Claude Code CLI** or **OpenAI Codex CLI** subprocess in a cloned copy of the repository. The worker manages the lifecycle - spawning, streaming output, handling timeouts, and collecting results.
 
-Agents communicate through **PR comment threads** — the same workflow as human developers. The Implementation Agent opens a PR, the Review Agent comments on it, the Implementation Agent responds, and so on.
+Agents communicate through **PR comment threads** - the same workflow as human developers. The Implementation Agent opens a PR, the Review Agent comments on it, the Implementation Agent responds, and so on.
 
 ## Providers
 
@@ -36,4 +36,4 @@ API keys can be set globally or per-workspace in **Settings > Models**.
 
 ## Custom agents
 
-You can add custom agents using the plugin system — linters, security scanners, notification hooks, or entirely new pipeline stages. See [Plugins](/docs/plugins) for details.
+You can add custom agents using the plugin system - linters, security scanners, notification hooks, or entirely new pipeline stages. See [Plugins](/docs/plugins) for details.
