@@ -1,4 +1,4 @@
-.PHONY: install setup dev serve worker app init repo-init db frontend backend clean help
+.PHONY: install setup dev serve worker app init db frontend backend clean help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -15,9 +15,6 @@ setup: db install ## Full setup: start postgres, install deps
 
 init: ## Generate ~/.maestro/config.yaml
 	maestro init
-
-repo-init: ## Scaffold .agents/ templates in current directory
-	maestro repo init .
 
 # ---------------------------------------------------------------------------
 # Run
