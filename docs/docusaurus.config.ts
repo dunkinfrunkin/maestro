@@ -113,14 +113,14 @@ const config: Config = {
       options: {
         securityLevel: 'loose',
         flowchart: {
-          nodeSpacing: 30,
-          rankSpacing: 50,
-          padding: 15,
-          useMaxWidth: true,
+          nodeSpacing: 40,
+          rankSpacing: 60,
+          padding: 20,
+          useMaxWidth: false,
         },
         themeVariables: {
           primaryColor: '#ebe5d9',
-          primaryTextColor: '#2c2416',
+          primaryTextColor: '#1a1207',
           primaryBorderColor: '#d4cab8',
           lineColor: '#8a7e6b',
           secondaryColor: '#f5f0e8',
@@ -128,6 +128,7 @@ const config: Config = {
           fontFamily: 'Inter, system-ui, sans-serif',
           fontSize: '14px',
           nodeBorder: '#d4cab8',
+          nodeTextColor: '#1a1207',
           mainBkg: '#ebe5d9',
           clusterBkg: '#f5f0e8',
           clusterBorder: '#d4cab8',

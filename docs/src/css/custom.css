@@ -208,23 +208,22 @@ table tr:hover td {
 
 .docusaurus-mermaid-container {
   cursor: zoom-in;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
   margin: 1.5rem 0;
+  padding: 1rem;
+  border: 1px solid var(--ma-border);
+  border-radius: 10px;
+  background: var(--ma-surface);
 }
 
 .docusaurus-mermaid-container svg {
-  max-width: 100%;
   height: auto;
-  min-height: 200px;
+  display: block;
 }
 
-.docusaurus-mermaid-container .nodeLabel {
-  font-size: 14px !important;
-  white-space: normal !important;
+.docusaurus-mermaid-container foreignObject {
   overflow: visible !important;
-  text-overflow: unset !important;
-  line-height: 1.4 !important;
-  padding: 8px 12px !important;
 }
 
 .docusaurus-mermaid-container .node rect,
@@ -237,7 +236,7 @@ table tr:hover td {
 
 .docusaurus-mermaid-container .edgeLabel {
   font-size: 12px !important;
-  background: var(--ma-bg) !important;
+  background: var(--ma-surface) !important;
   padding: 2px 6px !important;
 }
 
