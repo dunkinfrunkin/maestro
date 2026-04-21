@@ -9,18 +9,8 @@ Get Maestro running in under 5 minutes.
 
 ## Install
 
-### Homebrew (macOS / Linux)
-
 ```bash
 brew install dunkinfrunkin/tap/maestro
-```
-
-### From source
-
-```bash
-git clone https://github.com/dunkinfrunkin/maestro.git
-cd maestro
-make install
 ```
 
 ## Configure
@@ -45,23 +35,11 @@ See [Configuration](/docs/configuration) for all options.
 
 ## Start
 
-### With Homebrew (Docker-based)
-
 ```bash
 maestro app
 ```
 
 This pulls the Docker image and starts the full stack — backend, frontend, and nginx — on port 3000.
-
-### From source (local development)
-
-```bash
-# Start PostgreSQL
-make db
-
-# Start backend + frontend
-maestro app
-```
 
 Dashboard opens at [localhost:3000](http://localhost:3000).
 
