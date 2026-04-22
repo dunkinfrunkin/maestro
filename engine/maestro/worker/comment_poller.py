@@ -132,11 +132,14 @@ def _is_maestro_comment(body: str, user: str) -> bool:
 
 
 async def _fetch_pr_comments(task: TaskPipelineRecord) -> list[dict]:
-    """Fetch PR comments from the code host API."""
-    async with get_session() as session:
-        conn = await session.get(TrackerConnection, task.tracker_connection_id)
-        if not conn:
-            return []
+    """Fetch PR comments from the code host API based on pr_url domain."""
+    if not task.pr_url:
+        return []
+
+    conn = await _find_codehost_connection(task)
+    if not conn:
+        logger.debug("[comment-poller] No code host connection found for %s", task.pr_url)
+        return []
 
     token = decrypt_token(conn.encrypted_token)
 
@@ -146,6 +149,32 @@ async def _fetch_pr_comments(task: TaskPipelineRecord) -> list[dict]:
         return await _fetch_gitlab_comments(task.repo, task.pr_number, token, conn.endpoint)
 
     return []
+
+
+async def _find_codehost_connection(task: TaskPipelineRecord) -> TrackerConnection | None:
+    """Find a code host connection matching the PR URL domain."""
+    from urllib.parse import urlparse
+    pr_domain = urlparse(task.pr_url).hostname or ""
+
+    async with get_session() as session:
+        stmt = select(TrackerConnection).where(
+            TrackerConnection.kind.in_([TrackerKind.GITHUB.value, TrackerKind.GITLAB.value])
+        )
+        result = await session.execute(stmt)
+        conns = result.scalars().all()
+
+    for conn in conns:
+        conn_domain = ""
+        if conn.kind == TrackerKind.GITHUB:
+            conn_domain = urlparse(conn.endpoint or "https://github.com").hostname or "github.com"
+        elif conn.kind == TrackerKind.GITLAB:
+            conn_domain = urlparse(conn.endpoint or "https://gitlab.com").hostname or "gitlab.com"
+
+        if conn_domain and conn_domain == pr_domain:
+            logger.debug("[comment-poller] Matched connection %d (%s) for %s", conn.id, conn.kind.value, pr_domain)
+            return conn
+
+    return None
 
 
 async def _fetch_github_comments(repo: str, pr_number: str, token: str) -> list[dict]:
