@@ -65,7 +65,7 @@ Maestro is a monorepo with a Python FastAPI backend and Next.js frontend.
 
 ## Directory Structure
 - `engine/` - FastAPI server, SQLAlchemy models, agent implementations
-- `frontend/` - Next.js 16 App Router, Tailwind CSS
+- `ui/` - Next.js 16 App Router, Tailwind CSS
 - `cli/` - Go CLI distributed via Homebrew
 
 ## Data Flow

@@ -496,7 +496,7 @@ def _cmd_app(args: argparse.Namespace) -> None:
 
     # Find project directories
     backend_dir = Path(__file__).resolve().parent.parent
-    frontend_dir = backend_dir.parent / "frontend"
+    frontend_dir = backend_dir.parent / "ui"
     if not frontend_dir.exists():
         print(f"Error: frontend directory not found at {frontend_dir}")
         sys.exit(1)

@@ -163,7 +163,7 @@ uv sync
 uv pip install -e .
 
 # 3. Install frontend dependencies
-cd ../frontend
+cd ../ui
 npm ci
 ```
 

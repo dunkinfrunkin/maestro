@@ -1,9 +1,9 @@
-# ── Stage 1: Build frontend (always on native platform, no emulation) ──
-FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
+# ── Stage 1: Build UI (always on native platform, no emulation) ──
+FROM --platform=$BUILDPLATFORM node:22-alpine AS ui-builder
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY ui/package.json ui/package-lock.json* ./
 RUN npm ci
-COPY frontend/ .
+COPY ui/ .
 ENV NEXT_PUBLIC_API_URL=""
 RUN npm run build
 
@@ -35,11 +35,11 @@ WORKDIR /app/engine
 COPY --from=engine-builder /app/.venv ./.venv
 COPY --from=engine-builder /app/ .
 
-# Frontend — copy standalone build
-WORKDIR /app/frontend
-COPY --from=frontend-builder /app/.next/standalone ./
-COPY --from=frontend-builder /app/.next/static ./.next/static
-COPY --from=frontend-builder /app/public ./public
+# UI — copy standalone build
+WORKDIR /app/ui
+COPY --from=ui-builder /app/.next/standalone ./
+COPY --from=ui-builder /app/.next/static ./.next/static
+COPY --from=ui-builder /app/public ./public
 
 # Nginx config
 COPY nginx.docker.conf /etc/nginx/conf.d/maestro.conf

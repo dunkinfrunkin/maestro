@@ -9,7 +9,7 @@ help: ## Show this help
 
 install: ## Install backend (editable) + frontend dependencies
 	cd engine && uv sync && uv pip install -e .
-	cd frontend && npm ci
+	cd ui && npm ci
 
 setup: db install ## Full setup: start postgres, install deps
 
@@ -33,7 +33,7 @@ backend: ## Start backend only (uvicorn directly)
 	cd engine && uv run uvicorn maestro.app:app --reload --port 8000
 
 frontend: ## Start frontend only
-	cd frontend && npm run dev
+	cd ui && npm run dev
 
 # ---------------------------------------------------------------------------
 # Infrastructure

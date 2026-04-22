@@ -32,7 +32,7 @@ make install
 
 `make install` runs:
 - `cd engine && uv sync && uv pip install -e .` (installs the `maestro` CLI)
-- `cd frontend && npm ci`
+- `cd ui && npm ci`
 
 ## Running
 
@@ -120,7 +120,7 @@ Opens at [localhost:3000](http://localhost:3000) (use a different port if the ap
 ```
 maestro/
   engine/        Python FastAPI server
-  frontend/       Next.js dashboard
+  ui/       Next.js dashboard
   cli/            Go CLI (Homebrew distribution)
   docs/           Docusaurus docs site
   Dockerfile      Multi-stage production build

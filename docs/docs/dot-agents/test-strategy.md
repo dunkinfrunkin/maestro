@@ -32,7 +32,7 @@ E2E: Playwright (not yet set up)
 
 ## Running Tests
 pytest engine/tests/
-npm test --prefix frontend
+npm test --prefix ui
 
 ## Test Types
 | Type | Location | When to write |
