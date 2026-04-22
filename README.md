@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/static/img/logo.png" alt="Maestro" width="120" />
+
 # Maestro
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
