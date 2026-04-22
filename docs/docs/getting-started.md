@@ -15,6 +15,8 @@ Get Maestro running in under 5 minutes.
 brew install dunkinfrunkin/tap/maestro
 ```
 
+See [Installation](/docs/installation) for other methods (Docker, local development).
+
 ## Configure
 
 Generate a default config file:
