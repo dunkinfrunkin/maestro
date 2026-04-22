@@ -2,7 +2,7 @@
 
 # Maestro
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub release](https://img.shields.io/github/v/release/dunkinfrunkin/maestro)](https://github.com/dunkinfrunkin/maestro/releases)
 [![Homebrew](https://img.shields.io/badge/homebrew-dunkinfrunkin%2Ftap-blue)](https://github.com/dunkinfrunkin/homebrew-tap)
 [![Docs](https://img.shields.io/badge/docs-maestro.frankchan.dev-blue)](https://maestro.frankchan.dev)
@@ -112,4 +112,4 @@ We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)
