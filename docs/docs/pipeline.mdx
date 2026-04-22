@@ -9,29 +9,24 @@ Every task in Maestro has a lifecycle. From the moment an issue is synced from y
 
 ```mermaid
 graph LR
-  S["Synced"] --> A["Assigned"] --> I["Implement"] --> R["Review"] --> RP["Risk"] --> HG["Gate"] --> D["Deploy"] --> M["Monitor"] --> DN["Done"]
-  R -- "changes" --> I
+  TODO["todo"] -.-> IP["in-progress"] -.-> PRE["pre-req"] -.-> APP["approved"] -.-> LOWER["promote to lower envs"] -.-> DEP["deploy"]
 
-  style S fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
-  style A fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
-  style I fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
-  style R fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
-  style RP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
-  style HG fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
-  style D fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
-  style M fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
-  style DN fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
-
-  linkStyle 0 stroke:#2c2416,stroke-width:2px
-  linkStyle 1 stroke:#2c2416,stroke-width:2px
-  linkStyle 2 stroke:#b45309,stroke-width:2px
-  linkStyle 3 stroke:#b45309,stroke-width:2px
-  linkStyle 4 stroke:#b45309,stroke-width:2px
-  linkStyle 5 stroke:#2c2416,stroke-width:2px
-  linkStyle 6 stroke:#2c2416,stroke-width:2px
-  linkStyle 7 stroke:#2c2416,stroke-width:2px
-  linkStyle 8 stroke:#b45309,stroke-width:2px,stroke-dasharray:5 3
+  style TODO fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style IP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style PRE fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
+  style APP fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style LOWER fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style DEP fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
 ```
+
+| Status | What happens |
+|---|---|
+| **todo** | Task is synced from tracker, not triggered to run |
+| **in-progress** | Implementation agent writes code, AI/human/tool review, AI risk profile |
+| **pre-req** | All review comments resolved, human gate: approved by human |
+| **approved** | Auto-merged if not already merged by human, deploy and monitor lower envs |
+| **promote to lower envs** | Deploy to staging, QA validation (future: automated QA agent) |
+| **deploy** | Merged, deploying and monitoring to production |
 
 ## 1. Issue synced
 
