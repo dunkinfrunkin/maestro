@@ -74,11 +74,6 @@ const config: Config = {
           position: 'left',
         },
         {
-          to: '/changelog',
-          label: 'Changelog',
-          position: 'right',
-        },
-        {
           href: 'https://github.com/dunkinfrunkin/maestro',
           label: 'GitHub',
           position: 'right',
