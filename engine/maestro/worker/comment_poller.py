@@ -45,19 +45,30 @@ async def poll_comments_once() -> int:
         result = await session.execute(stmt)
         tasks = result.scalars().all()
 
+    if tasks:
+        logger.info("[comment-poller] Checking %d task(s) with open PRs", len(tasks))
+    else:
+        logger.debug("[comment-poller] No tasks with open PRs in reviewable status")
+
     for task in tasks:
         try:
+            logger.debug(
+                "[comment-poller] Checking %s PR #%s (%s) last_check=%s",
+                task.repo, task.pr_number, task.status.value,
+                task.last_comment_check_at.isoformat() if task.last_comment_check_at else "never",
+            )
             has_new = await _check_for_new_human_comments(task)
             if has_new:
                 logger.info(
-                    "New human comments on PR %s for task %s - dispatching implementation agent",
-                    task.pr_url,
-                    task.external_ref,
+                    "[comment-poller] New human comments on %s PR #%s - dispatching implementation agent",
+                    task.repo, task.pr_number,
                 )
                 await _dispatch_for_comments(task)
                 dispatched += 1
+            else:
+                logger.debug("[comment-poller] No new comments on %s PR #%s", task.repo, task.pr_number)
         except Exception:
-            logger.exception("Failed to check comments for task %s", task.external_ref)
+            logger.exception("[comment-poller] Failed to check comments for task %s", task.external_ref)
 
     return dispatched
 
@@ -67,6 +78,8 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
     since = task.last_comment_check_at
 
     comments = await _fetch_pr_comments(task)
+    logger.debug("[comment-poller] Fetched %d total comments for %s PR #%s", len(comments), task.repo, task.pr_number)
+
     if not comments:
         await _update_check_timestamp(task.id)
         return False
@@ -92,11 +105,16 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
         user = comment.get("user", {}).get("login", "")
 
         if _is_maestro_comment(body, user):
+            logger.debug("[comment-poller] Skipping agent comment by %s", user)
             continue
 
+        logger.debug("[comment-poller] New human comment by %s: %s", user, body[:80])
         new_human_comments.append(comment)
 
     await _update_check_timestamp(task.id)
+
+    if new_human_comments:
+        logger.info("[comment-poller] Found %d new human comment(s) on %s PR #%s", len(new_human_comments), task.repo, task.pr_number)
 
     return len(new_human_comments) > 0
 
@@ -228,15 +246,18 @@ async def run_comment_poller(
 ) -> None:
     """Background loop that polls for new human comments on open PRs."""
     _shutdown = shutdown or asyncio.Event()
-    logger.info("Comment poller started (interval=%.1fs)", interval)
+    logger.info("[comment-poller] Started (interval=%.1fs)", interval)
 
     while not _shutdown.is_set():
         try:
+            logger.debug("[comment-poller] Polling...")
             count = await poll_comments_once()
             if count > 0:
-                logger.info("Comment poller dispatched %d task(s)", count)
+                logger.info("[comment-poller] Dispatched %d task(s)", count)
+            else:
+                logger.debug("[comment-poller] No new comments found")
         except Exception:
-            logger.exception("Comment poller error")
+            logger.exception("[comment-poller] Poll error")
 
         try:
             await asyncio.wait_for(_shutdown.wait(), timeout=interval)

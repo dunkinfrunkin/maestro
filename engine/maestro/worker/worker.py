@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import platform
 import signal
 import sys
@@ -241,6 +242,14 @@ async def run_worker(
     comment_poll_interval: float = 60.0,
 ) -> None:
     """Main worker loop - claims and executes agent jobs."""
+    import logging as _logging
+    log_level = os.environ.get("MAESTRO_LOG_LEVEL", "INFO").upper()
+    _logging.basicConfig(
+        level=getattr(_logging, log_level, _logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
     await init_db()
     init_plugins()
 
