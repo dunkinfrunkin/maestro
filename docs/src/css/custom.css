@@ -212,9 +212,8 @@ table tr:hover td {
   overflow-y: visible;
   margin: 1.5rem 0;
   padding: 1rem;
-  border: 1px solid var(--ma-border);
-  border-radius: 10px;
-  background: var(--ma-surface);
+  border: none;
+  background: transparent;
 }
 
 .docusaurus-mermaid-container svg {
