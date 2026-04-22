@@ -16,7 +16,7 @@ At the highest level, Maestro sits between your team and your existing developme
 
 ```mermaid
 graph LR
-  USR["User"] --creates issue--> EXT["Trackers"]
+  USR["User"] -- "creates issue" --> EXT["Trackers"]
   EXT --syncs--> CC["CENTCOM"]
   CC --dispatches--> AL["Agentic Loop"]
   AL --PRs--> EXT
@@ -46,8 +46,8 @@ Maestro does not create issues - it consumes them from your existing tracker. Wh
 ```mermaid
 graph TB
   I["Issue created in tracker"] --auto-sync--> T["Appears in CENTCOM"]
-  T --assign repo--> A["Assigned to repo"]
-  A --move to Implement--> P["Pipeline starts"]
+  T -- "assign repo" --> A["Assigned to repo"]
+  A -- "move to Implement" --> P["Pipeline starts"]
 
   style I fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style T fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
@@ -69,12 +69,12 @@ Once a task enters the pipeline, three agents collaborate in a tight loop. The I
 graph TB
   subgraph LOOP ["agentic loop"]
     direction TB
-    IA["Implement"] --opens PR--> CB[("Codebase")]
+    IA["Implement"] -- "opens PR" --> CB[("Codebase")]
     IA --ready--> RA["Review"]
-    RA --changes needed--> IA
+    RA -- "changes needed" --> IA
     RA --comments--> CB
     RA --approved--> RP["Risk Profile"]
-    RP --issues found--> IA
+    RP -- "issues found" --> IA
   end
 
   RP --assessment--> OUT["Human Gate"]
@@ -144,7 +144,7 @@ graph TB
   DA --test--> QA["QA Agent"]
   QA --issues--> BACK["Back to Loop"]
   QA --pass--> DA2["Deploy prod"]
-  DA2 --15 min--> MA["Monitor"]
+  DA2 -- "15 min" --> MA["Monitor"]
   MA --anomaly--> BACK
   MA --clear--> DONE["Done"]
 
