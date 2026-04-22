@@ -7,11 +7,11 @@ COPY frontend/ .
 ENV NEXT_PUBLIC_API_URL=""
 RUN npm run build
 
-# ── Stage 2: Build backend deps ──
-FROM python:3.12-slim AS backend-builder
+# ── Stage 2: Build engine deps ──
+FROM python:3.12-slim AS engine-builder
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-COPY backend/ .
+COPY engine/ .
 RUN touch README.md && uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
 
 # ── Stage 3: Final image ──
@@ -31,9 +31,9 @@ RUN npm install -g @anthropic-ai/claude-code @openai/codex 2>/dev/null || \
     npm install -g @anthropic-ai/claude-code || true
 
 # Backend — copy venv and source
-WORKDIR /app/backend
-COPY --from=backend-builder /app/.venv ./.venv
-COPY --from=backend-builder /app/ .
+WORKDIR /app/engine
+COPY --from=engine-builder /app/.venv ./.venv
+COPY --from=engine-builder /app/ .
 
 # Frontend — copy standalone build
 WORKDIR /app/frontend

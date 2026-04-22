@@ -102,7 +102,7 @@ Every config.yaml field maps to an environment variable. Environment variables t
 For local development, you can use a `.env` file instead of exporting variables:
 
 ```bash
-cd backend
+cd engine
 cp .env.example .env.local
 ```
 

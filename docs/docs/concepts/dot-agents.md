@@ -40,7 +40,7 @@ This scaffolds 11 template files in `.agents/`. Each file has placeholder commen
 Be specific. Reference actual file paths, function names, table names, and conventions found in your code.
 
 **Good:**
-- "All API routes are in `backend/maestro/api/` and use FastAPI routers"
+- "All API routes are in `engine/maestro/api/` and use FastAPI routers"
 - "Authentication uses JWT in HTTP-only cookies, implemented in `auth.py`"
 - "Database migrations use Alembic, run with `alembic upgrade head`"
 
@@ -64,7 +64,7 @@ A minimal `ARCHITECTURE.md` for a FastAPI + Next.js project:
 Maestro is a monorepo with a Python FastAPI backend and Next.js frontend.
 
 ## Directory Structure
-- `backend/` - FastAPI server, SQLAlchemy models, agent implementations
+- `engine/` - FastAPI server, SQLAlchemy models, agent implementations
 - `frontend/` - Next.js 16 App Router, Tailwind CSS
 - `cli/` - Go CLI distributed via Homebrew
 

@@ -9,7 +9,7 @@ title: ARCHITECTURE.md
 
 ## Why it exists
 
-An agent can explore your directory structure, but it can't infer why things are organized the way they are. It doesn't know that `backend/maestro/external/` is for third-party integrations or that `frontend/src/lib/api.ts` is the single source of truth for all API calls. Without architectural context, agents put code in the wrong place, duplicate existing patterns, or break boundaries between modules.
+An agent can explore your directory structure, but it can't infer why things are organized the way they are. It doesn't know that `engine/maestro/external/` is for third-party integrations or that `frontend/src/lib/api.ts` is the single source of truth for all API calls. Without architectural context, agents put code in the wrong place, duplicate existing patterns, or break boundaries between modules.
 
 This file gives agents a map of the system before they start working.
 
@@ -34,10 +34,10 @@ frontend provides the dashboard UI, and the CLI is the distribution
 mechanism for end users.
 
 ## Directory Structure
-- backend/maestro/api/ - FastAPI routers, one file per resource
-- backend/maestro/agent/ - Agent implementations (one per pipeline stage)
-- backend/maestro/db/ - SQLAlchemy models and CRUD operations
-- backend/maestro/external/ - Third-party integrations (GitHub, GitLab, Linear, Jira)
+- engine/maestro/api/ - FastAPI routers, one file per resource
+- engine/maestro/agent/ - Agent implementations (one per pipeline stage)
+- engine/maestro/db/ - SQLAlchemy models and CRUD operations
+- engine/maestro/external/ - Third-party integrations (GitHub, GitLab, Linear, Jira)
 - frontend/src/app/ - Next.js App Router pages
 - frontend/src/lib/api.ts - All API calls go through authFetch()
 

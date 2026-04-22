@@ -8,7 +8,7 @@ help: ## Show this help
 # ---------------------------------------------------------------------------
 
 install: ## Install backend (editable) + frontend dependencies
-	cd backend && uv sync && uv pip install -e .
+	cd engine && uv sync && uv pip install -e .
 	cd frontend && npm ci
 
 setup: db install ## Full setup: start postgres, install deps
@@ -30,7 +30,7 @@ worker: ## Start agent worker process
 	maestro worker
 
 backend: ## Start backend only (uvicorn directly)
-	cd backend && uv run uvicorn maestro.app:app --reload --port 8000
+	cd engine && uv run uvicorn maestro.app:app --reload --port 8000
 
 frontend: ## Start frontend only
 	cd frontend && npm run dev
