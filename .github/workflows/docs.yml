@@ -23,11 +23,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: docs/package-lock.json
 
-      - run: npm install
+      - name: Install dependencies
         working-directory: docs
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install
 
       - run: npm run build
         working-directory: docs
