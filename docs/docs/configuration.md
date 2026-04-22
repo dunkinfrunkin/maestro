@@ -5,94 +5,207 @@ title: Configuration
 
 # Configuration
 
-Maestro is configured through environment variables and the dashboard UI.
+Maestro can be configured through multiple layers. Each layer overrides the one below it, so you can set broad defaults and override specific values where needed.
+
+## Configuration priority
+
+Settings are resolved in this order (highest priority first):
+
+| Priority | Source | Where it lives | Best for |
+|---|---|---|---|
+| 1 | CLI flags | `maestro serve --port 9000` | One-off overrides |
+| 2 | Environment variables | Shell, `.env` file, Docker `-e` | Secrets, CI/CD, containers |
+| 3 | config.yaml | `~/.maestro/config.yaml` | Local dev defaults |
+| 4 | Dashboard UI | Settings pages in the browser | Per-workspace config (connections, agents, models) |
+| 5 | Hardcoded defaults | Built into Maestro | Fallback values |
+
+## config.yaml
+
+The primary configuration file for local development. Generate it with:
+
+```bash
+maestro init
+```
+
+This creates `~/.maestro/config.yaml`:
+
+```yaml
+# Server
+server:
+  host: 127.0.0.1
+  port: 8000
+
+# Frontend
+frontend:
+  port: 3000
+
+# Worker
+worker:
+  concurrency: 3
+  poll_interval: 2.0
+  mode: inline          # "inline" or "queue"
+
+# Database
+database:
+  url: ""               # postgresql+asyncpg://user:pass@host:5432/db
+
+# Authentication
+auth:
+  secret: ""            # Required. Generate with: openssl rand -hex 32
+  disabled: false       # Set true to skip auth (dev only)
+  oidc_issuer: ""       # e.g. https://yourcompany.okta.com/oauth2/default
+  oidc_client_id: ""
+  oidc_client_secret: ""
+
+# Encryption
+encryption:
+  key: ""               # Fernet key for encrypting stored tokens
+
+# Frontend URL (for CORS and redirects)
+frontend_url: ""        # e.g. http://localhost:3000
+
+# API keys (can also be set per-workspace in Settings > Models)
+anthropic:
+  api_key: ""
+
+openai:
+  api_key: ""
+```
 
 ## Environment variables
 
-Create a `.env` file in the backend directory:
+Every config.yaml field maps to an environment variable. Environment variables take priority over config.yaml.
+
+| Variable | config.yaml path | Description |
+|---|---|---|
+| `DATABASE_URL` | `database.url` | PostgreSQL connection string |
+| `MAESTRO_SECRET` | `auth.secret` | JWT signing secret (required) |
+| `MAESTRO_AUTH_DISABLED` | `auth.disabled` | Skip auth entirely (dev only) |
+| `MAESTRO_OIDC_ISSUER` | `auth.oidc_issuer` | OIDC provider URL |
+| `MAESTRO_OIDC_CLIENT_ID` | `auth.oidc_client_id` | OAuth client ID |
+| `MAESTRO_OIDC_CLIENT_SECRET` | `auth.oidc_client_secret` | OAuth client secret |
+| `MAESTRO_ENCRYPTION_KEY` | `encryption.key` | Fernet key for token encryption |
+| `MAESTRO_FRONTEND_URL` | `frontend_url` | Frontend URL for CORS |
+| `MAESTRO_WORKER_MODE` | `worker.mode` | `inline` or `queue` |
+| `MAESTRO_CORS_ORIGINS` | - | Comma-separated allowed origins |
+| `ANTHROPIC_API_KEY` | `anthropic.api_key` | Claude API key |
+| `OPENAI_API_KEY` | `openai.api_key` | OpenAI API key |
+| `POSTGRES_HOST` | - | PostgreSQL host (Docker mode) |
+| `POSTGRES_PORT` | - | PostgreSQL port (Docker mode) |
+| `POSTGRES_DB` | - | Database name (Docker mode) |
+| `POSTGRES_USER` | - | Database user (Docker mode) |
+| `POSTGRES_PASSWORD` | - | Database password (Docker mode) |
+| `PORT` | - | Port to expose (Docker mode) |
+
+## .env file
+
+For local development, you can use a `.env` file instead of exporting variables:
 
 ```bash
-# Database
-DATABASE_URL=postgresql://maestro:maestro@localhost:5432/maestro
-
-# LLM provider (required - at least one)
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Tracker integrations (optional)
-GITHUB_TOKEN=ghp_...
-LINEAR_API_KEY=lin_api_...
-
-# Server
-HOST=0.0.0.0
-PORT=8000
-LOG_LEVEL=info
+cd backend
+cp .env.example .env.local
 ```
 
-All tokens are encrypted at rest using Fernet symmetric encryption before being stored in the database.
+Load it with:
 
-## Workspaces
+```bash
+maestro serve --env-file .env.local
+```
 
-A workspace represents a codebase that agents operate on.
+Or source it manually:
 
-| Field | Description |
-|---|---|
-| Name | Display name (e.g., `acme-api`) |
-| Path | Local filesystem path to the repo |
-| Remote URL | GitHub repository URL |
-| Default branch | Branch to base work off (default: `main`) |
+```bash
+set -a && source .env.local && set +a
+maestro serve
+```
 
-Create and manage workspaces via **Settings > Workspaces** in the dashboard.
+The `.env` file has the lowest priority - it won't override variables already set in the environment or config.yaml.
 
-## Projects
+## Docker
 
-A project groups tasks, agent configurations, and pipeline settings together.
+When running via Docker (`maestro app`, `maestro serve`, `maestro worker`), pass environment variables with `-e`:
 
-| Field | Description |
-|---|---|
-| Name | Project display name |
-| Workspace | Which workspace to use |
-| Description | Context for agents (helps them understand the codebase) |
+```bash
+docker run -d --name maestro \
+  -p 3000:3000 \
+  -e MAESTRO_SECRET=$(openssl rand -hex 32) \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db \
+  ghcr.io/dunkinfrunkin/maestro:latest
+```
 
-Each project has its own agent prompts, risk thresholds, and connection settings.
+The Go CLI automatically passes through all `MAESTRO_*`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`, and `POSTGRES_*` environment variables to the Docker container.
 
-## Connections
+## Dashboard UI
 
-### GitHub
+Some settings are configured through the dashboard rather than files:
 
-| Field | Description |
-|---|---|
-| Token | Personal access token or GitHub App token |
-| Owner | Repository owner (org or user) |
-| Repo | Repository name (or `*` for all repos) |
+### Connections
 
-### Linear
+Configured in **Settings > Connections**. Stored encrypted in the database.
 
-| Field | Description |
-|---|---|
-| API key | Linear API key |
-| Team ID | Linear team identifier |
-| Project ID | Optional - sync a specific Linear project |
+- GitHub, GitLab, Linear, Jira tokens and endpoints
+- Per-connection repository/project scoping
 
-## Agent prompts
+See [Integrations](/docs/integrations) for setup details.
 
-Each agent's system prompt can be customized per-project from the dashboard under **Agents**.
+### Agent configuration
 
-The prompt editor uses CodeMirror with markdown syntax highlighting. Changes are saved immediately and apply to the next agent run.
+Configured in **Settings > Agents** per workspace.
 
-**What you can customize:**
-- Code style and conventions for the Implementation Agent
-- Review criteria and severity rules for the Review Agent
-- Risk dimension weights for the Risk Profile Agent
-- Monitoring thresholds for the Monitor Agent
+| Setting | Where | What it controls |
+|---|---|---|
+| Enabled/disabled | Per agent toggle | Whether this agent runs in the pipeline |
+| Model | Per agent dropdown | Which LLM model to use |
+| Provider | Per agent dropdown | Anthropic or OpenAI |
+| System prompt | Per agent editor | Custom instructions for the agent |
 
-## Model selection
+### Model selection
 
-Each agent can use a different model. Configure per-agent in the dashboard or via the API:
+Each agent can use a different model. Configure per-workspace in **Settings > Models** or per-agent in the agent settings.
 
 | Agent | Default model | Notes |
 |---|---|---|
 | Implementation | `claude-sonnet-4-6` | Needs strong coding ability |
 | Review | `claude-sonnet-4-6` | Needs to reason about code quality |
 | Risk Profile | `claude-haiku-4-5` | Lighter task, faster model works well |
-| Deployment | None | No LLM needed - uses `gh` CLI directly |
+| Deployment | None | No LLM needed |
 | Monitor | `claude-haiku-4-5` | Reads logs and metrics |
+
+### API keys
+
+API keys can be set at two levels:
+
+- **Global** - via config.yaml or environment variables (applies to all workspaces)
+- **Per-workspace** - via **Settings > Models** in the dashboard (overrides global)
+
+## Authentication
+
+Maestro supports SSO via any OpenID Connect provider.
+
+| Provider | OIDC issuer value |
+|---|---|
+| Okta | `https://yourcompany.okta.com/oauth2/default` |
+| Google | `https://accounts.google.com` |
+| Azure AD | `https://login.microsoftonline.com/{tenant-id}/v2.0` |
+
+Set `MAESTRO_AUTH_DISABLED=true` to skip auth entirely (development only).
+
+## Worker configuration
+
+Workers can be tuned via config.yaml, CLI flags, or environment variables:
+
+```yaml
+# config.yaml
+worker:
+  concurrency: 3        # max parallel agent jobs
+  poll_interval: 2.0    # seconds between queue polls
+  mode: queue            # "inline" (in API process) or "queue" (separate workers)
+```
+
+```bash
+# CLI flags override config.yaml
+maestro worker --concurrency 5 --poll-interval 1.0
+```
+
+In production with separate workers, set `mode: queue` so the API server dispatches jobs to the queue instead of running agents inline.
