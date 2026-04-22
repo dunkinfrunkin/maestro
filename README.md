@@ -1,6 +1,18 @@
+<div align="center">
+
 # Maestro
 
-Autonomous coding agent orchestration for engineering teams.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/dunkinfrunkin/maestro)](https://github.com/dunkinfrunkin/maestro/releases)
+[![Homebrew](https://img.shields.io/badge/homebrew-dunkinfrunkin%2Ftap-blue)](https://github.com/dunkinfrunkin/homebrew-tap)
+[![Docs](https://img.shields.io/badge/docs-maestro.frankchan.dev-blue)](https://maestro.frankchan.dev)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://github.com/dunkinfrunkin/maestro/pkgs/container/maestro)
+
+**Autonomous coding agent orchestration for engineering teams.**
+
+[Documentation](https://maestro.frankchan.dev) | [Getting Started](https://maestro.frankchan.dev/docs/getting-started) | [Contributing](CONTRIBUTING.md)
+
+</div>
 
 Maestro is built on top of agentic coding systems like Claude Code, Codex, and whatever comes next. It doesn't compete with these platforms - it orchestrates them. It provides the pipeline, quality gates, and operational guardrails that turn raw agent capability into reliable engineering output.
 
@@ -83,16 +95,21 @@ See the full [local development guide](https://maestro.frankchan.dev/docs/instal
 
 ## Documentation
 
-Full docs at [maestro.frankchan.dev](https://maestro.frankchan.dev):
+Full docs at **[maestro.frankchan.dev](https://maestro.frankchan.dev)**:
 
-- [Getting Started](https://maestro.frankchan.dev/docs/getting-started)
-- [Concepts](https://maestro.frankchan.dev/docs/concepts)
-- [Lifecycle](https://maestro.frankchan.dev/docs/pipeline)
-- [Agents](https://maestro.frankchan.dev/docs/agents)
-- [Integrations](https://maestro.frankchan.dev/docs/integrations)
-- [Configuration](https://maestro.frankchan.dev/docs/configuration)
-- [Authentication](https://maestro.frankchan.dev/docs/authentication)
+- [Getting Started](https://maestro.frankchan.dev/docs/getting-started) - Install and run in 5 minutes
+- [Concepts](https://maestro.frankchan.dev/docs/concepts) - Architecture and how components fit together
+- [Lifecycle](https://maestro.frankchan.dev/docs/pipeline) - How a task moves through the pipeline
+- [Agents](https://maestro.frankchan.dev/docs/agents) - The five agents and their configuration
+- [.agents/](https://maestro.frankchan.dev/docs/dot-agents) - Context files that make agents effective
+- [Integrations](https://maestro.frankchan.dev/docs/integrations) - GitHub, GitLab, Linear, Jira setup
+- [Configuration](https://maestro.frankchan.dev/docs/configuration) - All config sources and options
+- [Authentication](https://maestro.frankchan.dev/docs/authentication) - Okta, Google, Azure AD SSO
+
+## Contributing
+
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT
+[MIT](LICENSE)
