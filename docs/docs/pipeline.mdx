@@ -1,0 +1,207 @@
+---
+sidebar_position: 3
+title: Lifecycle
+---
+
+# Lifecycle
+
+Every task in Maestro has a lifecycle. From the moment an issue is synced from your tracker to the moment code is deployed and monitored in production, each stage is handled by a specialized agent with quality gates enforced between them.
+
+```mermaid
+graph LR
+  S["Synced"] --> A["Assigned"] --> I["Implement"] --> R["Review"] --> RP["Risk"] --> HG["Gate"] --> D["Deploy"] --> M["Monitor"] --> DN["Done"]
+  R -- "changes" --> I
+
+  style S fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style A fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style I fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style R fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style RP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style HG fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
+  style D fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style M fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style DN fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px
+  linkStyle 1 stroke:#2c2416,stroke-width:2px
+  linkStyle 2 stroke:#b45309,stroke-width:2px
+  linkStyle 3 stroke:#b45309,stroke-width:2px
+  linkStyle 4 stroke:#b45309,stroke-width:2px
+  linkStyle 5 stroke:#2c2416,stroke-width:2px
+  linkStyle 6 stroke:#2c2416,stroke-width:2px
+  linkStyle 7 stroke:#2c2416,stroke-width:2px
+  linkStyle 8 stroke:#2c2416,stroke-width:2px
+  linkStyle 9 stroke:#b45309,stroke-width:2px,stroke-dasharray:5 3
+```
+
+## 1. Issue synced
+
+A task begins its lifecycle when an issue is created in your connected tracker (GitHub Issues, Linear, Jira, or GitLab). Maestro polls the tracker on a configurable interval and syncs new issues to the Tasks page. At this point the task exists in Maestro but no agent has touched it.
+
+- Issue title, description, priority, and labels are synced
+- Task appears on the dashboard with status `queued`
+- No repository is assigned yet
+
+## 2. Assigned and triggered
+
+A human assigns a target repository to the task and moves it to **Implement**. This is the intentional trigger that starts the agent pipeline. Maestro will not autonomously pick up tasks without this step.
+
+```mermaid
+graph TB
+  TR["Tracker"] -- "syncs issue" --> CC["CENTCOM"]
+  CC --> DASH["Dashboard"]
+  DASH -- "user assigns repo" --> REPO["Repo selected"]
+  REPO -- "move to Implement" --> GO["Dispatched"]
+
+  style TR fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style CC fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style DASH fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style REPO fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style GO fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px
+  linkStyle 2 stroke:#2c2416,stroke-width:2px
+  linkStyle 3 stroke:#b45309,stroke-width:2.5px
+```
+
+## 3. Implementation
+
+The Implementation Agent clones the repository, reads the codebase to understand conventions, writes the code, runs the test suite, and opens a pull request.
+
+- Reads the task description and any `.agents/` context files in the repo
+- Explores project structure, patterns, and dependencies
+- Writes the implementation across new and modified files
+- Runs existing tests to verify nothing is broken
+- Creates a `maestro/*` branch and opens a PR on the code host
+- Attaches the PR link to the task
+
+## 4. Review
+
+The Review Agent checks out the PR and performs inline code review, posting comments on specific lines via the code host API.
+
+- Reads every changed file in full context
+- Posts inline comments categorized as bug, style, performance, security, or suggestion
+- Issues a verdict: **APPROVE** or **REQUEST_CHANGES**
+
+If changes are requested, the task cycles back to the Implementation Agent. This is the core feedback loop that ensures code quality before anything gets merged.
+
+```mermaid
+graph TB
+  IA["Implement"] -- "opens PR" --> CB[("Codebase")]
+  IA -- "ready" --> RA["Review"]
+  RA -- "APPROVE" --> NEXT["Risk Assessment"]
+  RA -- "REQUEST_CHANGES" --> IA
+  RA -- "comments" --> CB
+
+  style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style CB fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style RA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style NEXT fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px
+  linkStyle 2 stroke:#2c2416,stroke-width:2px
+  linkStyle 3 stroke:#b45309,stroke-width:2.5px
+  linkStyle 4 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+```
+
+This loop has a configurable maximum iteration count (default: 5) to prevent infinite cycles.
+
+## 5. Risk assessment
+
+After review approval, the Risk Profile Agent scores the change across seven dimensions.
+
+| Dimension | What it measures |
+|---|---|
+| Scope | Files and lines changed |
+| Blast radius | Systems and users affected |
+| Complexity | Cyclomatic complexity, new abstractions |
+| Test coverage | Whether tests exist for changed paths |
+| Security | Auth, crypto, PII, secrets handling |
+| Reversibility | Can this be rolled back cleanly? |
+| Dependencies | New or updated external packages |
+
+Each dimension is scored 1-5. The overall risk level determines what happens next:
+
+```mermaid
+graph LR
+  RP["Risk Profile"] --> LOW["LOW"]
+  RP --> MED["MEDIUM"]
+  RP --> HIGH["HIGH"]
+  LOW -- "auto-approve" --> MERGE["Merge"]
+  MED -- "1 approval" --> MERGE
+  HIGH -- "sign-off" --> MERGE
+
+  style RP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style LOW fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style MED fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style HIGH fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
+  style MERGE fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px
+  linkStyle 1 stroke:#2c2416,stroke-width:2px
+  linkStyle 2 stroke:#2c2416,stroke-width:2px
+  linkStyle 3 stroke:#2c2416,stroke-width:2px
+  linkStyle 4 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 5 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+```
+
+If the Risk Profile Agent finds issues in the diff, it can send the task back to the Implementation Agent for fixes before proceeding.
+
+## 6. Human gate
+
+For medium and high risk changes, a human reviews the risk assessment and the PR before approving the merge. This is the final quality gate before code enters the deployment path. Low risk changes skip this step entirely.
+
+## 7. Deployment
+
+The Deployment Agent handles merging and CI verification.
+
+- Checks all CI pipelines (build, lint, test, deploy-preview)
+- Waits for all checks to pass
+- Merges the PR via squash into the target branch
+- Optionally deploys to staging for QA verification before production
+
+If a QA Agent is configured, it validates in staging. Issues found loop back to the Implementation Agent. Once staging is clean, the Deployment Agent promotes to production.
+
+## 8. Monitoring
+
+The Monitor Agent watches for post-deploy regressions in production.
+
+```mermaid
+graph TB
+  D["Deployed"] --> M["Monitor Agent"]
+  M -- "15 min" --> CHECK{"All clear?"}
+  CHECK -- "yes" --> DONE["Done"]
+  CHECK -- "anomaly" --> FLAG["Flag + rollback"]
+
+  style D fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style M fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style CHECK fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style DONE fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style FLAG fill:#fef3e2,stroke:#b45309,stroke-width:2px,color:#b45309
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px
+  linkStyle 1 stroke:#2c2416,stroke-width:2px
+  linkStyle 2 stroke:#2c2416,stroke-width:2px
+  linkStyle 3 stroke:#b45309,stroke-width:2px
+```
+
+- Queries metrics dashboards for latency and error rate changes
+- Checks logs for new exceptions
+- Monitors for 15 minutes after deploy
+- Flags the task if anomalies are detected, which can trigger a rollback or loop back for fixes
+
+If the monitoring window passes clean, the task is marked **done** and the tracker is updated.
+
+## Terminal states
+
+At any point during its lifecycle, a task can transition to:
+
+| State | Meaning |
+|---|---|
+| **Done** | Successfully completed all stages |
+| **Failed** | Unrecoverable error during any stage |
+| **Blocked** | Human intervention required (high-risk PR, CI failure, merge conflict) |
+
+All state transitions are logged in the task activity feed and visible in real time on the dashboard.
