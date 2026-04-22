@@ -5,6 +5,8 @@ title: Getting Started
 
 # Getting Started
 
+Maestro orchestrates agentic coding systems like Claude Code and Codex to implement, review, and ship code changes autonomously. It doesn't compete with these platforms - it builds the pipeline, quality gates, and operational guardrails around them. As these platforms improve, Maestro gets more capable for free.
+
 Get Maestro running in under 5 minutes.
 
 ## Install

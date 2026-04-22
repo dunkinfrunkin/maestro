@@ -24,6 +24,12 @@ export default function Philosophy() {
           Over the past year, something fundamental changed in how software gets built. The bottleneck is no longer writing code. It's designing environments where agents can do reliable work. Maestro encodes that shift into a pipeline.
         </p>
 
+        <Section title="We orchestrate, not compete">
+          <P>Maestro is built on top of agentic coding systems like Claude Code, Codex, and whatever comes next. These platforms are backed by Anthropic, OpenAI, and others investing billions into making AI agents better at writing code. Maestro doesn't compete with them - it orchestrates them.</P>
+          <P>As these platforms get smarter, Maestro gets more capable for free. We don't build our own LLM. We don't build our own code generation model. We build the pipeline, the orchestration, the quality gates, and the operational guardrails that turn raw agent capability into reliable engineering output.</P>
+          <P last>This is a deliberate bet: the agent platforms will keep getting better. Our job is to make that improvement useful in a production engineering workflow.</P>
+        </Section>
+
         <Section title="The role of the engineer is changing">
           <P>For decades, software engineering meant writing code. Reading requirements, thinking through edge cases, typing out implementations, running tests, fixing what broke. The craft was in the keystrokes.</P>
           <P>That's shifting. When a coding agent can clone a repo, read the codebase, write an implementation, run the test suite, and open a pull request - all in minutes - the engineer's value moves upstream. You stop being the person who writes the code. You become the person who designs the system that makes agents effective.</P>
