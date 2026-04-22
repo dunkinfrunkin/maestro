@@ -1,46 +1,48 @@
 ---
 sidebar_position: 3
-title: Pipeline
+title: Lifecycle
 ---
 
-# Pipeline
+# Lifecycle
 
-Every task in Maestro flows through a deterministic pipeline. Each stage is handled by a specialized agent, and the pipeline enforces quality gates between them.
+Every task in Maestro has a lifecycle. From the moment an issue is synced from your tracker to the moment code is deployed and monitored in production, each stage is handled by a specialized agent with quality gates enforced between them.
 
-```
-Queued → Implement → Review ↔ Implement → Risk Profile → Deploy → Monitor → Done
-```
+## 1. Issue synced
 
-## Queued
+A task begins its lifecycle when an issue is created in your connected tracker (GitHub Issues, Linear, Jira, or GitLab). Maestro polls the tracker on a configurable interval and syncs new issues to the Tasks page. At this point the task exists in Maestro but no agent has touched it.
 
-A task enters the queue when created from the dashboard, via the API, or synced from GitHub/Linear.
+- Issue title, description, priority, and labels are synced
+- Task appears on the dashboard with status `queued`
+- No repository is assigned yet
 
-- Task is validated and assigned to a workspace
-- Receives a unique internal ID
-- Status set to `queued`
+## 2. Assigned and triggered
 
-## Implement
+A human assigns a target repository to the task and moves it to **Implement**. This is the intentional trigger that starts the agent pipeline. Maestro will not autonomously pick up tasks without this step.
 
-The Implementation Agent picks up the task and writes code.
+- User selects a repository from the connected code host
+- User moves the task status to Implement
+- CENTCOM dispatches the task to an available worker
 
-- Reads the project codebase to understand context and conventions
-- Writes the implementation based on the task description
-- Runs the test suite to verify correctness
-- Creates a Git branch and opens a pull request
+## 3. Implementation
+
+The Implementation Agent clones the repository, reads the codebase to understand conventions, writes the code, runs the test suite, and opens a pull request.
+
+- Reads the task description and any `.agents/` context files in the repo
+- Explores project structure, patterns, and dependencies
+- Writes the implementation across new and modified files
+- Runs existing tests to verify nothing is broken
+- Creates a `maestro/*` branch and opens a PR on the code host
 - Attaches the PR link to the task
 
-## Review
+## 4. Review
 
-The Review Agent reads the pull request and performs inline code review.
+The Review Agent checks out the PR and performs inline code review, posting comments on specific lines via the code host API.
 
-- Checks out the PR and reads every changed file
-- Posts inline comments on specific lines where issues are found
-- Comments cover bugs, missing validation, style, performance, and security
-- If no issues are found, approves immediately
+- Reads every changed file in full context
+- Posts inline comments categorized as bug, style, performance, security, or suggestion
+- Issues a verdict: **APPROVE** or **REQUEST_CHANGES**
 
-## Review loop
-
-If the Review Agent requests changes, the task cycles back to the Implementation Agent:
+If changes are requested, the task cycles back to the Implementation Agent:
 
 1. Implementation Agent reads the review comments
 2. Applies fixes and pushes new commits
@@ -48,11 +50,11 @@ If the Review Agent requests changes, the task cycles back to the Implementation
 4. Review Agent re-reviews and verifies each fix
 5. Resolves threads and approves once everything is addressed
 
-The loop has a configurable maximum iteration count (default: 5) to prevent infinite cycles.
+This loop has a configurable maximum iteration count (default: 5) to prevent infinite cycles.
 
-## Risk Profile
+## 5. Risk assessment
 
-After review approval, the Risk Profile Agent scores the change.
+After review approval, the Risk Profile Agent scores the change across seven dimensions.
 
 | Dimension | What it measures |
 |---|---|
@@ -64,37 +66,48 @@ After review approval, the Risk Profile Agent scores the change.
 | Reversibility | Can this be rolled back cleanly? |
 | Dependencies | New or updated external packages |
 
-Each dimension is scored 1-5. The overall risk level is `LOW`, `MEDIUM`, or `HIGH`.
+Each dimension is scored 1-5. The overall risk level determines what happens next:
 
 - **LOW** - auto-approved for merge
 - **MEDIUM** - requires one human approval
 - **HIGH** - requires explicit human sign-off
 
-The auto-approve threshold is configurable per workspace.
+If the Risk Profile Agent finds issues in the diff, it can send the task back to the Implementation Agent for fixes before proceeding.
 
-## Deploy
+## 6. Human gate
+
+For medium and high risk changes, a human reviews the risk assessment and the PR before approving the merge. This is the final quality gate before code enters the deployment path. Low risk changes skip this step entirely.
+
+## 7. Deployment
 
 The Deployment Agent handles merging and CI verification.
 
-- Checks all GitHub Actions pipelines (build, lint, test, deploy-preview)
+- Checks all CI pipelines (build, lint, test, deploy-preview)
 - Waits for all checks to pass
 - Merges the PR via squash into the target branch
-- Reports success or failure back to the task
+- Optionally deploys to staging for QA verification before production
 
-## Monitor
+If a QA Agent is configured, it validates in staging. Issues found loop back to the Implementation Agent. Once staging is clean, the Deployment Agent promotes to production.
 
-The Monitor Agent watches for post-deploy regressions.
+## 8. Monitoring
 
-- Checks Datadog dashboards for latency and error rate changes
-- Queries Splunk logs for new exceptions
+The Monitor Agent watches for post-deploy regressions in production.
+
+- Queries metrics dashboards for latency and error rate changes
+- Checks logs for new exceptions
 - Monitors for 15 minutes after deploy
-- Flags the change if anomalies are detected
+- Flags the task if anomalies are detected, which can trigger a rollback or loop back for fixes
 
-## Status transitions
+If the monitoring window passes clean, the task is marked **done** and the tracker is updated.
 
-At any point, a task can transition to:
+## Terminal states
 
-- **failed** - unrecoverable error during any stage
-- **blocked** - human intervention required (high-risk PR, CI failure, etc.)
+At any point during its lifecycle, a task can transition to:
 
-All transitions are logged in the task activity feed and visible in the dashboard.
+| State | Meaning |
+|---|---|
+| **Done** | Successfully completed all stages |
+| **Failed** | Unrecoverable error during any stage |
+| **Blocked** | Human intervention required (high-risk PR, CI failure, merge conflict) |
+
+All state transitions are logged in the task activity feed and visible in real time on the dashboard.

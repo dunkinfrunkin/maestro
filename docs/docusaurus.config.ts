@@ -100,7 +100,7 @@ const config: Config = {
           title: 'Docs',
           items: [
             {label: 'Getting Started', to: '/docs/getting-started'},
-            {label: 'Pipeline', to: '/docs/pipeline'},
+            {label: 'Lifecycle', to: '/docs/pipeline'},
             {label: 'Agents', to: '/docs/agents'},
             {label: 'Plugins', to: '/docs/plugins'},
           ],

@@ -96,7 +96,7 @@ Once in Implement, five agents take over in sequence:
 
 You can watch each stage in real time from the task detail page.
 
-See [Pipeline](/docs/pipeline) for how each stage works, or [Agents](/docs/agents) for agent-specific configuration.
+See [Lifecycle](/docs/pipeline) for how each stage works, or [Agents](/docs/agents) for agent-specific configuration.
 
 ## CLI commands
 
