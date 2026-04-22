@@ -235,8 +235,12 @@ async def _deregister_worker(worker_id: str) -> None:
         pass
 
 
-async def run_worker(concurrency: int = 3, poll_interval: float = 2.0) -> None:
-    """Main worker loop — claims and executes agent jobs."""
+async def run_worker(
+    concurrency: int = 3,
+    poll_interval: float = 2.0,
+    comment_poll_interval: float = 60.0,
+) -> None:
+    """Main worker loop - claims and executes agent jobs."""
     await init_db()
     init_plugins()
 
@@ -268,6 +272,14 @@ async def run_worker(concurrency: int = 3, poll_interval: float = 2.0) -> None:
                 pass
 
     hb_task = asyncio.create_task(heartbeat_loop())
+
+    # Comment poller background task (leader-elected via advisory lock)
+    comment_task = None
+    if comment_poll_interval > 0:
+        from maestro.worker.comment_poller import run_comment_poller
+        comment_task = asyncio.create_task(
+            run_comment_poller(interval=comment_poll_interval, shutdown=shutdown)
+        )
 
     while not shutdown.is_set():
         # Clean up finished tasks
@@ -304,6 +316,8 @@ async def run_worker(concurrency: int = 3, poll_interval: float = 2.0) -> None:
 
     # Graceful shutdown
     hb_task.cancel()
+    if comment_task:
+        comment_task.cancel()
     if active_tasks:
         print(f"[WORKER] Waiting for {len(active_tasks)} in-flight jobs...")
         await asyncio.gather(*active_tasks, return_exceptions=True)

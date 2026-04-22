@@ -13,6 +13,7 @@ Workers are the processes that actually run agents. They pick up jobs dispatched
 - Run agent processes (Claude Code CLI or OpenAI Codex CLI) in cloned repo workspaces
 - Report results back - token usage, success/failure, logs
 - Send heartbeats so CENTCOM knows they're alive
+- Poll open PRs for new human comments and re-dispatch agents to address them
 
 ## How to run
 
@@ -49,4 +50,19 @@ maestro worker --concurrency 5
 worker:
   concurrency: 5
   poll_interval: 2.0
+  comment_poll_interval: 60.0
+```
+
+## Comment polling
+
+Each worker runs a background loop that checks open PRs for new human comments. When someone posts a review comment on a PR outside of Maestro, the worker detects it and automatically dispatches the Implementation Agent to address it.
+
+- Polls every 60 seconds by default (configurable)
+- Only checks tasks in "in-review" or "risk-profile" status with an open PR
+- Filters out comments made by Maestro agents (only human comments trigger re-dispatch)
+- Moves the task back to "implementing" and runs the agent to address the feedback
+
+```bash
+maestro worker --comment-poll-interval 30   # check every 30s
+maestro worker --comment-poll-interval 0    # disable comment polling
 ```

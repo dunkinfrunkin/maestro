@@ -103,6 +103,10 @@ async def init_db() -> None:
             await conn.execute(sa.text(
                 f"ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS {col} {typ} NOT NULL DEFAULT {default}"
             ))
+        # Add comment polling timestamp to task_pipeline
+        await conn.execute(sa.text(
+            "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS last_comment_check_at TIMESTAMPTZ"
+        ))
         # Migrate old model IDs to CLI aliases
         await conn.execute(sa.text(
             "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"

@@ -553,11 +553,15 @@ def _cmd_worker(args: argparse.Namespace) -> None:
     config = _load_all_config(getattr(args, "env_file", None))
     concurrency = args.concurrency or _get_nested(config, "worker.concurrency") or 3
     poll_interval = args.poll_interval or _get_nested(config, "worker.poll_interval") or 2.0
+    comment_poll_interval = args.comment_poll_interval
+    if comment_poll_interval is None:
+        comment_poll_interval = _get_nested(config, "worker.comment_poll_interval") or 60.0
     import asyncio
     from maestro.worker.worker import run_worker
     asyncio.run(run_worker(
         concurrency=int(concurrency),
         poll_interval=float(poll_interval),
+        comment_poll_interval=float(comment_poll_interval),
     ))
 
 
@@ -622,6 +626,7 @@ def main(argv: list[str] | None = None) -> None:
     worker_parser.add_argument("--env-file", help="Path to .env file to load")
     worker_parser.add_argument("--concurrency", type=int, default=None, help="Max concurrent agent jobs (default: config or 3)")
     worker_parser.add_argument("--poll-interval", type=float, default=None, help="Seconds between job polls (default: config or 2.0)")
+    worker_parser.add_argument("--comment-poll-interval", type=float, default=None, help="Seconds between PR comment checks (default: config or 60, 0 to disable)")
 
     # maestro repo init
     repo_parser = subparsers.add_parser("repo", help="Repository agent configuration")
