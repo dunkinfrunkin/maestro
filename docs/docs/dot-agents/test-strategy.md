@@ -31,7 +31,7 @@ Frontend: vitest
 E2E: Playwright (not yet set up)
 
 ## Running Tests
-pytest backend/tests/
+pytest engine/tests/
 npm test --prefix frontend
 
 ## Test Types

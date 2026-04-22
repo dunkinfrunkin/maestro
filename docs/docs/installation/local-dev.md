@@ -31,12 +31,12 @@ make install
 ```
 
 `make install` runs:
-- `cd backend && uv sync && uv pip install -e .` (installs the `maestro` CLI)
+- `cd engine && uv sync && uv pip install -e .` (installs the `maestro` CLI)
 - `cd frontend && npm ci`
 
 ## Running
 
-The `maestro` CLI is now available from the backend virtualenv:
+The `maestro` CLI is now available from the engine virtualenv:
 
 ```bash
 # Start everything (backend + frontend)
@@ -52,18 +52,18 @@ If `maestro` is not found in your PATH, either activate the venv or create a sym
 
 ```bash
 # Option A: activate the venv
-cd backend && source .venv/bin/activate
+cd engine && source .venv/bin/activate
 
 # Option B: symlink
-ln -sf $(pwd)/backend/.venv/bin/maestro /opt/homebrew/bin/maestro
+ln -sf $(pwd)/engine/.venv/bin/maestro /opt/homebrew/bin/maestro
 ```
 
 ## Environment
 
-Create a `.env.local` file in the backend directory:
+Create a `.env.local` file in the engine directory:
 
 ```bash
-cd backend
+cd engine
 cp .env.example .env.local
 ```
 
@@ -119,7 +119,7 @@ Opens at [localhost:3000](http://localhost:3000) (use a different port if the ap
 
 ```
 maestro/
-  backend/        Python FastAPI server
+  engine/        Python FastAPI server
   frontend/       Next.js dashboard
   cli/            Go CLI (Homebrew distribution)
   docs/           Docusaurus docs site

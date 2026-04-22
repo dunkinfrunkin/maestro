@@ -156,7 +156,7 @@ Configure connections from **Settings > Connections** in the dashboard.
 docker compose up -d
 
 # 2. Install the Maestro CLI locally
-cd backend
+cd engine
 cp .env.example .env.local   # fill in your keys
 set -a && source .env.local && set +a
 uv sync
@@ -169,7 +169,7 @@ npm ci
 
 ### Running locally
 
-The `maestro` CLI is now available from the backend virtualenv:
+The `maestro` CLI is now available from the engine virtualenv:
 
 ```bash
 # Start everything (backend + frontend)
@@ -185,10 +185,10 @@ If `maestro` is not found in your PATH, either activate the venv or create a sym
 
 ```bash
 # Option A: activate the venv
-cd backend && source .venv/bin/activate
+cd engine && source .venv/bin/activate
 
 # Option B: symlink to a directory in your PATH
-ln -sf $(pwd)/backend/.venv/bin/maestro /opt/homebrew/bin/maestro
+ln -sf $(pwd)/engine/.venv/bin/maestro /opt/homebrew/bin/maestro
 ```
 
 ### Configuration
