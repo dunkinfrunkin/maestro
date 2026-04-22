@@ -100,7 +100,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `MIT License \u00b7 \u00a9 ${new Date().getFullYear()} Frank Chan`,
+      copyright: `Apache 2.0 License \u00b7 \u00a9 ${new Date().getFullYear()} Frank Chan`,
     },
     mermaid: {
       theme: {light: 'base'},

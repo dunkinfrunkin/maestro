@@ -62,7 +62,7 @@ jobs:
           class Maestro < Formula
             desc "Autonomous coding agent orchestration for engineering teams"
             homepage "https://github.com/dunkinfrunkin/maestro"
-            license "MIT"
+            license "Apache-2.0"
 
             on_macos do
               on_arm do
