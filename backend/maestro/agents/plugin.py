@@ -7,7 +7,7 @@ Enterprises can create custom agents by:
 
 Example plugin:
 
-    from maestro.agent.plugin import AgentPlugin, PluginResult
+    from maestro.agents.plugin import AgentPlugin, PluginResult
 
     class MyCustomAgent(AgentPlugin):
         name = "custom_qa"
@@ -107,7 +107,7 @@ class ImplementationPlugin(AgentPlugin):
     trigger_status = "implement"
 
     async def run(self, context: dict[str, Any]) -> PluginResult:
-        from maestro.agent.implementation import run_implementation_agent
+        from maestro.agents.implementation import run_implementation_agent
         result = await run_implementation_agent(
             api_key=context["api_key"],
             model=context["model"],
@@ -132,7 +132,7 @@ class ReviewPlugin(AgentPlugin):
     trigger_status = "review"
 
     async def run(self, context: dict[str, Any]) -> PluginResult:
-        from maestro.agent.review import run_review_agent
+        from maestro.agents.review import run_review_agent
         result = await run_review_agent(
             api_key=context["api_key"],
             model=context["model"],
@@ -167,7 +167,7 @@ class RiskProfilePlugin(AgentPlugin):
     ]
 
     async def run(self, context: dict[str, Any]) -> PluginResult:
-        from maestro.agent.risk_profile import run_risk_profile_agent
+        from maestro.agents.risk_profile import run_risk_profile_agent
         extra = context.get("extra_config", {})
         result = await run_risk_profile_agent(
             api_key=context["api_key"],
@@ -199,7 +199,7 @@ class DeploymentPlugin(AgentPlugin):
     trigger_status = "deploy"
 
     async def run(self, context: dict[str, Any]) -> PluginResult:
-        from maestro.agent.deployment import run_deployment_agent
+        from maestro.agents.deployment import run_deployment_agent
         extra = context.get("extra_config", {})
         result = await run_deployment_agent(
             api_key=context["api_key"],
@@ -227,7 +227,7 @@ class MonitorPlugin(AgentPlugin):
     trigger_status = "monitor"
 
     async def run(self, context: dict[str, Any]) -> PluginResult:
-        from maestro.agent.monitor import run_monitor_agent
+        from maestro.agents.monitor import run_monitor_agent
         extra = context.get("extra_config", {})
         result = await run_monitor_agent(
             api_key=context["api_key"],

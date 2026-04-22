@@ -8,8 +8,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from maestro.agent.prompt import render_prompt
-from maestro.agent.runner import AgentRunner, TurnResult
+from maestro.agents.prompt import render_prompt
+from maestro.agents.runner import AgentRunner, TurnResult
 from maestro.config.loader import ConfigLoader
 from maestro.config.schema import ServiceConfig
 from maestro.models import Issue, RetryEntry, RunAttempt, RunAttemptStatus

@@ -155,7 +155,7 @@ async def kill_agent_run(
     user: User = Depends(get_current_user),
 ) -> dict:
     """Kill a running agent process."""
-    from maestro.agent.cli_runner import kill_run
+    from maestro.agents.cli_runner import kill_run
     from datetime import datetime, timezone
 
     partial = await kill_run(run_id)

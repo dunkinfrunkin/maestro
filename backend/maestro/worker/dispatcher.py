@@ -20,7 +20,7 @@ from maestro.db.models import (
     PipelineStatus,
     TaskPipelineRecord,
 )
-from maestro.agent.plugin import registry
+from maestro.agents.plugin import registry
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +340,7 @@ async def _execute_agent(
     extra_config: dict,
 ) -> None:
     """Execute an agent in the background with live log streaming."""
-    from maestro.agent.cli_runner import run_cli_with_logging
+    from maestro.agents.cli_runner import run_cli_with_logging
 
     # Mark as running
     async with get_session() as session:
@@ -359,7 +359,7 @@ async def _execute_agent(
         workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
 
         # Clone repo if available
-        from maestro.agent.sdk_runner import _write_log
+        from maestro.agents.sdk_runner import _write_log
         if clone_url:
             # Log repo name but not the token-embedded URL
             await _write_log(run_id, "status", f"Cloning repository: {repo}")
@@ -391,7 +391,7 @@ async def _execute_agent(
         else:
             system_prompt = ""
             try:
-                mod = __import__(f"maestro.agent.{plugin.name}", fromlist=["SYSTEM_PROMPT"])
+                mod = __import__(f"maestro.agents.{plugin.name}", fromlist=["SYSTEM_PROMPT"])
                 # Pick host-specific prompt if available
                 if code_host == "gitlab":
                     system_prompt = getattr(mod, "SYSTEM_PROMPT_GITLAB", "") or getattr(mod, "SYSTEM_PROMPT", "")
@@ -693,7 +693,7 @@ async def _auto_transition(
     max_iterations: int,
 ) -> None:
     """Auto-transition pipeline status based on agent result."""
-    from maestro.agent.sdk_runner import _write_log
+    from maestro.agents.sdk_runner import _write_log
     from maestro.db import crud
 
     next_status = None

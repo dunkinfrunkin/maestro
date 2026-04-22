@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Failed to initialize database")
 
-    from maestro.agent.plugin import init_plugins
+    from maestro.agents.plugin import init_plugins
     init_plugins()
 
     orchestrator = None

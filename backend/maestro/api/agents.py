@@ -11,8 +11,8 @@ from maestro.db.engine import get_session
 from sqlalchemy import select
 
 from maestro.db.models import AgentRun, AgentType, ApiKeyProvider, User
-from maestro.agent.implementation import DEFAULT_MODEL
-from maestro.agent.plugin import registry
+from maestro.agents.implementation import DEFAULT_MODEL
+from maestro.agents.plugin import registry
 
 PROVIDER_MODELS: dict[str, list[dict]] = {
     "anthropic": [
@@ -54,7 +54,7 @@ async def list_plugins(user: User = Depends(get_current_user)) -> list[dict]:
 async def get_default_prompt(agent_type: str, user: User = Depends(get_current_user)) -> dict:
     """Get the default system prompt for an agent type."""
     try:
-        mod = __import__(f"maestro.agent.{agent_type}", fromlist=["SYSTEM_PROMPT"])
+        mod = __import__(f"maestro.agents.{agent_type}", fromlist=["SYSTEM_PROMPT"])
         prompt = getattr(mod, "SYSTEM_PROMPT", "")
     except (ImportError, AttributeError):
         prompt = ""
