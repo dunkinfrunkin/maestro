@@ -222,22 +222,40 @@ async def _update_check_timestamp(task_id: int) -> None:
 async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
     """Move task back to implement and dispatch the implementation agent."""
     from maestro.worker.dispatcher import dispatch_agent_for_status
+    from maestro.db.models import Project
 
     async with get_session() as session:
         record = await session.get(TaskPipelineRecord, task.id)
         if not record:
+            logger.warning("[comment-poller] Task %d not found, skipping dispatch", task.id)
             return
+
+        project = await session.get(Project, record.project_id)
+        if not project:
+            logger.warning("[comment-poller] Project %d not found for task %d, skipping", record.project_id, task.id)
+            return
+
+        workspace_id = project.workspace_id
         record.status = PipelineStatus.IMPLEMENT
         await session.commit()
-        workspace_id = record.project_id
 
-    await dispatch_agent_for_status(
+    logger.info(
+        "[comment-poller] Moved task %s to implement (workspace=%d, pipeline=%d)",
+        task.external_ref, workspace_id, task.id,
+    )
+
+    result = await dispatch_agent_for_status(
         workspace_id=workspace_id,
         task_pipeline_id=task.id,
         status=PipelineStatus.IMPLEMENT.value,
         issue_title=task.external_ref,
         triggered_by="comment_poller",
     )
+
+    if result:
+        logger.info("[comment-poller] Dispatched agent run %d for task %s", result, task.external_ref)
+    else:
+        logger.warning("[comment-poller] Dispatch returned None for task %s - agent may be disabled or no API key", task.external_ref)
 
 
 async def run_comment_poller(
