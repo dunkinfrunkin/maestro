@@ -1,0 +1,164 @@
+---
+sidebar_position: 2
+title: Concepts
+sidebar_label: Concepts
+---
+
+# Concepts
+
+Maestro is built on top of agentic coding systems like Claude Code, Codex, and whatever comes next. These platforms are backed by Anthropic, OpenAI, and others investing billions into making AI agents better at writing code. Maestro doesn't compete with them - it orchestrates them. It provides the pipeline, quality gates, and operational guardrails that turn raw agent capability into reliable engineering output.
+
+This page explains how the major components relate to each other and how work flows through the system - from an issue in your tracker to deployed, monitored code in production.
+
+*Click any diagram to expand and zoom.*
+
+## System overview
+
+At the highest level, Maestro sits between your team and your existing development infrastructure. Users create issues in their tracker of choice. Maestro syncs those issues, runs them through an autonomous agent pipeline that writes code, reviews it, assesses risk, and deploys - then reports status back to the tracker. The entire cycle happens without context switching between tools.
+
+```mermaid
+graph LR
+  USR["User"] -- "creates issue" --> EXT["Trackers"]
+  EXT --syncs--> CC["CENTCOM"]
+  CC --dispatches--> AL["Agentic Loop"]
+  AL --PRs--> EXT
+  AL --approved--> DP["Deploy"]
+  DP --status--> EXT
+
+  style USR fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style EXT fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style CC fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style AL fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style DP fill:#ebe5d9,stroke:#2c2416,stroke-width:2px,color:#2c2416
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 2 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 3 stroke:#b45309,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 4 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 5 stroke:#d4cab8,stroke-width:1.5px,stroke-dasharray:5 3
+```
+
+
+## How a task enters the pipeline
+
+Maestro does not create issues - it consumes them from your existing tracker. When you connect GitHub Issues, Linear, Jira, or GitLab, Maestro continuously syncs open issues and surfaces them on the Tasks page. From there, you assign a target repository and move the task to "Implement" to kick off the agent pipeline. This intentional human trigger ensures agents only work on what you explicitly queue.
+
+```mermaid
+graph TB
+  I["Issue created in tracker"] --auto-sync--> T["Appears in CENTCOM"]
+  T -- "assign repo" --> A["Assigned to repo"]
+  A -- "move to Implement" --> P["Pipeline starts"]
+
+  style I fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style T fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style A fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style P fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 2 stroke:#b45309,stroke-width:2.5px,stroke-dasharray:8 5
+```
+
+
+## The agentic loop
+
+Once a task enters the pipeline, three agents collaborate in a tight loop. The Implementation Agent reads the codebase, writes code, runs tests, and opens a PR. The Review Agent reads the diff and posts inline comments - just like a human reviewer. If changes are needed, the Implementation Agent addresses the feedback and pushes new commits. This cycle repeats until the Review Agent approves. Then the Risk Profile Agent scores the change across seven dimensions (scope, blast radius, complexity, reversibility, test coverage, security, dependencies) and either auto-approves or escalates to a human gate.
+
+```mermaid
+graph TB
+  subgraph LOOP ["agentic loop"]
+    direction TB
+    IA["Implement"] -- "opens PR" --> CB[("Codebase")]
+    IA --ready--> RA["Review"]
+    RA -- "changes needed" --> IA
+    RA --comments--> CB
+    RA --approved--> RP["Risk Profile"]
+    RP -- "issues found" --> IA
+  end
+
+  RP --assessment--> OUT["Human Gate"]
+
+  style LOOP fill:none,stroke:#b45309,stroke-width:2px,stroke-dasharray:10 5,color:#b45309
+  style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style CB fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style RA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style RP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style OUT fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px
+  linkStyle 2 stroke:#b45309,stroke-width:2.5px
+  linkStyle 3 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 4 stroke:#2c2416,stroke-width:2px
+  linkStyle 5 stroke:#b45309,stroke-width:2px,stroke-dasharray:5 3
+  linkStyle 6 stroke:#2c2416,stroke-width:2px
+```
+
+
+## CENTCOM and workers
+
+CENTCOM is the central server - it runs the API, serves the dashboard, and coordinates the orchestrator that dispatches work. Workers are separate processes that pick up jobs from a PostgreSQL queue and execute agents. This separation means you can run one CENTCOM instance and scale workers independently based on throughput needs. Workers can run on the same machine, in separate containers, or on dedicated VMs. Each worker sends heartbeats so CENTCOM knows which workers are alive and how much capacity is available.
+
+```mermaid
+graph TB
+  CC["CENTCOM"] --dispatch--> W1["Worker 1"]
+  CC --dispatch--> W2["Worker 2"]
+  CC --dispatch--> W3["Worker N"]
+  W1 --runs--> A1["Agent"]
+  W2 --runs--> A2["Agent"]
+  W3 --runs--> A3["Agent"]
+  W1 -.heartbeat.-> CC
+  W2 -.heartbeat.-> CC
+  W3 -.heartbeat.-> CC
+
+  style CC fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+  style W1 fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style W2 fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style W3 fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416,stroke-dasharray:5 3
+  style A1 fill:#fef3e2,stroke:#b45309,stroke-width:1.5px,color:#b45309
+  style A2 fill:#fef3e2,stroke:#b45309,stroke-width:1.5px,color:#b45309
+  style A3 fill:#fef3e2,stroke:#b45309,stroke-width:1.5px,color:#b45309
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 2 stroke:#d4cab8,stroke-width:1.5px,stroke-dasharray:5 3
+  linkStyle 3 stroke:#b45309,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 4 stroke:#b45309,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 5 stroke:#b45309,stroke-width:1.5px,stroke-dasharray:5 3
+  linkStyle 6 stroke:#d4cab8,stroke-width:1px,stroke-dasharray:3 3
+  linkStyle 7 stroke:#d4cab8,stroke-width:1px,stroke-dasharray:3 3
+  linkStyle 8 stroke:#d4cab8,stroke-width:1px,stroke-dasharray:3 3
+```
+
+
+## Exit: deploy and monitor
+
+After the agentic loop produces an approved, risk-assessed PR, the task exits through a deployment and monitoring phase. A human gate (or auto-approve for low-risk changes) controls the merge. The Deploy Agent verifies CI checks pass and merges the PR. A QA Agent can optionally validate in staging - if issues are found, the task loops back to the Implementation Agent for fixes. Once deployed to production, the Monitor Agent watches metrics and logs for 15 minutes. If anomalies are detected, it flags the change. If everything is clean, the task is marked done and the tracker is updated.
+
+```mermaid
+graph TB
+  HG{{"Human Gate"}} --approved--> DA["Deploy staging"]
+  DA --test--> QA["QA Agent"]
+  QA --issues--> BACK["Back to Loop"]
+  QA --pass--> DA2["Deploy prod"]
+  DA2 -- "15 min" --> MA["Monitor"]
+  MA --anomaly--> BACK
+  MA --clear--> DONE["Done"]
+
+  style HG fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
+  style DA fill:#ebe5d9,stroke:#d4cab8,stroke-width:2px,color:#8a7e6b
+  style QA fill:#ebe5d9,stroke:#d4cab8,stroke-width:2px,color:#8a7e6b
+  style DA2 fill:#ebe5d9,stroke:#d4cab8,stroke-width:2px,color:#8a7e6b
+  style MA fill:#ebe5d9,stroke:#d4cab8,stroke-width:2px,color:#8a7e6b
+  style BACK fill:#fef3e2,stroke:#b45309,stroke-width:1.5px,color:#b45309
+  style DONE fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
+
+  linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 1 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 2 stroke:#b45309,stroke-width:2px,stroke-dasharray:5 3
+  linkStyle 3 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 4 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
+  linkStyle 5 stroke:#b45309,stroke-width:2px,stroke-dasharray:5 3
+  linkStyle 6 stroke:#2c2416,stroke-width:2px
+```

@@ -20,6 +20,12 @@ const config: Config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
 
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+  clientModules: ['./src/mermaidZoom.js'],
+
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -94,16 +100,43 @@ const config: Config = {
           title: 'Docs',
           items: [
             {label: 'Getting Started', to: '/docs/getting-started'},
-            {label: 'Pipeline', to: '/docs/pipeline'},
+            {label: 'Lifecycle', to: '/docs/pipeline'},
             {label: 'Agents', to: '/docs/agents'},
-            {label: 'Plugins', to: '/docs/plugins'},
           ],
         },
       ],
       copyright: `MIT License \u00b7 \u00a9 ${new Date().getFullYear()} Frank Chan`,
     },
+    mermaid: {
+      theme: {light: 'base'},
+      options: {
+        securityLevel: 'loose',
+        flowchart: {
+          nodeSpacing: 40,
+          rankSpacing: 60,
+          padding: 20,
+          useMaxWidth: false,
+        },
+        themeVariables: {
+          primaryColor: '#ebe5d9',
+          primaryTextColor: '#1a1207',
+          primaryBorderColor: '#d4cab8',
+          lineColor: '#8a7e6b',
+          secondaryColor: '#f5f0e8',
+          tertiaryColor: '#f5f0e8',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: '14px',
+          nodeBorder: '#d4cab8',
+          nodeTextColor: '#1a1207',
+          mainBkg: '#ebe5d9',
+          clusterBkg: '#f5f0e8',
+          clusterBorder: '#d4cab8',
+          edgeLabelBackground: '#ebe5d9',
+        },
+      },
+    },
     prism: {
-      theme: prismThemes.github,
+      theme: prismThemes.dracula,
       additionalLanguages: ['bash', 'python', 'yaml', 'json'],
     },
   } satisfies Preset.ThemeConfig,

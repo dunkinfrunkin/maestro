@@ -39,10 +39,10 @@ const HERO_STEPS = [
     color: '#059669',
     lines: [
       { text: 'Checking GitHub Actions pipelines...', style: 'muted' },
-      { text: 'CI: build — passed', style: 'success' },
-      { text: 'CI: lint — passed', style: 'success' },
-      { text: 'CI: test — passed (47 tests)', style: 'success' },
-      { text: 'CI: deploy-preview — passed', style: 'success' },
+      { text: 'CI: build - passed', style: 'success' },
+      { text: 'CI: lint - passed', style: 'success' },
+      { text: 'CI: test - passed (47 tests)', style: 'success' },
+      { text: 'CI: deploy-preview - passed', style: 'success' },
       { text: 'All checks green. Merging via squash...', style: 'muted' },
       { text: 'Merged to main', style: 'success' },
     ],
@@ -57,7 +57,7 @@ const HERO_STEPS = [
       { text: 'Error rate: 0.00%', style: 'success' },
       { text: 'Checking Splunk logs...', style: 'tool' },
       { text: 'No new exceptions detected', style: 'success' },
-      { text: '15m elapsed — all systems healthy', style: 'success' },
+      { text: '15m elapsed - all systems healthy', style: 'success' },
     ],
   },
 ];
@@ -119,7 +119,7 @@ function RiskScoreCard() {
         fontSize: '0.7rem', color: 'var(--ma-muted)', fontStyle: 'italic',
         paddingTop: '0.25rem', borderTop: '1px solid var(--ma-border)',
       }}>
-        Below threshold — auto-approved for merge
+        Below threshold - auto-approved for merge
       </div>
     </div>
   );
@@ -161,7 +161,7 @@ function HeroPipelineCard() {
     <div style={{
       position: 'relative', width: 680, flexShrink: 0,
     }}>
-      {/* Maestro mascot — top right, flipped */}
+      {/* Maestro mascot - top right, flipped */}
       <div style={{
         position: 'absolute', top: -36, right: -24, zIndex: 2,
       }}>
@@ -205,7 +205,7 @@ function HeroPipelineCard() {
           </span>
         </div>
 
-        {/* Log lines — animated in one by one */}
+        {/* Log lines - animated in one by one */}
         <div style={{
           padding: '1.25rem 1.5rem', height: 300, overflow: 'hidden',
           background: 'var(--ma-bg)',
@@ -233,7 +233,7 @@ function HeroPipelineCard() {
           )}
         </div>
 
-        {/* Step progress bar + labels — clickable */}
+        {/* Step progress bar + labels - clickable */}
         <div style={{
           display: 'flex', gap: '0.35rem', padding: '0.75rem 1.5rem 0.85rem',
           borderTop: '1px solid var(--ma-border)',
@@ -287,7 +287,7 @@ const VALUE_PROPS = [
   {
     label: 'Agent-to-agent review',
     title: 'Code review that never sleeps',
-    desc: 'The Review Agent checks out every PR, reads every changed file, and posts inline comments on specific lines — just like a human reviewer. When fixes land, it verifies, resolves threads, and approves. No context switching required.',
+    desc: 'The Review Agent checks out every PR, reads every changed file, and posts inline comments on specific lines - just like a human reviewer. When fixes land, it verifies, resolves threads, and approves. No context switching required.',
   },
   {
     label: 'Risk scoring',
@@ -297,7 +297,7 @@ const VALUE_PROPS = [
   {
     label: 'Post-deploy observability',
     title: 'Confidence after the merge',
-    desc: 'The Monitor Agent checks Datadog and Splunk for 15 minutes after every deploy. Latency spikes, error rate changes, new exceptions — all caught automatically. Deploy confidence from verification, not hope.',
+    desc: 'The Monitor Agent checks Datadog and Splunk for 15 minutes after every deploy. Latency spikes, error rate changes, new exceptions - all caught automatically. Deploy confidence from verification, not hope.',
   },
 ];
 
@@ -322,7 +322,7 @@ export default function Home() {
   return (
     <Layout title="Maestro" description="Autonomous coding agent orchestration for enterprise teams">
 
-      {/* Hero — full-width split: text left, visual right */}
+      {/* Hero - full-width split: text left, visual right */}
       <section style={{
         display: 'flex', alignItems: 'center', minHeight: 'calc(100vh - 60px)',
         padding: '3rem 4rem', gap: '4rem',
@@ -345,7 +345,7 @@ export default function Home() {
             Your codebase,<br />orchestrated.
           </h1>
           <p style={{ fontSize: '1.15rem', color: 'var(--ma-muted)', lineHeight: 1.7, margin: '0 0 2rem', maxWidth: 480 }}>
-            AI agents that implement, review, and deploy your tickets — from issue to production, autonomously.
+            AI agents that implement, review, and deploy your tickets - from issue to production, autonomously.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <Link to="/docs/getting-started" style={{
@@ -384,7 +384,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Value props — alternating left/right ── */}
+      {/* ── Value props - alternating left/right ── */}
       <section style={{ maxWidth: 1000, margin: '0 auto', padding: '5rem 3rem' }}>
         {VALUE_PROPS.map((v, i) => (
           <div key={i} style={{
@@ -405,7 +405,7 @@ export default function Home() {
               }}>{v.title}</h2>
               <p style={{ fontSize: '0.95rem', color: 'var(--ma-muted)', lineHeight: 1.75, margin: 0 }}>{v.desc}</p>
             </div>
-            {/* Visual side — pipeline stage card */}
+            {/* Visual side - pipeline stage card */}
             <div style={{
               flex: '0 0 280px', padding: '1.5rem', borderRadius: '0.75rem',
               background: 'var(--ma-surface)', border: '1px solid var(--ma-border)',
@@ -422,7 +422,7 @@ export default function Home() {
               {i === 1 && (
                 <div style={{ fontSize: '0.78rem', color: 'var(--ma-fg)', lineHeight: 1.8, fontFamily: 'var(--ifm-font-family-monospace)' }}>
                   <div style={{ color: '#5c7cba' }}>Reading changed files...</div>
-                  <div style={{ color: '#d97706' }}>stripe.ts:47 — missing key</div>
+                  <div style={{ color: '#d97706' }}>stripe.ts:47 - missing key</div>
                   <div style={{ color: 'var(--ma-muted)', marginTop: '0.5rem' }}>--- after fix ---</div>
                   <div style={{ color: '#16a34a' }}>Verified. Thread resolved.</div>
                   <div style={{ color: '#16a34a', fontWeight: 500 }}>Approved.</div>
@@ -452,7 +452,7 @@ export default function Home() {
                     marginTop: '0.5rem', padding: '0.4rem 0.6rem', borderRadius: '0.35rem',
                     background: '#dcfce7', textAlign: 'center',
                     fontSize: '0.72rem', fontWeight: 600, color: '#15803d',
-                  }}>LOW — auto-approved</div>
+                  }}>LOW - auto-approved</div>
                 </div>
               )}
               {i === 3 && (

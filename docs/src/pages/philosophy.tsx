@@ -24,9 +24,15 @@ export default function Philosophy() {
           Over the past year, something fundamental changed in how software gets built. The bottleneck is no longer writing code. It's designing environments where agents can do reliable work. Maestro encodes that shift into a pipeline.
         </p>
 
+        <Section title="We orchestrate, not compete">
+          <P>Maestro is built on top of agentic coding systems like Claude Code, Codex, and whatever comes next. These platforms are backed by Anthropic, OpenAI, and others investing billions into making AI agents better at writing code. Maestro doesn't compete with them - it orchestrates them.</P>
+          <P>As these platforms get smarter, Maestro gets more capable for free. We don't build our own LLM. We don't build our own code generation model. We build the pipeline, the orchestration, the quality gates, and the operational guardrails that turn raw agent capability into reliable engineering output.</P>
+          <P last>This is a deliberate bet: the agent platforms will keep getting better. Our job is to make that improvement useful in a production engineering workflow.</P>
+        </Section>
+
         <Section title="The role of the engineer is changing">
           <P>For decades, software engineering meant writing code. Reading requirements, thinking through edge cases, typing out implementations, running tests, fixing what broke. The craft was in the keystrokes.</P>
-          <P>That's shifting. When a coding agent can clone a repo, read the codebase, write an implementation, run the test suite, and open a pull request — all in minutes — the engineer's value moves upstream. You stop being the person who writes the code. You become the person who designs the system that makes agents effective.</P>
+          <P>That's shifting. When a coding agent can clone a repo, read the codebase, write an implementation, run the test suite, and open a pull request - all in minutes - the engineer's value moves upstream. You stop being the person who writes the code. You become the person who designs the system that makes agents effective.</P>
           <P last>Maestro is built around this idea. Humans steer. Agents execute.</P>
         </Section>
 
@@ -37,19 +43,19 @@ export default function Philosophy() {
         </Section>
 
         <Section title="No special channels">
-          <P>When a human reviewer posts an inline comment on a pull request, they use the GitHub API. When Maestro's Review Agent does the same thing, it uses the same API. It checks out the PR, reads every changed file, and posts comments on specific lines of code — the exact same workflow.</P>
+          <P>When a human reviewer posts an inline comment on a pull request, they use the GitHub API. When Maestro's Review Agent does the same thing, it uses the same API. It checks out the PR, reads every changed file, and posts comments on specific lines of code - the exact same workflow.</P>
           <P>When the Implementation Agent fixes the issue, it replies directly in the PR thread. When the Review Agent verifies the fix, it resolves the conversation via GitHub's GraphQL API and approves the PR.</P>
           <P last>There is no separate agent log you need to consult. The pull request <em>is</em> the record. You can read the history and understand what happened, whether the author was a person or an agent.</P>
         </Section>
 
         <Section title="Corrections are cheap. Waiting is expensive.">
           <P>In traditional engineering, you block merges until everything is perfect. Code review is a gate. CI is a gate. QA is a gate. Every gate adds latency.</P>
-          <P>In high-throughput agent systems, the math changes. The cost of a follow-up fix is almost always lower than the cost of blocking progress. Review agents catch issues. Implementation agents fix them. The loop continues — often in minutes, not days.</P>
+          <P>In high-throughput agent systems, the math changes. The cost of a follow-up fix is almost always lower than the cost of blocking progress. Review agents catch issues. Implementation agents fix them. The loop continues - often in minutes, not days.</P>
           <P last>This would be irresponsible in a low-throughput environment. When agent throughput exceeds human attention by an order of magnitude, it's the right tradeoff.</P>
         </Section>
 
         <Section title="Risk is scored, not assumed">
-          <P>Not every change needs a human in the loop. A one-line copy fix and a database migration rewrite are not the same thing. Treating them the same — either blocking everything or auto-approving everything — is wrong.</P>
+          <P>Not every change needs a human in the loop. A one-line copy fix and a database migration rewrite are not the same thing. Treating them the same - either blocking everything or auto-approving everything - is wrong.</P>
           <P>Maestro's Risk Profile Agent scores every pull request across seven dimensions before it can be merged:</P>
 
           <div style={{
@@ -80,7 +86,7 @@ export default function Philosophy() {
 
         <Section title="Observability is not optional">
           <P>Deploying code is not the finish line. It's the beginning of a new question: did it work?</P>
-          <P>After every merge, Maestro's Monitor Agent watches. It checks Datadog dashboards for latency spikes and error rate changes. It queries Splunk logs for new exceptions. It does this for 15 minutes — long enough to catch slow-burn regressions that don't show up in the first few seconds.</P>
+          <P>After every merge, Maestro's Monitor Agent watches. It checks Datadog dashboards for latency spikes and error rate changes. It queries Splunk logs for new exceptions. It does this for 15 minutes - long enough to catch slow-burn regressions that don't show up in the first few seconds.</P>
           <P last>Deploy confidence comes from automated post-deploy verification, not hope.</P>
         </Section>
 
@@ -116,7 +122,7 @@ export default function Philosophy() {
             ))}
           </div>
 
-          <P>Each transition is an explicit handoff. Each agent has its own system prompt, model, and configuration. The pipeline is visible, auditable, and configurable — not a black box.</P>
+          <P>Each transition is an explicit handoff. Each agent has its own system prompt, model, and configuration. The pipeline is visible, auditable, and configurable - not a black box.</P>
           <P last>This is what we mean by harness engineering: building the scaffolding that makes agents effective, rather than writing the code yourself. The discipline shows up in the system design, not the syntax.</P>
         </Section>
 
