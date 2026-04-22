@@ -472,7 +472,7 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate, user
     # Dispatch agent for this status change
     agent_run_id = None
     if body.workspace_id:
-        from maestro.agent.dispatcher import dispatch_agent_for_status
+        from maestro.worker.dispatcher import dispatch_agent_for_status
         agent_run_id = await dispatch_agent_for_status(
             workspace_id=body.workspace_id,
             task_pipeline_id=record.id,

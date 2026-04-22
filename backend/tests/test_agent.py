@@ -7,8 +7,8 @@ import textwrap
 
 import pytest
 
-from maestro.agent.prompt import render_prompt
-from maestro.agent.runner import AgentRunner, TurnResult
+from maestro.agents.prompt import render_prompt
+from maestro.agents.runner import AgentRunner, TurnResult
 
 
 # ---------------------------------------------------------------------------

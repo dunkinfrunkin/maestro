@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from maestro.db.engine import get_session, init_db
 from maestro.db.models import AgentRun, AgentRunStatus, ApiKeyProvider, WorkerHeartbeat
 from maestro.db import crud
-from maestro.agent.plugin import registry, init_plugins
+from maestro.agents.plugin import registry, init_plugins
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ async def claim_next_job() -> AgentRun | None:
 
 async def execute_job(job) -> None:
     """Execute a claimed agent job."""
-    from maestro.agent.dispatcher import _execute_agent
+    from maestro.worker.dispatcher import _execute_agent
     from maestro.db.encryption import decrypt_token
 
     run_id = job.id
