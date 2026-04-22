@@ -355,6 +355,12 @@ async def _execute_agent(
         import os
         os.environ["ANTHROPIC_API_KEY"] = api_key
 
+        # Set code host token so glab/gh CLI can authenticate
+        if clone_url and code_host == "gitlab":
+            _set_gitlab_token_from_clone_url(clone_url)
+        elif clone_url and code_host == "github":
+            _set_github_token_from_clone_url(clone_url)
+
         # Create workspace directory
         workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
 
@@ -984,6 +990,28 @@ def _extract_repo_from_text(description: str, url: str, tracker_kind: str, endpo
         return match.group(1).rstrip(".")
 
     return ""
+
+
+def _set_gitlab_token_from_clone_url(clone_url: str) -> None:
+    """Extract the GitLab token from the clone URL and set GITLAB_TOKEN env var."""
+    import os
+    from urllib.parse import urlparse
+    parsed = urlparse(clone_url)
+    if parsed.password:
+        os.environ["GITLAB_TOKEN"] = parsed.password
+    elif parsed.username and parsed.username != "oauth2":
+        os.environ["GITLAB_TOKEN"] = parsed.username
+
+
+def _set_github_token_from_clone_url(clone_url: str) -> None:
+    """Extract the GitHub token from the clone URL and set GH_TOKEN env var."""
+    import os
+    from urllib.parse import urlparse
+    parsed = urlparse(clone_url)
+    if parsed.password:
+        os.environ["GH_TOKEN"] = parsed.password
+    elif parsed.username and "@" not in parsed.username:
+        os.environ["GH_TOKEN"] = parsed.username
 
 
 def _build_clone_url(repo: str, tracker_kind: str, endpoint: str, token: str, email: str) -> str:
