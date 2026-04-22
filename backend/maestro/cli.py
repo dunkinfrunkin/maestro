@@ -554,7 +554,7 @@ def _cmd_worker(args: argparse.Namespace) -> None:
     concurrency = args.concurrency or _get_nested(config, "worker.concurrency") or 3
     poll_interval = args.poll_interval or _get_nested(config, "worker.poll_interval") or 2.0
     import asyncio
-    from maestro.agent.worker import run_worker
+    from maestro.worker.worker import run_worker
     asyncio.run(run_worker(
         concurrency=int(concurrency),
         poll_interval=float(poll_interval),

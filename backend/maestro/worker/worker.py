@@ -60,7 +60,7 @@ async def claim_next_job() -> AgentRun | None:
 
 async def execute_job(job) -> None:
     """Execute a claimed agent job."""
-    from maestro.agent.dispatcher import _execute_agent
+    from maestro.worker.dispatcher import _execute_agent
     from maestro.db.encryption import decrypt_token
 
     run_id = job.id
