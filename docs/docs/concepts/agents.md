@@ -34,6 +34,3 @@ Each agent can use a different LLM provider and model. Configure per-agent in th
 
 API keys can be set globally or per-workspace in **Settings > Models**.
 
-## Custom agents
-
-You can add custom agents using the plugin system - linters, security scanners, notification hooks, or entirely new pipeline stages. See [Plugins](/docs/plugins) for details.

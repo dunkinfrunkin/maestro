@@ -102,7 +102,6 @@ const config: Config = {
             {label: 'Getting Started', to: '/docs/getting-started'},
             {label: 'Lifecycle', to: '/docs/pipeline'},
             {label: 'Agents', to: '/docs/agents'},
-            {label: 'Plugins', to: '/docs/plugins'},
           ],
         },
       ],
