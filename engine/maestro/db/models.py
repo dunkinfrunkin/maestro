@@ -26,12 +26,21 @@ class TrackerKind(str, enum.Enum):
 
 
 class PipelineStatus(str, enum.Enum):
-    QUEUED = "queued"
-    IMPLEMENT = "implement"
-    REVIEW = "review"
-    RISK_PROFILE = "risk_profile"
-    DEPLOY = "deploy"
-    MONITOR = "monitor"
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"          # not yet implemented
+    PROMOTE = "promote"            # not yet implemented
+    DEPLOY = "deploy"              # not yet implemented
+    DONE = "done"
+    FAILED = "failed"
+    HALTED = "halted"
+    # Legacy values kept for backward compatibility during migration
+    QUEUED = "queued"              # maps to TODO
+    IMPLEMENT = "implement"        # maps to IN_PROGRESS
+    REVIEW = "review"              # maps to IN_PROGRESS
+    RISK_PROFILE = "risk_profile"  # maps to IN_PROGRESS
+    MONITOR = "monitor"            # maps to DEPLOY
 
 
 class WorkspaceRole(str, enum.Enum):
@@ -144,7 +153,7 @@ class TaskPipelineRecord(Base):
     external_ref: Mapped[str] = mapped_column(String(512), nullable=False)
     tracker_connection_id: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[PipelineStatus] = mapped_column(
-        Enum(PipelineStatus), nullable=False, default=PipelineStatus.QUEUED
+        Enum(PipelineStatus), nullable=False, default=PipelineStatus.TODO
     )
     pr_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     pr_number: Mapped[str] = mapped_column(String(50), nullable=False, default="")

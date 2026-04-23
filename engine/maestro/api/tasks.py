@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from maestro.auth import get_current_user
 from maestro.db import crud
 from maestro.db.engine import get_session
-from maestro.db.models import AgentRunLog, PipelineStatus, TaskPipelineRecord, TrackerKind, User
+from maestro.db.models import AgentRun, AgentRunLog, AgentRunStatus, PipelineStatus, TaskPipelineRecord, TrackerKind, User
+from sqlalchemy import select
 from maestro.tracker.github import GitHubClient
 from maestro.tracker.linear import LinearClient
 
@@ -470,6 +471,27 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate, user
             await session.commit()
             await session.refresh(record)
 
+    # Kill active agents when halting or failing
+    if status in (PipelineStatus.HALTED, PipelineStatus.FAILED):
+        from maestro.agents.cli_runner import kill_run
+        async with get_session() as session:
+            active_stmt = (
+                select(AgentRun)
+                .where(AgentRun.task_pipeline_id == record.id)
+                .where(AgentRun.status.in_([AgentRunStatus.PENDING.value, AgentRunStatus.RUNNING.value]))
+            )
+            active_runs = (await session.execute(active_stmt)).scalars().all()
+            for run in active_runs:
+                try:
+                    await kill_run(run.id)
+                except Exception:
+                    pass
+                run.status = AgentRunStatus.FAILED
+                run.error = f"Task {status.value} by user"
+            await session.commit()
+            if active_runs:
+                _log.getLogger(__name__).info("[STATUS] Killed %d active agent(s) for task %s", len(active_runs), external_ref)
+
     # Dispatch agent for this status change
     agent_run_id = None
     if body.workspace_id:
@@ -750,7 +772,7 @@ async def update_task_repo(external_ref: str, body: TaskRepoUpdateBody) -> dict:
             record = TaskPipelineRecord(
                 external_ref=external_ref,
                 tracker_connection_id=conn_id,
-                status=PipelineStatus.QUEUED,
+                status=PipelineStatus.TODO,
                 project_id=project_id,
             )
             session.add(record)

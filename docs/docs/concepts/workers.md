@@ -58,9 +58,9 @@ worker:
 Each worker runs a background loop that checks open PRs for new human comments. When someone posts a review comment on a PR outside of Maestro, the worker detects it and automatically dispatches the Implementation Agent to address it.
 
 - Polls every 60 seconds by default (configurable)
-- Only checks tasks in "in-review" or "risk-profile" status with an open PR
+- Only checks tasks in "in_progress" or "pending_approval" status with an open PR
 - Filters out comments made by Maestro agents (only human comments trigger re-dispatch)
-- Moves the task back to "implementing" and runs the agent to address the feedback
+- Moves the task back to "in_progress" and runs the agent to address the feedback
 
 ```bash
 maestro worker --comment-poll-interval 30   # check every 30s
