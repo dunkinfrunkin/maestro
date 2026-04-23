@@ -20,7 +20,7 @@ A task is a unit of work that flows through the Maestro pipeline. Tasks originat
 | State | What's happening |
 |---|---|
 | **todo** | Task is synced, waiting for user to trigger |
-| **in_progress** | Agentic loop: implement, AI review, AI risk profile |
+| **in_progress** | Agentic loop: implement, AI risk profile (once), AI review |
 | **pending_approval** | AI work done, waiting for human review and approval |
 | **approved** | Human approved, auto-merge and deploy to lower envs (not yet implemented) |
 | **promote** | Lower envs healthy, promoting to production (not yet implemented) |
