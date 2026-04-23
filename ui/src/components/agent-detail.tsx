@@ -130,7 +130,7 @@ export function AgentDetailPage({
   const isUsingDefault = !config?.extra_config?.custom_prompt;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-4xl">
       {/* Back */}
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-4 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -335,12 +335,15 @@ function PromptEditor({ value, onChange }: { value: string; onChange: (v: string
   }, []);
 
   return (
-    <div className="rounded-md border border-border overflow-hidden">
+    <div
+      className="rounded-md border border-border overflow-hidden resize"
+      style={{ minHeight: "400px", height: "400px", minWidth: "100%" }}
+    >
       <CodeMirrorEditor
         value={value}
         onChange={onChange}
         extensions={extensions}
-        height="400px"
+        height="100%"
         basicSetup={{
           lineNumbers: true,
           foldGutter: false,
@@ -351,6 +354,7 @@ function PromptEditor({ value, onChange }: { value: string; onChange: (v: string
         style={{
           fontSize: "13px",
           fontFamily: "var(--font-geist-mono), monospace",
+          height: "100%",
         }}
       />
     </div>
