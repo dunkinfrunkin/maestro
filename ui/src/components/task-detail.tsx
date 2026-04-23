@@ -7,8 +7,11 @@ import {
   AgentRunResponse,
   AgentLogEntry,
   PIPELINE_STATUSES,
+  StatusInfo,
   UnifiedTask,
   RepoEntry,
+  fetchStatuses,
+  findStatusInfo,
   fetchTaskRuns,
   fetchRunLogs,
   updateTaskStatus,
@@ -18,9 +21,15 @@ import {
 } from "@/lib/api";
 import { ExecutionTraceChart } from "./execution-trace-chart";
 
-const STATUS_LABELS: Record<string, string> = {
-  queued: "Queued", implement: "Implement", review: "Review",
-  risk_profile: "Risk Profile", deploy: "Deploy", monitor: "Monitor",
+const COLOR_MAP: Record<string, string> = {
+  gray: "bg-gray-200 text-gray-800 border-gray-300",
+  blue: "bg-blue-100 text-blue-800 border-blue-300",
+  purple: "bg-purple-100 text-purple-800 border-purple-300",
+  teal: "bg-teal-100 text-teal-800 border-teal-300",
+  yellow: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  orange: "bg-orange-100 text-orange-800 border-orange-300",
+  green: "bg-green-100 text-green-800 border-green-300",
+  red: "bg-red-100 text-red-800 border-red-300",
 };
 
 const formatDuration = (ms: number) => {
@@ -38,14 +47,6 @@ const formatDuration = (ms: number) => {
   }
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  queued: "bg-gray-200 text-gray-800 border-gray-300",
-  implement: "bg-blue-100 text-blue-800 border-blue-300",
-  review: "bg-purple-100 text-purple-800 border-purple-300",
-  risk_profile: "bg-orange-100 text-orange-800 border-orange-300",
-  deploy: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  monitor: "bg-green-100 text-green-800 border-green-300",
-};
 
 const RUN_STATUS_COLORS: Record<string, string> = {
   pending: "bg-gray-100 text-gray-600 border-gray-300",
@@ -100,6 +101,7 @@ export function TaskDetailPage({
   onBack: () => void;
   onTaskUpdated: () => void;
 }) {
+  const [statuses, setStatuses] = useState<StatusInfo[]>([]);
   const [runs, setRuns] = useState<AgentRunResponse[]>([]);
 
   const loadRuns = useCallback(() => {
@@ -108,8 +110,11 @@ export function TaskDetailPage({
   }, [task.external_ref, task.pipeline_status]);
 
   useEffect(() => {
+    fetchStatuses().then(setStatuses).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     loadRuns();
-    // Only poll if there are active runs
     const hasActive = runs.some(r => r.status === "running" || r.status === "pending");
     if (hasActive) {
       const interval = setInterval(loadRuns, 3000);
@@ -178,8 +183,8 @@ export function TaskDetailPage({
           <span className="text-xs font-mono text-muted">{task.identifier}</span>
           <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">{task.tracker_kind}</span>
           {task.pipeline_status && (
-            <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[task.pipeline_status] || ""}`}>
-              {STATUS_LABELS[task.pipeline_status] || task.pipeline_status}
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${COLOR_MAP[findStatusInfo(statuses, task.pipeline_status)?.color || "gray"] || COLOR_MAP.gray}`}>
+              {findStatusInfo(statuses, task.pipeline_status)?.label || task.pipeline_status}
             </span>
           )}
         </div>
@@ -297,8 +302,8 @@ export function TaskDetailPage({
                     className={`flex-1 text-xs px-2 py-1 rounded-md border border-border bg-background text-foreground ${!hasRepo ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <option value="" disabled>Set status...</option>
-                    {PIPELINE_STATUSES.map((s) => (
-                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    {statuses.filter(s => s.active).map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
                   {task.pipeline_status && task.pipeline_status !== "queued" && (

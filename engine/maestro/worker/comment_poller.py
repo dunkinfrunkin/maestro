@@ -24,10 +24,29 @@ logger = logging.getLogger(__name__)
 
 MAESTRO_BOT_MARKERS = ["maestro", "Co-Authored-By: Claude", "agent"]
 
-REVIEWABLE_STATUSES = {
+POLLABLE_STATUSES = {
+    PipelineStatus.IN_PROGRESS,
+    PipelineStatus.PENDING_APPROVAL,
+    # Legacy
     PipelineStatus.REVIEW,
     PipelineStatus.RISK_PROFILE,
 }
+
+
+async def _has_active_agent_run(task_pipeline_id: int) -> bool:
+    """Check if there's a running or pending agent run for this task."""
+    async with get_session() as session:
+        stmt = (
+            select(AgentRun)
+            .where(AgentRun.task_pipeline_id == task_pipeline_id)
+            .where(AgentRun.status.in_([
+                AgentRunStatus.PENDING.value,
+                AgentRunStatus.RUNNING.value,
+            ]))
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
 
 async def poll_comments_once() -> int:
@@ -40,7 +59,7 @@ async def poll_comments_once() -> int:
             .where(TaskPipelineRecord.pr_url != "")
             .where(TaskPipelineRecord.pr_number != "")
             .where(TaskPipelineRecord.repo != "")
-            .where(TaskPipelineRecord.status.in_([s.value for s in REVIEWABLE_STATUSES]))
+            .where(TaskPipelineRecord.status.in_([s.value for s in POLLABLE_STATUSES]))
         )
         result = await session.execute(stmt)
         tasks = result.scalars().all()
@@ -52,6 +71,10 @@ async def poll_comments_once() -> int:
 
     for task in tasks:
         try:
+            if await _has_active_agent_run(task.id):
+                logger.debug("[comment-poller] Skipping %s PR #%s - agent already running", task.repo, task.pr_number)
+                continue
+
             logger.debug(
                 "[comment-poller] Checking %s PR #%s (%s) last_check=%s",
                 task.repo, task.pr_number, task.status.value,
@@ -265,7 +288,7 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
             return
 
         workspace_id = project.workspace_id
-        record.status = PipelineStatus.IMPLEMENT
+        record.status = PipelineStatus.IN_PROGRESS
         await session.commit()
 
     logger.info(
@@ -276,7 +299,7 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
     result = await dispatch_agent_for_status(
         workspace_id=workspace_id,
         task_pipeline_id=task.id,
-        status=PipelineStatus.IMPLEMENT.value,
+        status=PipelineStatus.IN_PROGRESS.value,
         issue_title=task.external_ref,
         triggered_by="comment_poller",
     )

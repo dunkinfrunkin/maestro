@@ -9,26 +9,30 @@ Every task in Maestro has a lifecycle. From the moment an issue is synced from y
 
 ```mermaid
 graph LR
-  TODO["todo"] -.-> IMP["implementing"] -.-> REV["in-review"] -.-> APP["approved"] -.-> DEP["deploying"] -.-> DONE["done"]
+  TODO["todo"] -.-> IP["in_progress"] -.-> PA["pending_approval"] -.-> APP["approved"] -.-> PRO["promote"] -.-> DEP["deploy"] -.-> DONE["done"]
 
   style TODO fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
-  style IMP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
-  style REV fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style IP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style PA fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
   style APP fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style PRO fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
   style DEP fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
   style DONE fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
 ```
 
-| Status | What's happening | Who's responsible |
-|---|---|---|
-| **todo** | Synced from tracker, waiting for user to trigger | User |
-| **implementing** | Agent writing code, running tests, opening PR | Implementation Agent |
-| **in-review** | AI review, human review, risk assessment | Review + Risk Agents |
-| **approved** | All gates passed, ready to merge and deploy | System |
-| **deploying** | Merging, deploying to envs, monitoring | Deploy + Monitor Agents |
-| **done** | In prod, monitoring passed | - |
-| **failed** | Error at any stage | Needs attention |
-| **blocked** | Needs human intervention | User |
+| Status | What's happening | Who's responsible | Comment polling |
+|---|---|---|---|
+| **todo** | Synced from tracker, waiting for user to trigger | User | No |
+| **in_progress** | Agentic loop: implement, AI review, AI risk profile | Agents | Yes - saves comments, dispatches if no agent running |
+| **pending_approval** | AI work done, waiting for human to review and approve | User | Yes - dispatches agent on new comments |
+| **approved** | Human approved, auto-merge and deploy to lower envs | System | No |
+| **promote** | Lower envs healthy, promoting to production | System | No |
+| **deploy** | Deploying to prod, monitoring | Agents | No |
+| **done** | Complete, monitoring passed | - | No |
+| **failed** | Error at any stage - can be retried | Needs attention | No |
+| **halted** | User manually stopped - can be resumed | User | No |
+
+Statuses from `approved` through `deploy` are not yet implemented. Tasks currently stop at `pending_approval` and require manual progression.
 
 ## 1. todo
 
@@ -45,7 +49,7 @@ graph TB
   TR["Tracker"] -- "syncs issue" --> CC["CENTCOM"]
   CC --> DASH["Dashboard"]
   DASH -- "assign repo" --> REPO["Repo selected"]
-  REPO -- "trigger" --> GO["implementing"]
+  REPO -- "trigger" --> GO["in_progress"]
 
   style TR fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
   style CC fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
@@ -112,7 +116,7 @@ graph LR
   LOW["LOW risk"] -- "auto" --> APP["approved"]
   MED["MEDIUM risk"] -- "1 approval" --> APP
   HIGH["HIGH risk"] -- "sign-off" --> APP
-  APP --> DEP["deploying"]
+  APP --> DEP["deploy"]
 
   style LOW fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
   style MED fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416

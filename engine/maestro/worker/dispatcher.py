@@ -24,8 +24,11 @@ from maestro.agents.plugin import registry
 
 logger = logging.getLogger(__name__)
 
-# Map pipeline status → agent type
+# Map pipeline status -> agent type
 STATUS_TO_AGENT: dict[str, str] = {
+    # New statuses
+    PipelineStatus.IN_PROGRESS.value: AgentType.IMPLEMENTATION.value,
+    # Legacy statuses (backward compat)
     PipelineStatus.IMPLEMENT.value: AgentType.IMPLEMENTATION.value,
     PipelineStatus.REVIEW.value: AgentType.REVIEW.value,
     PipelineStatus.RISK_PROFILE.value: AgentType.RISK_PROFILE.value,
@@ -706,46 +709,47 @@ async def _auto_transition(
     reason = ""
 
     if plugin_name == "implementation":
-        # Implementation done → move to review
+        # Implementation done - move to review (still in_progress internally)
         next_status = PipelineStatus.REVIEW
-        reason = "Implementation completed — moving to review"
+        reason = "Implementation completed - moving to review"
 
     elif plugin_name == "review":
-        # Check the verdict from agent output
         verdict = _extract_verdict(result)
 
-        # Double-check: if agent said APPROVE but there are unresolved inline comments, override to REQUEST_CHANGES
         if verdict == "APPROVE":
             has_unresolved = await _check_unresolved_comments(task_pipeline_id)
             if has_unresolved:
                 verdict = "REQUEST_CHANGES"
-                print(f"[MAESTRO] Overriding APPROVE → REQUEST_CHANGES: unresolved inline comments exist")
+                print(f"[MAESTRO] Overriding APPROVE -> REQUEST_CHANGES: unresolved inline comments exist")
 
         if verdict == "APPROVE":
             next_status = PipelineStatus.RISK_PROFILE
-            reason = "Review approved — moving to risk profile"
+            reason = "Review approved - moving to risk profile"
         elif verdict == "REQUEST_CHANGES":
-            if iteration_count < max_iterations * 2:  # *2 because each loop is impl+review
+            if iteration_count < max_iterations * 2:
                 next_status = PipelineStatus.IMPLEMENT
-                reason = f"Review requested changes — sending back to implement (iteration {iteration_count // 2 + 1}/{max_iterations})"
+                reason = f"Review requested changes - sending back to implement (iteration {iteration_count // 2 + 1}/{max_iterations})"
             else:
-                reason = f"Review requested changes but max iterations ({max_iterations}) reached — needs human intervention"
+                reason = f"Review requested changes but max iterations ({max_iterations}) reached - needs human intervention"
                 logger.warning(reason)
 
     elif plugin_name == "risk_profile":
         import re
         all_text = re.sub(r'[*`_~]', '', result.get("all_text", "") or result.get("last_text", ""))
         upper = all_text.upper()
-        if "AUTO_APPROVE: YES" in upper or "RISK_LEVEL: LOW" in upper or "RISK LEVEL: LOW" in upper:
-            next_status = PipelineStatus.DEPLOY
-            reason = "Risk profile: low risk, auto-approved — moving to deploy"
+        # After risk profile, always move to pending_approval for human gate
+        next_status = PipelineStatus.PENDING_APPROVAL
+        if "RISK_LEVEL: LOW" in upper or "RISK LEVEL: LOW" in upper or "AUTO_APPROVE: YES" in upper:
+            reason = "Risk profile: LOW - moving to pending approval (human gate)"
         elif "RISK_LEVEL: MEDIUM" in upper or "RISK_LEVEL: HIGH" in upper or "RISK_LEVEL: CRITICAL" in upper:
-            reason = "Risk profile: requires human review — not auto-deploying"
-            logger.info(reason)
+            reason = "Risk profile: elevated risk - moving to pending approval (human gate)"
+        else:
+            reason = "Risk profile completed - moving to pending approval (human gate)"
 
     elif plugin_name == "deployment":
-        next_status = PipelineStatus.MONITOR
-        reason = "Deployment completed — moving to monitor"
+        # Deployment stages not yet implemented - mark done for now
+        next_status = PipelineStatus.DONE
+        reason = "Deployment completed - done"
 
     if next_status:
         logger.info("Auto-transition for task %d: %s (%s)", task_pipeline_id, next_status.value, reason)

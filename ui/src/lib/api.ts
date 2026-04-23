@@ -289,16 +289,57 @@ export interface RepoEntry {
   tracker_kind: string;
 }
 
+export interface StatusInfo {
+  value: string;
+  label: string;
+  color: string;
+  active: boolean;
+  order: number;
+}
+
+export async function fetchStatuses(): Promise<StatusInfo[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/statuses`, { cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchLegacyMap(): Promise<Record<string, string>> {
+  const res = await authFetch(`${API_BASE}/api/v1/statuses/legacy-map`, { cache: "no-store" });
+  if (!res.ok) return {};
+  return res.json();
+}
+
 export const PIPELINE_STATUSES = [
-  "queued",
-  "implement",
-  "review",
-  "risk_profile",
+  "todo",
+  "in_progress",
+  "pending_approval",
+  "approved",
+  "promote",
   "deploy",
-  "monitor",
+  "done",
+  "failed",
+  "halted",
 ] as const;
 
-export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
+export type PipelineStatus = (typeof PIPELINE_STATUSES)[number] | string;
+
+const LEGACY_STATUS_MAP: Record<string, string> = {
+  queued: "todo",
+  implement: "in_progress",
+  review: "in_progress",
+  risk_profile: "in_progress",
+  monitor: "deploy",
+};
+
+export function normalizeStatus(status: string | null | undefined): string {
+  if (!status) return "";
+  return LEGACY_STATUS_MAP[status] || status;
+}
+
+export function findStatusInfo(statuses: StatusInfo[], status: string | null | undefined): StatusInfo | undefined {
+  const normalized = normalizeStatus(status);
+  return statuses.find(s => s.value === normalized);
+}
 
 export interface PaginatedTasks {
   tasks: UnifiedTask[];
