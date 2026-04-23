@@ -23,7 +23,7 @@ graph LR
 | Status | What's happening | Who's responsible | Comment polling |
 |---|---|---|---|
 | **todo** | Synced from tracker, waiting for user to trigger | User | No |
-| **in_progress** | Agentic loop: implement, AI review, AI risk profile | Agents | Yes - saves comments, dispatches if no agent running |
+| **in_progress** | Agentic loop: implement, AI risk profile (once), AI review | Agents | Yes - saves comments, dispatches if no agent running |
 | **pending_approval** | AI work done, waiting for human to review and approve | User | Yes - dispatches agent on new comments |
 | **approved** | Human approved, auto-merge and deploy to lower envs | System | No |
 | **promote** | Lower envs healthy, promoting to production | System | No |
@@ -74,34 +74,47 @@ The Implementation Agent clones the repository, reads the codebase to understand
 - Creates a `maestro/*` branch and opens a PR on the code host
 - Attaches the PR link to the task
 
-## 3. in-review
+## 3. Risk assessment
 
-The Review Agent checks out the PR and performs inline code review, posting comments on specific lines via the code host API. The Risk Profile Agent also runs during this stage, scoring the change across seven dimensions.
+Immediately after the first implementation, the Risk Profile Agent scores the change across seven dimensions. This runs once - subsequent implement/review loops skip it since the risk has already been assessed.
+
+- Scores scope, blast radius, complexity, test coverage, security, reversibility, dependencies
+- Each dimension scored 1-5
+- Produces overall risk level: LOW, MEDIUM, or HIGH
+- Risk information is available to the Review Agent and human reviewers
+
+## 4. Review
+
+The Review Agent checks out the PR and performs inline code review, posting comments on specific lines via the code host API.
 
 - Reads every changed file in full context
 - Posts inline comments categorized as bug, style, performance, security, or suggestion
 - Issues a verdict: **APPROVE** or **REQUEST_CHANGES**
-- Risk Profile Agent scores scope, blast radius, complexity, test coverage, security, reversibility, dependencies
 
-If changes are requested, the task cycles back to **implementing**. This is the core feedback loop that ensures code quality before anything gets merged.
+If changes are requested, the task cycles back to implementation (skipping risk profile). This is the core feedback loop that ensures code quality before anything gets merged.
 
 ```mermaid
 graph TB
   IA["Implement"] -- "opens PR" --> CB[("Codebase")]
-  IA -- "ready" --> RA["Review"]
-  RA -- "APPROVE" --> NEXT["approved"]
+  IA -- "first run" --> RP["Risk Profile"]
+  IA -- "subsequent" --> RA["Review"]
+  RP -- "scored" --> RA
+  RA -- "APPROVE" --> NEXT["pending_approval"]
   RA -- "REQUEST_CHANGES" --> IA
   RA -- "comments" --> CB
 
   style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style CB fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2px,color:#2c2416
+  style RP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
   style RA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
-  style NEXT fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style NEXT fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
 
   linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
   linkStyle 1 stroke:#2c2416,stroke-width:2px
-  linkStyle 2 stroke:#2c2416,stroke-width:2px
-  linkStyle 3 stroke:#b45309,stroke-width:2.5px
+  linkStyle 2 stroke:#2c2416,stroke-width:2px,stroke-dasharray:5 3
+  linkStyle 3 stroke:#b45309,stroke-width:2px
+  linkStyle 4 stroke:#2c2416,stroke-width:2px
+  linkStyle 5 stroke:#b45309,stroke-width:2.5px
   linkStyle 4 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
 ```
 

@@ -23,16 +23,16 @@ Maestro is built on top of agentic coding systems like Claude Code, Codex, and w
 Issues come from your tracker. Agents take over from there.
 
 ```
-Issue synced -> Implementing -> In Review -> Approved -> Deploying -> Done
+todo -> in_progress -> pending_approval -> approved -> deploy -> done
 ```
 
-| Agent | What it does |
-|---|---|
-| **Implementation** | Reads your codebase, writes code, runs tests, opens a PR |
-| **Review** | Posts inline comments on specific lines, requests changes or approves |
-| **Risk Profile** | Scores the PR across 7 dimensions, auto-approves low risk |
-| **Deploy** | Verifies CI checks, merges via squash |
-| **Monitor** | Watches metrics and logs for 15 minutes post-deploy |
+| Agent | Order | What it does |
+|---|---|---|
+| **Implementation** | 1st | Reads your codebase, writes code, runs tests, opens a PR |
+| **Risk Profile** | 2nd (once) | Scores the PR across 7 dimensions |
+| **Review** | 3rd | Posts inline comments on specific lines, requests changes or approves |
+| **Deploy** | After approval | Verifies CI checks, merges via squash |
+| **Monitor** | After deploy | Watches metrics and logs for 15 minutes post-deploy |
 
 Agents communicate through PR comment threads - the same workflow as human developers.
 

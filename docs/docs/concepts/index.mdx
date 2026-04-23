@@ -63,35 +63,35 @@ graph TB
 
 ## The agentic loop
 
-Once a task enters the pipeline, three agents collaborate in a tight loop. The Implementation Agent reads the codebase, writes code, runs tests, and opens a PR. The Review Agent reads the diff and posts inline comments - just like a human reviewer. If changes are needed, the Implementation Agent addresses the feedback and pushes new commits. This cycle repeats until the Review Agent approves. Then the Risk Profile Agent scores the change across seven dimensions (scope, blast radius, complexity, reversibility, test coverage, security, dependencies) and either auto-approves or escalates to a human gate.
+Once a task enters the pipeline, three agents collaborate. The Implementation Agent writes code and opens a PR. The Risk Profile Agent then scores the change across seven dimensions (runs once). Then the Review Agent reads the diff and posts inline comments - just like a human reviewer. If changes are needed, the Implementation Agent addresses the feedback and pushes new commits, then review runs again (skipping risk profile). This cycle repeats until the Review Agent approves, at which point the task moves to pending approval for the human gate.
 
 ```mermaid
 graph TB
   subgraph LOOP ["agentic loop"]
     direction TB
     IA["Implement"] -- "opens PR" --> CB[("Codebase")]
-    IA --ready--> RA["Review"]
+    IA -- "first run" --> RP["Risk Profile"]
+    RP --scored--> RA["Review"]
+    IA -- "subsequent" --> RA
     RA -- "changes needed" --> IA
     RA --comments--> CB
-    RA --approved--> RP["Risk Profile"]
-    RP -- "issues found" --> IA
   end
 
-  RP --assessment--> OUT["Human Gate"]
+  RA --approved--> OUT["Pending Approval"]
 
   style LOOP fill:none,stroke:#b45309,stroke-width:2px,stroke-dasharray:10 5,color:#b45309
   style IA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style CB fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
-  style RA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style RP fill:#fef3e2,stroke:#b45309,stroke-width:2.5px,color:#b45309
+  style RA fill:#ebe5d9,stroke:#6b5b3e,stroke-width:2.5px,color:#2c2416
   style OUT fill:#ebe5d9,stroke:#2c2416,stroke-width:2.5px,color:#2c2416
 
   linkStyle 0 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
   linkStyle 1 stroke:#2c2416,stroke-width:2px
-  linkStyle 2 stroke:#b45309,stroke-width:2.5px
-  linkStyle 3 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
-  linkStyle 4 stroke:#2c2416,stroke-width:2px
-  linkStyle 5 stroke:#b45309,stroke-width:2px,stroke-dasharray:5 3
+  linkStyle 2 stroke:#b45309,stroke-width:2px
+  linkStyle 3 stroke:#2c2416,stroke-width:2px,stroke-dasharray:5 3
+  linkStyle 4 stroke:#b45309,stroke-width:2.5px
+  linkStyle 5 stroke:#2c2416,stroke-width:2px,stroke-dasharray:8 5
   linkStyle 6 stroke:#2c2416,stroke-width:2px
 ```
 

@@ -90,13 +90,13 @@ Once connected, Maestro automatically syncs issues and you can queue tasks from 
 3. Assign a repository to the task
 4. Move the task to **Implement** to kick off the pipeline
 
-Once in Implement, five agents take over in sequence:
+Once in progress, agents take over:
 
 1. **Implementation** - reads your codebase, writes code, runs tests, opens a PR
-2. **Review** - posts inline comments on specific lines, requests changes or approves
-3. **Risk Profile** - scores the PR across seven dimensions, auto-approves if low risk
-4. **Deployment** - verifies CI checks, merges via squash
-5. **Monitor** - watches metrics and logs for 15 minutes post-deploy
+2. **Risk Profile** - scores the PR across seven dimensions (runs once)
+3. **Review** - posts inline comments on specific lines, requests changes or approves
+4. If changes requested, loops back to Implementation (skips Risk Profile)
+5. Once approved, moves to **Pending Approval** for human review
 
 You can watch each stage in real time from the task detail page.
 
