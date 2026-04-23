@@ -563,24 +563,46 @@ async def _execute_agent(
             if is_gitlab and pr_url and "/-/merge_requests/" in pr_url:
                 project_path = pr_url.split("/-/merge_requests/")[0].split("://", 1)[1].split("/", 1)[1]
                 encoded = project_path.replace("/", "%2F")
+                endpoint = pr_url.split("/-/merge_requests/")[0].rsplit("/", 1)[0].rsplit("/", 1)[0]
+                if "://" in pr_url:
+                    endpoint = pr_url.split("://")[0] + "://" + pr_url.split("://")[1].split("/")[0]
+
+                # Pre-fetch diff SHAs so the agent doesn't need to
+                diff_refs = await _fetch_gitlab_diff_refs(endpoint, encoded, pr_num, clone_url)
+                sha_block = ""
+                if diff_refs:
+                    sha_block = (
+                        f"\n\nDiff SHAs (use these for ALL inline comments):"
+                        f"\n  base_sha={diff_refs['base_sha']}"
+                        f"\n  head_sha={diff_refs['head_sha']}"
+                        f"\n  start_sha={diff_refs['start_sha']}"
+                    )
+
                 prompt_parts.append(
-                    f"\n## REVIEW INSTRUCTIONS — YOU MUST POST INLINE COMMENTS"
+                    f"\n## REVIEW INSTRUCTIONS - YOU MUST POST INLINE COMMENTS"
+                    f"{sha_block}"
                     f"\n"
                     f"\n1. Checkout: `glab mr checkout {pr_num}`"
-                    f"\n2. Get SHAs: `glab api 'projects/{encoded}/merge_requests/{pr_num}' | jq -r '.diff_refs'`"
-                    f"\n3. For EACH finding, post an INLINE comment with position params:"
+                    f"\n2. For EACH finding, post an INLINE comment with position params:"
                     f"\n```"
-                    f"\nglab api --method POST 'projects/{encoded}/merge_requests/{pr_num}/discussions' \\"
-                    f"\n  -f 'body=YOUR FINDING HERE' \\"
-                    f"\n  -f 'position[position_type]=text' \\"
-                    f"\n  -f 'position[base_sha]=BASE_SHA_HERE' \\"
-                    f"\n  -f 'position[head_sha]=HEAD_SHA_HERE' \\"
-                    f"\n  -f 'position[start_sha]=START_SHA_HERE' \\"
-                    f"\n  -f 'position[new_path]=path/to/file.tsx' \\"
-                    f"\n  -f 'position[new_line]=LINE_NUMBER'"
+                    f"\ncurl -sf -X POST -H \"PRIVATE-TOKEN: $GITLAB_TOKEN\" \\"
+                    f"\n  -H \"Content-Type: application/json\" \\"
+                    f"\n  \"{endpoint}/api/v4/projects/{encoded}/merge_requests/{pr_num}/discussions\" \\"
+                    f"\n  -d '{{"
+                    f"\n    \"body\": \"YOUR FINDING HERE\\n\\n---\\n*Created by Maestro*\","
+                    f"\n    \"position\": {{"
+                    f"\n      \"position_type\": \"text\","
+                    f"\n      \"base_sha\": \"{diff_refs['base_sha'] if diff_refs else 'BASE_SHA'}\","
+                    f"\n      \"head_sha\": \"{diff_refs['head_sha'] if diff_refs else 'HEAD_SHA'}\","
+                    f"\n      \"start_sha\": \"{diff_refs['start_sha'] if diff_refs else 'START_SHA'}\","
+                    f"\n      \"new_path\": \"path/to/file.tsx\","
+                    f"\n      \"new_line\": 42"
+                    f"\n    }}"
+                    f"\n  }}'"
                     f"\n```"
                     f"\nCRITICAL: You MUST include ALL position fields. Without them the comment is NOT inline."
                     f"\nnew_line MUST be a line ADDED or CHANGED in the diff (shown with + prefix)."
+                    f"\nUse curl with PRIVATE-TOKEN header (GITLAB_TOKEN is in env)."
                     f"\n"
                     f"\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
                 )
@@ -1150,6 +1172,39 @@ async def _check_unresolved_gitlab(task: TaskPipelineRecord, mr_number: str) -> 
         print(f"[MAESTRO] Found {unresolved} unresolved discussions on MR !{mr_number}")
         return True
     return False
+
+
+async def _fetch_gitlab_diff_refs(endpoint: str, encoded_project: str, mr_number: str, clone_url: str) -> dict | None:
+    """Fetch diff SHAs from GitLab MR so the agent can post inline comments."""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(clone_url)
+        token = parsed.password or parsed.username or ""
+
+        proc = await asyncio.create_subprocess_exec(
+            "curl", "-sf",
+            "-H", f"PRIVATE-TOKEN: {token}",
+            f"{endpoint}/api/v4/projects/{encoded_project}/merge_requests/{mr_number}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return None
+
+        import json
+        mr = json.loads(stdout.decode())
+        diff_refs = mr.get("diff_refs", {})
+        if not diff_refs:
+            return None
+
+        return {
+            "base_sha": diff_refs.get("base_sha", ""),
+            "head_sha": diff_refs.get("head_sha", ""),
+            "start_sha": diff_refs.get("start_sha", ""),
+        }
+    except Exception:
+        return None
 
 
 def _extract_verdict(result: dict) -> str:
