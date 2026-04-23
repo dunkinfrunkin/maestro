@@ -33,6 +33,22 @@ POLLABLE_STATUSES = {
 }
 
 
+async def _has_active_agent_run(task_pipeline_id: int) -> bool:
+    """Check if there's a running or pending agent run for this task."""
+    async with get_session() as session:
+        stmt = (
+            select(AgentRun)
+            .where(AgentRun.task_pipeline_id == task_pipeline_id)
+            .where(AgentRun.status.in_([
+                AgentRunStatus.PENDING.value,
+                AgentRunStatus.RUNNING.value,
+            ]))
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+
 async def poll_comments_once() -> int:
     """Check all active PRs for new human comments. Returns count of tasks re-dispatched."""
     dispatched = 0
@@ -55,6 +71,10 @@ async def poll_comments_once() -> int:
 
     for task in tasks:
         try:
+            if await _has_active_agent_run(task.id):
+                logger.debug("[comment-poller] Skipping %s PR #%s - agent already running", task.repo, task.pr_number)
+                continue
+
             logger.debug(
                 "[comment-poller] Checking %s PR #%s (%s) last_check=%s",
                 task.repo, task.pr_number, task.status.value,
