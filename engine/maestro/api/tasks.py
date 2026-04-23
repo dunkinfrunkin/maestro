@@ -722,7 +722,7 @@ async def update_task_repo(external_ref: str, body: TaskRepoUpdateBody) -> dict:
             record = TaskPipelineRecord(
                 external_ref=external_ref,
                 tracker_connection_id=conn_id,
-                status=PipelineStatus.QUEUED,
+                status=PipelineStatus.TODO,
                 project_id=project_id,
             )
             session.add(record)

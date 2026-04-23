@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 MAESTRO_BOT_MARKERS = ["maestro", "Co-Authored-By: Claude", "agent"]
 
-REVIEWABLE_STATUSES = {
+POLLABLE_STATUSES = {
+    PipelineStatus.IN_PROGRESS,
+    PipelineStatus.PENDING_APPROVAL,
+    # Legacy
     PipelineStatus.REVIEW,
     PipelineStatus.RISK_PROFILE,
 }
@@ -40,7 +43,7 @@ async def poll_comments_once() -> int:
             .where(TaskPipelineRecord.pr_url != "")
             .where(TaskPipelineRecord.pr_number != "")
             .where(TaskPipelineRecord.repo != "")
-            .where(TaskPipelineRecord.status.in_([s.value for s in REVIEWABLE_STATUSES]))
+            .where(TaskPipelineRecord.status.in_([s.value for s in POLLABLE_STATUSES]))
         )
         result = await session.execute(stmt)
         tasks = result.scalars().all()
@@ -265,7 +268,7 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
             return
 
         workspace_id = project.workspace_id
-        record.status = PipelineStatus.IMPLEMENT
+        record.status = PipelineStatus.IN_PROGRESS
         await session.commit()
 
     logger.info(
@@ -276,7 +279,7 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
     result = await dispatch_agent_for_status(
         workspace_id=workspace_id,
         task_pipeline_id=task.id,
-        status=PipelineStatus.IMPLEMENT.value,
+        status=PipelineStatus.IN_PROGRESS.value,
         issue_title=task.external_ref,
         triggered_by="comment_poller",
     )

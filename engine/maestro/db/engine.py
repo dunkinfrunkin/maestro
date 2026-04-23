@@ -58,7 +58,17 @@ async def init_db() -> None:
                 "ALTER TYPE apikeyprovider ADD VALUE IF NOT EXISTS 'OPENAI'"
             ))
     except Exception:
-        pass  # fresh DB — create_all will handle it
+        pass  # fresh DB - create_all will handle it
+
+    # Add new pipeline status enum values
+    try:
+        async with _engine.begin() as conn:
+            for val in ("todo", "in_progress", "pending_approval", "approved", "promote", "done", "failed", "halted"):
+                await conn.execute(sa.text(
+                    f"ALTER TYPE pipelinestatus ADD VALUE IF NOT EXISTS '{val}'"
+                ))
+    except Exception:
+        pass  # fresh DB - create_all will handle it
 
     # Step 2: Create tables + run migrations
     async with _engine.begin() as conn:
