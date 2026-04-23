@@ -1049,11 +1049,10 @@ async def _has_completed_agent_type(task_pipeline_id: int, agent_type: str) -> b
 
 
 async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
-    """Check if the PR has unresolved inline review comments.
+    """Check if the PR/MR has unresolved inline review comments.
 
-    A comment is considered resolved if it has at least one reply
-    (the implementation agent replies with 'Fixed: ...' and/or
-    the review agent replies with 'Verified').
+    GitHub: A comment is resolved if it has at least one reply.
+    GitLab: Uses the discussions API resolved state.
     """
     try:
         async with get_session() as session:
@@ -1063,45 +1062,94 @@ async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
 
         pr_number = task.pr_url.rstrip("/").split("/")[-1]
         repo = task.repo
+        is_gitlab = "gitlab" in task.pr_url
 
-        # Get all inline comments with their replies
-        proc = await asyncio.create_subprocess_exec(
-            "gh", "api", f"repos/{repo}/pulls/{pr_number}/comments",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _ = await proc.communicate()
-        if proc.returncode != 0:
-            return False
-
-        import json
-        comments = json.loads(stdout.decode())
-
-        # Find top-level comments (not replies themselves)
-        # A comment is a reply if it has in_reply_to_id set
-        top_level = [c for c in comments if not c.get("in_reply_to_id")]
-        replies_by_parent = {}
-        for c in comments:
-            parent = c.get("in_reply_to_id")
-            if parent:
-                replies_by_parent.setdefault(parent, []).append(c)
-
-        unresolved = 0
-        for comment in top_level:
-            comment_id = comment["id"]
-            has_replies = len(replies_by_parent.get(comment_id, [])) > 0
-            if not has_replies:
-                unresolved += 1
-
-        if unresolved > 0:
-            print(f"[MAESTRO] Found {unresolved} unresolved inline comments (no replies) on PR #{pr_number}")
-            return True
-
-        print(f"[MAESTRO] All {len(top_level)} inline comments have replies — considered resolved")
-        return False
+        if is_gitlab:
+            return await _check_unresolved_gitlab(task, pr_number)
+        else:
+            return await _check_unresolved_github(repo, pr_number)
     except Exception as exc:
         print(f"[MAESTRO] Error checking comments: {exc}")
         return False
+
+
+async def _check_unresolved_github(repo: str, pr_number: str) -> bool:
+    """Check unresolved comments on GitHub PR."""
+    proc = await asyncio.create_subprocess_exec(
+        "gh", "api", f"repos/{repo}/pulls/{pr_number}/comments",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return False
+
+    import json
+    comments = json.loads(stdout.decode())
+
+    top_level = [c for c in comments if not c.get("in_reply_to_id")]
+    replies_by_parent = {}
+    for c in comments:
+        parent = c.get("in_reply_to_id")
+        if parent:
+            replies_by_parent.setdefault(parent, []).append(c)
+
+    unresolved = 0
+    for comment in top_level:
+        if not replies_by_parent.get(comment["id"]):
+            unresolved += 1
+
+    if unresolved > 0:
+        print(f"[MAESTRO] Found {unresolved} unresolved inline comments on PR #{pr_number}")
+        return True
+    return False
+
+
+async def _check_unresolved_gitlab(task: TaskPipelineRecord, mr_number: str) -> bool:
+    """Check unresolved discussions on GitLab MR."""
+    from maestro.worker.comment_poller import _find_codehost_connection
+    from maestro.db.encryption import decrypt_token
+    import json
+    from urllib.parse import quote
+
+    conn = await _find_codehost_connection(task)
+    if not conn:
+        return False
+
+    token = decrypt_token(conn.encrypted_token)
+    endpoint = (conn.endpoint or "https://gitlab.com").rstrip("/")
+    encoded = quote(task.repo, safe="")
+
+    proc = await asyncio.create_subprocess_exec(
+        "curl", "-sf",
+        "-H", f"PRIVATE-TOKEN: {token}",
+        f"{endpoint}/api/v4/projects/{encoded}/merge_requests/{mr_number}/discussions",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return False
+
+    discussions = json.loads(stdout.decode())
+
+    unresolved = 0
+    for disc in discussions:
+        if disc.get("individual_note"):
+            continue
+        notes = disc.get("notes", [])
+        if not notes:
+            continue
+        first_note = notes[0]
+        if first_note.get("system"):
+            continue
+        if first_note.get("resolvable") and not first_note.get("resolved"):
+            unresolved += 1
+
+    if unresolved > 0:
+        print(f"[MAESTRO] Found {unresolved} unresolved discussions on MR !{mr_number}")
+        return True
+    return False
 
 
 def _extract_verdict(result: dict) -> str:

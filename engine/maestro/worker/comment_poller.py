@@ -22,7 +22,7 @@ from maestro.db.encryption import decrypt_token
 
 logger = logging.getLogger(__name__)
 
-MAESTRO_BOT_MARKERS = ["maestro", "Co-Authored-By: Claude", "agent"]
+MAESTRO_FOOTER = "*Created by Maestro*"
 
 POLLABLE_STATUSES = {
     PipelineStatus.IN_PROGRESS,
@@ -156,13 +156,16 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
 
 
 def _is_maestro_comment(body: str, user: str) -> bool:
-    """Detect if a comment was made by Maestro agents."""
-    lower_body = body.lower()
-    lower_user = user.lower()
-    for marker in MAESTRO_BOT_MARKERS:
-        if marker.lower() in lower_body or marker.lower() in lower_user:
-            return True
-    if "[bot]" in lower_user:
+    """Detect if a comment was made by Maestro agents.
+
+    Primary check: the footer '*Created by Maestro*' or 'created by Maestro'
+    is present in the body. Fallback: user is a known bot account.
+    """
+    if MAESTRO_FOOTER in body:
+        return True
+    if "created by Maestro" in body:
+        return True
+    if "[bot]" in user.lower():
         return True
     return False
 
