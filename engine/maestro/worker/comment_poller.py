@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -33,16 +33,29 @@ POLLABLE_STATUSES = {
 }
 
 
-async def _has_active_agent_run(task_pipeline_id: int) -> bool:
-    """Check if there's a running or pending agent run for this task."""
+async def _has_active_or_recent_agent_run(task_pipeline_id: int) -> bool:
+    """Check if there's a running/pending agent run or one that completed very recently.
+
+    The 'recently completed' check prevents races with auto-transition:
+    when a review agent finishes, auto-transition dispatches the next agent.
+    If the comment poller checks in that window, it would also dispatch,
+    creating a duplicate.
+    """
+    from sqlalchemy import or_
+
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=60)
+
     async with get_session() as session:
         stmt = (
             select(AgentRun)
             .where(AgentRun.task_pipeline_id == task_pipeline_id)
-            .where(AgentRun.status.in_([
-                AgentRunStatus.PENDING.value,
-                AgentRunStatus.RUNNING.value,
-            ]))
+            .where(or_(
+                AgentRun.status.in_([
+                    AgentRunStatus.PENDING.value,
+                    AgentRunStatus.RUNNING.value,
+                ]),
+                AgentRun.finished_at > cutoff,
+            ))
             .limit(1)
         )
         result = await session.execute(stmt)
@@ -71,8 +84,8 @@ async def poll_comments_once() -> int:
 
     for task in tasks:
         try:
-            if await _has_active_agent_run(task.id):
-                logger.debug("[comment-poller] Skipping %s PR #%s - agent already running", task.repo, task.pr_number)
+            if await _has_active_or_recent_agent_run(task.id):
+                logger.debug("[comment-poller] Skipping %s PR #%s - agent active or recently finished", task.repo, task.pr_number)
                 continue
 
             logger.debug(
