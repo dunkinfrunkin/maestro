@@ -60,10 +60,10 @@ async def init_db() -> None:
     except Exception:
         pass  # fresh DB - create_all will handle it
 
-    # Add new pipeline status enum values
+    # Add new pipeline status enum values (uppercase to match SQLAlchemy Enum behavior)
     try:
         async with _engine.begin() as conn:
-            for val in ("todo", "in_progress", "pending_approval", "approved", "promote", "done", "failed", "halted"):
+            for val in ("TODO", "IN_PROGRESS", "PENDING_APPROVAL", "APPROVED", "PROMOTE", "DONE", "FAILED", "HALTED"):
                 await conn.execute(sa.text(
                     f"ALTER TYPE pipelinestatus ADD VALUE IF NOT EXISTS '{val}'"
                 ))
