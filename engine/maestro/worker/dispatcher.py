@@ -52,6 +52,7 @@ async def dispatch_agent_for_status(
     issue_title: str = "",
     issue_description: str = "",
     issue_url: str = "",
+    issue_identifier: str = "",
     triggered_by: str = "",
 ) -> int | None:
     """Dispatch the appropriate agent for a pipeline status change.
@@ -77,6 +78,7 @@ async def dispatch_agent_for_status(
             issue_title=issue_title,
             issue_description=issue_description,
             issue_url=issue_url,
+            issue_identifier=issue_identifier,
             triggered_by=triggered_by,
         )
 
@@ -90,6 +92,7 @@ async def _dispatch_agent_locked(
     issue_title: str = "",
     issue_description: str = "",
     issue_url: str = "",
+    issue_identifier: str = "",
     triggered_by: str = "",
 ) -> int | None:
     # Check if agent is enabled
@@ -220,6 +223,7 @@ async def _dispatch_agent_locked(
             "issue_title": issue_title,
             "issue_description": issue_description,
             "issue_url": issue_url,
+            "issue_identifier": issue_identifier,
             "pr_url": pr_url,
             "pr_number": pr_number,
             "repo": repo,
@@ -284,6 +288,7 @@ async def _dispatch_agent_locked(
                 issue_title=issue_title,
                 issue_description=issue_description,
                 issue_url=issue_url,
+                issue_identifier=issue_identifier,
                 pr_url=pr_url,
                 pr_number=pr_number,
                 repo=repo,
@@ -389,6 +394,7 @@ async def _execute_agent(
     issue_title: str,
     issue_description: str,
     issue_url: str,
+    issue_identifier: str,
     pr_url: str,
     pr_number: str,
     repo: str,
@@ -450,7 +456,13 @@ async def _execute_agent(
         # Get system prompt: custom from DB first, fall back to agent module default
         custom_prompt = extra_config.get("custom_prompt", "")
         if custom_prompt:
-            system_prompt = custom_prompt
+            system_prompt = (
+                custom_prompt
+                .replace("[ISSUE]", issue_identifier)
+                .replace("[ISSUE_TITLE]", issue_title)
+                .replace("[ISSUE_DESCRIPTION]", issue_description)
+                .replace("[ISSUE_URL]", issue_url)
+            )
         else:
             system_prompt = ""
             try:

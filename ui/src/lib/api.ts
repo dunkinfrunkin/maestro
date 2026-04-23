@@ -337,6 +337,7 @@ export async function updateTaskStatus(
     issue_title?: string;
     issue_description?: string;
     issue_url?: string;
+    issue_identifier?: string;
   },
 ): Promise<{ agent_run_id?: number }> {
   const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {

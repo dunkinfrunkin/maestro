@@ -210,6 +210,7 @@ export function TaskDetailPage({
         issue_title: task.title,
         issue_description: task.description || "",
         issue_url: task.url || "",
+        issue_identifier: task.identifier || "",
       });
       onTaskUpdated();
       loadRuns();

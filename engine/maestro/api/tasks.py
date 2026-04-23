@@ -70,6 +70,7 @@ class PipelineStatusUpdate(BaseModel):
     issue_title: str = ""
     issue_description: str = ""
     issue_url: str = ""
+    issue_identifier: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +481,7 @@ async def update_task_status(external_ref: str, body: PipelineStatusUpdate, user
             issue_title=body.issue_title,
             issue_description=body.issue_description,
             issue_url=body.issue_url,
+            issue_identifier=body.issue_identifier,
             triggered_by=user.name or user.email,
         )
 
