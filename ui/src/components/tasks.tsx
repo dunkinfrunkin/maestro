@@ -166,6 +166,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
               <TaskCard
                 key={task.external_ref}
                 task={task}
+                statuses={statuses}
                 onStatusChange={handleStatusChange}
                 onClick={() => router.push(task.id ? `/tasks/${task.id}` : `/tasks/${encodeURIComponent(task.external_ref)}`)}
               />
@@ -203,10 +204,12 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
 
 function TaskCard({
   task,
+  statuses,
   onStatusChange,
   onClick,
 }: {
   task: UnifiedTask;
+  statuses: StatusInfo[];
   onStatusChange: (task: UnifiedTask, status: string) => void;
   onClick: () => void;
 }) {
