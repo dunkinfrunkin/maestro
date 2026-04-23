@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PIPELINE_STATUSES,
+  StatusInfo,
   UnifiedTask,
+  fetchStatuses,
   fetchTasks,
   updateTaskStatus,
   removeTaskStatus,
@@ -12,26 +14,20 @@ import {
   fetchConnections,
 } from "@/lib/api";
 
-const STATUS_LABELS: Record<string, string> = {
-  queued: "Queued",
-  implement: "Implement",
-  review: "Review",
-  risk_profile: "Risk Profile",
-  deploy: "Deploy",
-  monitor: "Monitor",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  queued: "bg-gray-200 text-gray-800 border-gray-300",
-  implement: "bg-blue-100 text-blue-800 border-blue-300",
-  review: "bg-purple-100 text-purple-800 border-purple-300",
-  risk_profile: "bg-orange-100 text-orange-800 border-orange-300",
-  deploy: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  monitor: "bg-green-100 text-green-800 border-green-300",
+const COLOR_MAP: Record<string, string> = {
+  gray: "bg-gray-200 text-gray-800 border-gray-300",
+  blue: "bg-blue-100 text-blue-800 border-blue-300",
+  purple: "bg-purple-100 text-purple-800 border-purple-300",
+  teal: "bg-teal-100 text-teal-800 border-teal-300",
+  yellow: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  orange: "bg-orange-100 text-orange-800 border-orange-300",
+  green: "bg-green-100 text-green-800 border-green-300",
+  red: "bg-red-100 text-red-800 border-red-300",
 };
 
 export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; projectId?: number }) {
   const router = useRouter();
+  const [statuses, setStatuses] = useState<StatusInfo[]>([]);
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [total, setTotal] = useState(0);
   const [connections, setConnections] = useState<TrackerConnection[]>([]);
@@ -65,6 +61,7 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
 
   useEffect(() => {
     fetchConnections().then(setConnections).catch(() => {});
+    fetchStatuses().then(setStatuses).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -132,9 +129,9 @@ export function TasksPage({ workspaceId, projectId }: { workspaceId?: number; pr
         >
           <option value="">All statuses</option>
           <option value="none">No status</option>
-          {PIPELINE_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
+          {statuses.filter(s => s.active).map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>
@@ -237,16 +234,16 @@ function TaskCard({
         <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {task.pipeline_status ? (
             <>
-              <span className={`text-xs px-2 py-1 rounded-full border ${STATUS_COLORS[task.pipeline_status] || "bg-gray-200 text-gray-800 border-gray-300"}`}>
-                {STATUS_LABELS[task.pipeline_status] || task.pipeline_status}
+              <span className={`text-xs px-2 py-1 rounded-full border ${COLOR_MAP[statuses.find(s => s.value === task.pipeline_status)?.color || "gray"] || COLOR_MAP.gray}`}>
+                {statuses.find(s => s.value === task.pipeline_status)?.label || task.pipeline_status}
               </span>
               <select
                 value={task.pipeline_status}
                 onChange={(e) => onStatusChange(task, e.target.value)}
                 className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-foreground"
               >
-                {PIPELINE_STATUSES.map((s) => (
-                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                {statuses.filter(s => s.active).map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
                 <option value="">Remove</option>
               </select>
@@ -258,8 +255,8 @@ function TaskCard({
               className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-muted"
             >
               <option value="" disabled>Set status...</option>
-              {PIPELINE_STATUSES.map((s) => (
-                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              {statuses.filter(s => s.active).map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
           )}

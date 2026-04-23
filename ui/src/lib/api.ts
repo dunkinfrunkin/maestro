@@ -289,16 +289,39 @@ export interface RepoEntry {
   tracker_kind: string;
 }
 
+export interface StatusInfo {
+  value: string;
+  label: string;
+  color: string;
+  active: boolean;
+  order: number;
+}
+
+export async function fetchStatuses(): Promise<StatusInfo[]> {
+  const res = await authFetch(`${API_BASE}/api/v1/statuses`, { cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchLegacyMap(): Promise<Record<string, string>> {
+  const res = await authFetch(`${API_BASE}/api/v1/statuses/legacy-map`, { cache: "no-store" });
+  if (!res.ok) return {};
+  return res.json();
+}
+
 export const PIPELINE_STATUSES = [
-  "queued",
-  "implement",
-  "review",
-  "risk_profile",
+  "todo",
+  "in_progress",
+  "pending_approval",
+  "approved",
+  "promote",
   "deploy",
-  "monitor",
+  "done",
+  "failed",
+  "halted",
 ] as const;
 
-export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
+export type PipelineStatus = (typeof PIPELINE_STATUSES)[number] | string;
 
 export interface PaginatedTasks {
   tasks: UnifiedTask[];
