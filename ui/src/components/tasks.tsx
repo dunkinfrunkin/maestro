@@ -12,6 +12,7 @@ import {
   removeTaskStatus,
   TrackerConnection,
   fetchConnections,
+  findStatusInfo,
 } from "@/lib/api";
 
 const COLOR_MAP: Record<string, string> = {
@@ -237,8 +238,8 @@ function TaskCard({
         <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {task.pipeline_status ? (
             <>
-              <span className={`text-xs px-2 py-1 rounded-full border ${COLOR_MAP[statuses.find(s => s.value === task.pipeline_status)?.color || "gray"] || COLOR_MAP.gray}`}>
-                {statuses.find(s => s.value === task.pipeline_status)?.label || task.pipeline_status}
+              <span className={`text-xs px-2 py-1 rounded-full border ${COLOR_MAP[findStatusInfo(statuses, task.pipeline_status)?.color || "gray"] || COLOR_MAP.gray}`}>
+                {findStatusInfo(statuses, task.pipeline_status)?.label || task.pipeline_status}
               </span>
               <select
                 value={task.pipeline_status}

@@ -11,6 +11,7 @@ import {
   UnifiedTask,
   RepoEntry,
   fetchStatuses,
+  findStatusInfo,
   fetchTaskRuns,
   fetchRunLogs,
   updateTaskStatus,
@@ -182,8 +183,8 @@ export function TaskDetailPage({
           <span className="text-xs font-mono text-muted">{task.identifier}</span>
           <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted">{task.tracker_kind}</span>
           {task.pipeline_status && (
-            <span className={`text-xs px-2 py-0.5 rounded-full border ${COLOR_MAP[statuses.find(s => s.value === task.pipeline_status)?.color || "gray"] || COLOR_MAP.gray}`}>
-              {statuses.find(s => s.value === task.pipeline_status)?.label || task.pipeline_status}
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${COLOR_MAP[findStatusInfo(statuses, task.pipeline_status)?.color || "gray"] || COLOR_MAP.gray}`}>
+              {findStatusInfo(statuses, task.pipeline_status)?.label || task.pipeline_status}
             </span>
           )}
         </div>
