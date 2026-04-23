@@ -78,37 +78,64 @@ async def init_db() -> None:
     except Exception:
         pass  # fresh DB — create_all will handle it
 
-    # Step 2: Create tables
-    try:
-        async with _engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    except Exception:
-        pass
-
-    # Step 3: Column migrations — each in its own transaction so concurrent startups
-    # don't deadlock (ALTER TABLE takes AccessExclusiveLock; IF NOT EXISTS makes them idempotent)
-    _ddl = [
-        "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''",
-        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS input_tokens INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS output_tokens INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE agent_configs ADD COLUMN IF NOT EXISTS provider VARCHAR(50) NOT NULL DEFAULT 'anthropic'",
-        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) NOT NULL DEFAULT ''",
-        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS peak_memory_mb FLOAT NOT NULL DEFAULT 0.0",
-        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS avg_cpu_percent FLOAT NOT NULL DEFAULT 0.0",
-        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS job_payload TEXT NOT NULL DEFAULT '{}'",
-        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS cpu_percent FLOAT NOT NULL DEFAULT 0.0",
-        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS memory_used_mb FLOAT NOT NULL DEFAULT 0.0",
-        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS memory_total_mb FLOAT NOT NULL DEFAULT 0.0",
-        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS cpu_count INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS estimated_capacity INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS last_comment_check_at TIMESTAMPTZ",
-        "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'",
-        "UPDATE agent_configs SET model = 'opus' WHERE model = 'claude-opus-4-6'",
-    ]
-    for stmt in _ddl:
+    # Step 2: Acquire advisory lock so only one process runs migrations at a time.
+    # This prevents deadlocks when maestro app and maestro worker start simultaneously.
+    import asyncio
+    lock_acquired = False
+    for attempt in range(3):
         try:
             async with _engine.begin() as conn:
-                await conn.execute(sa.text(stmt))
+                result = await conn.execute(sa.text("SELECT pg_try_advisory_lock(73571)"))
+                lock_acquired = result.scalar()
+                if lock_acquired:
+                    break
+        except Exception:
+            pass
+        if not lock_acquired:
+            await asyncio.sleep(2)
+
+    if not lock_acquired:
+        # Another process is running migrations - skip, tables should already exist
+        return
+
+    try:
+        # Create tables
+        try:
+            async with _engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        except Exception:
+            pass
+
+        # Column migrations
+        _ddl = [
+            "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS input_tokens INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS output_tokens INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE agent_configs ADD COLUMN IF NOT EXISTS provider VARCHAR(50) NOT NULL DEFAULT 'anthropic'",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) NOT NULL DEFAULT ''",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS peak_memory_mb FLOAT NOT NULL DEFAULT 0.0",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS avg_cpu_percent FLOAT NOT NULL DEFAULT 0.0",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS job_payload TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS cpu_percent FLOAT NOT NULL DEFAULT 0.0",
+            "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS memory_used_mb FLOAT NOT NULL DEFAULT 0.0",
+            "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS memory_total_mb FLOAT NOT NULL DEFAULT 0.0",
+            "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS cpu_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS estimated_capacity INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS last_comment_check_at TIMESTAMPTZ",
+            "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'",
+            "UPDATE agent_configs SET model = 'opus' WHERE model = 'claude-opus-4-6'",
+        ]
+        for stmt in _ddl:
+            try:
+                async with _engine.begin() as conn:
+                    await conn.execute(sa.text(stmt))
+            except Exception:
+                pass
+    finally:
+        # Release advisory lock
+        try:
+            async with _engine.begin() as conn:
+                await conn.execute(sa.text("SELECT pg_advisory_unlock(73571)"))
         except Exception:
             pass
 
