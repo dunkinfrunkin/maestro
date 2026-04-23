@@ -58,6 +58,7 @@ class RunResult:
     all_text: str = ""
     pr_url: str = ""
     review_verdict: str = ""
+    log_text: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -186,7 +187,8 @@ async def _process_text(run_id: int, text: str, result: RunResult) -> None:
         result.review_verdict = verdict
         await _write_log(run_id, "status", f"Review verdict: {verdict}")
 
-    await _write_log(run_id, "text", text)
+    if result.log_text:
+        await _write_log(run_id, "text", text)
     result.messages.append({"type": "text", "text": text})
 
 
@@ -257,8 +259,6 @@ async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> No
         result.input_tokens = usage.get("input_tokens", 0) or 0
         result.output_tokens = usage.get("output_tokens", 0) or 0
         result_text = event.get("result", "")
-        if result_text:
-            await _process_text(run_id, result_text, result)
 
         is_error = event.get("is_error", False)
         if is_error:
@@ -267,9 +267,15 @@ async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> No
             await _write_log(run_id, "error", f"Agent failed: {result.error}")
         else:
             result.status = "completed"
-            await _write_log(run_id, "status",
-                f"Claude Code CLI completed (cost: ${result.total_cost_usd:.4f}, "
-                f"tokens: {result.input_tokens}in/{result.output_tokens}out)")
+            if result.log_text:
+                await _write_log(run_id, "status",
+                    f"Claude Code CLI completed (cost: ${result.total_cost_usd:.4f}, "
+                    f"tokens: {result.input_tokens}in/{result.output_tokens}out)")
+
+        # The result event's text duplicates what was already streamed via assistant events.
+        # Only fall back to it if no streaming text was captured (e.g. very short responses).
+        if result_text and not result.all_text.strip():
+            await _process_text(run_id, result_text, result)
 
 
 # ---------------------------------------------------------------------------
@@ -382,19 +388,21 @@ async def run_cli_with_logging(
     workspace_path: str,
     allowed_tools: list[str],
     api_key: str,
+    log_text: bool = True,
 ) -> dict[str, Any]:
     """Run CLI agent and stream log entries to the DB.
 
     Returns dict with: status, error, total_cost_usd, input_tokens, output_tokens,
     messages, last_text, all_text, pr_url, review_verdict
     """
-    result = RunResult()
+    result = RunResult(log_text=log_text)
     tools_str = ",".join(allowed_tools)
 
     # Build command and env based on provider
     is_codex = provider == "openai"
     cli_name = "Codex CLI" if is_codex else "Claude Code CLI"
-    await _write_log(run_id, "status", f"Starting {cli_name} (model: {model}, tools: {tools_str})")
+    if log_text:
+        await _write_log(run_id, "status", f"Starting {cli_name} (model: {model}, tools: {tools_str})")
 
     if is_codex:
         cmd = _build_codex_cmd(prompt, model, system_prompt)
@@ -409,7 +417,8 @@ async def run_cli_with_logging(
     else:
         env["ANTHROPIC_API_KEY"] = api_key
 
-    await _write_log(run_id, "status", f"$ {cmd[0]} ... --model {model}")
+    if log_text:
+        await _write_log(run_id, "status", f"$ {cmd[0]} ... --model {model}")
 
     try:
         # Codex CLI requires explicit login — env var alone is not sufficient

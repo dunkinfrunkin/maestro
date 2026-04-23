@@ -251,7 +251,7 @@ export function AgentDetailPage({
           <div className="flex items-center justify-between rounded-md border border-border p-3">
             <div>
               <div className="text-sm font-medium">Enabled</div>
-              <div className="text-xs text-muted">Agent will be triggered when tasks move to this pipeline stage</div>
+              <div className="text-xs text-muted">{agent.triggerStatus ? "Agent will be triggered when tasks move to this pipeline stage" : "Agent can be triggered manually from the task detail view"}</div>
             </div>
             <button
               onClick={() => setDraft({ ...draft, enabled: !draft.enabled })}

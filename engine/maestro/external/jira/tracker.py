@@ -287,22 +287,147 @@ def _normalize_issue(item: dict[str, Any], base_url: str) -> Issue:
 
 
 def _md_to_adf(text: str) -> dict[str, Any]:
-    """Wrap plain/markdown text in a minimal ADF document.
+    """Convert markdown to Atlassian Document Format (ADF).
 
-    Splits on blank lines to produce paragraph nodes so JIRA renders
-    line breaks correctly. Full markdown→ADF conversion is out of scope.
+    Handles headings, bullet/ordered/task lists, code blocks, inline
+    bold/italic/code/links/strikethrough, and horizontal rules.
     """
-    paragraphs = []
-    for para in text.split("\n\n"):
-        para = para.strip()
+    import re as _re
+
+    nodes: list[dict[str, Any]] = []
+    lines = text.split("\n")
+    i = 0
+    _id = [0]
+
+    def _next_id() -> str:
+        _id[0] += 1
+        return str(_id[0])
+
+    def _inline(src: str) -> list[dict[str, Any]]:
+        """Parse inline markdown into ADF text nodes with marks."""
+        result: list[dict[str, Any]] = []
+        pat = _re.compile(
+            r"(?P<code>`[^`]+`)"
+            r"|(?P<bold_italic>\*{3}(?P<bi>.+?)\*{3})"
+            r"|(?P<bold>\*{2}(?P<b>.+?)\*{2})"
+            r"|(?P<bold2>__(?P<b2>.+?)__)"
+            r"|(?P<italic>\*(?P<it>.+?)\*)"
+            r"|(?P<italic2>_(?P<it2>.+?)_)"
+            r"|(?P<strike>~~(?P<s>.+?)~~)"
+            r"|\[(?P<lt>[^\]]+)\]\((?P<lh>[^)]+)\)"
+        )
+        last = 0
+        for m in pat.finditer(src):
+            if m.start() > last:
+                result.append({"type": "text", "text": src[last:m.start()]})
+            if m.group("code"):
+                result.append({"type": "text", "text": m.group("code")[1:-1], "marks": [{"type": "code"}]})
+            elif m.group("bold_italic"):
+                result.append({"type": "text", "text": m.group("bi"), "marks": [{"type": "strong"}, {"type": "em"}]})
+            elif m.group("bold"):
+                result.append({"type": "text", "text": m.group("b"), "marks": [{"type": "strong"}]})
+            elif m.group("bold2"):
+                result.append({"type": "text", "text": m.group("b2"), "marks": [{"type": "strong"}]})
+            elif m.group("italic"):
+                result.append({"type": "text", "text": m.group("it"), "marks": [{"type": "em"}]})
+            elif m.group("italic2"):
+                result.append({"type": "text", "text": m.group("it2"), "marks": [{"type": "em"}]})
+            elif m.group("strike"):
+                result.append({"type": "text", "text": m.group("s"), "marks": [{"type": "strike"}]})
+            elif m.group("lt"):
+                result.append({"type": "text", "text": m.group("lt"), "marks": [{"type": "link", "attrs": {"href": m.group("lh")}}]})
+            last = m.end()
+        if last < len(src):
+            result.append({"type": "text", "text": src[last:]})
+        return result or [{"type": "text", "text": src}]
+
+    _IS_TASK   = _re.compile(r"^[-*]\s+\[[ xX]\]")
+    _IS_BULLET = _re.compile(r"^[-*]\s+")
+    _IS_ORDERED = _re.compile(r"^\d+[.)]\s+")
+    _IS_HEADING = _re.compile(r"^(#{1,6})\s+(.*)")
+    _IS_HR     = _re.compile(r"^(?:[-*_]){3,}\s*$")
+    _IS_BLOCK  = _re.compile(r"^(?:#{1,6}\s|```|[-*]\s|\d+[.)]\s|(?:[-*_]){3,}\s*$)")
+
+    while i < len(lines):
+        line = lines[i]
+
+        # Fenced code block
+        if line.startswith("```"):
+            lang = line[3:].strip()
+            i += 1
+            code: list[str] = []
+            while i < len(lines) and not lines[i].startswith("```"):
+                code.append(lines[i])
+                i += 1
+            i += 1
+            nodes.append({"type": "codeBlock", "attrs": {"language": lang}, "content": [{"type": "text", "text": "\n".join(code)}]})
+            continue
+
+        # Heading
+        m = _IS_HEADING.match(line)
+        if m:
+            nodes.append({"type": "heading", "attrs": {"level": len(m.group(1))}, "content": _inline(m.group(2).strip())})
+            i += 1
+            continue
+
+        # Horizontal rule
+        if _IS_HR.match(line):
+            nodes.append({"type": "rule"})
+            i += 1
+            continue
+
+        # Task list
+        if _IS_TASK.match(line):
+            items: list[dict[str, Any]] = []
+            list_id = _next_id()
+            while i < len(lines) and _IS_TASK.match(lines[i]):
+                tm = _re.match(r"^[-*]\s+\[([ xX])\]\s*(.*)", lines[i])
+                if tm:
+                    items.append({"type": "taskItem", "attrs": {"state": "DONE" if tm.group(1).lower() == "x" else "TODO", "localId": _next_id()}, "content": _inline(tm.group(2))})
+                i += 1
+            nodes.append({"type": "taskList", "attrs": {"localId": list_id}, "content": items})
+            continue
+
+        # Unordered list
+        if _IS_BULLET.match(line):
+            items = []
+            while i < len(lines) and _IS_BULLET.match(lines[i]) and not _IS_TASK.match(lines[i]):
+                bm = _re.match(r"^[-*]\s+(.*)", lines[i])
+                if bm:
+                    items.append({"type": "listItem", "content": [{"type": "paragraph", "content": _inline(bm.group(1))}]})
+                i += 1
+            if items:
+                nodes.append({"type": "bulletList", "content": items})
+            continue
+
+        # Ordered list
+        if _IS_ORDERED.match(line):
+            items = []
+            while i < len(lines) and _IS_ORDERED.match(lines[i]):
+                om = _re.match(r"^\d+[.)]\s+(.*)", lines[i])
+                if om:
+                    items.append({"type": "listItem", "content": [{"type": "paragraph", "content": _inline(om.group(1))}]})
+                i += 1
+            if items:
+                nodes.append({"type": "orderedList", "content": items})
+            continue
+
+        # Blank line
+        if not line.strip():
+            i += 1
+            continue
+
+        # Paragraph — collect until blank line or block element
+        para: list[str] = []
+        while i < len(lines) and lines[i].strip() and not _IS_BLOCK.match(lines[i]):
+            para.append(lines[i])
+            i += 1
         if para:
-            paragraphs.append({
-                "type": "paragraph",
-                "content": [{"type": "text", "text": para}],
-            })
-    if not paragraphs:
-        paragraphs = [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]
-    return {"type": "doc", "version": 1, "content": paragraphs}
+            nodes.append({"type": "paragraph", "content": _inline(" ".join(para))})
+
+    if not nodes:
+        nodes = [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]
+    return {"type": "doc", "version": 1, "content": nodes}
 
 
 def _extract_adf_text(adf: dict[str, Any]) -> str:

@@ -732,6 +732,46 @@ async def dispatch_requirements_agent(
             except (json.JSONDecodeError, TypeError):
                 extra = {}
 
+        # Resolve repo and clone URL using the same logic as other agents
+        task_record = await session.get(TaskPipelineRecord, task_pipeline_id)
+        repo = task_record.repo if task_record else ""
+        conn = None
+        tracker_token = ""
+        if task_record:
+            conn = await crud.get_connection(session, task_record.tracker_connection_id)
+            if conn:
+                tracker_token = crud.get_decrypted_token(conn)
+        if not repo and task_record:
+            if conn and conn.project:
+                repo = conn.project
+            if not repo:
+                repo = _extract_repo_from_text(
+                    issue_description, issue_url,
+                    conn.kind.value if conn else "",
+                    conn.endpoint if conn else "",
+                )
+            if repo:
+                task_record.repo = repo
+                await session.commit()
+        clone_url = ""
+        clone_conn = conn
+        clone_token = tracker_token
+        if repo and conn and conn.kind.value in ("jira", "linear"):
+            all_conns = await crud.list_connections(session)
+            for c in all_conns:
+                if c.kind.value in ("github", "gitlab"):
+                    clone_conn = c
+                    clone_token = crud.get_decrypted_token(c)
+                    break
+        if repo and clone_conn:
+            clone_url = _build_clone_url(
+                repo=repo,
+                tracker_kind=clone_conn.kind.value,
+                endpoint=clone_conn.endpoint,
+                token=clone_token,
+                email=clone_conn.email,
+            )
+
         run = AgentRun(
             workspace_id=workspace_id,
             task_pipeline_id=task_pipeline_id,
@@ -760,7 +800,25 @@ async def dispatch_requirements_agent(
     system_prompt = extra.get("custom_prompt") or DEFAULT_SYSTEM_PROMPT
 
     async def _run():
+        import tempfile, shutil
+        workspace_path = None
         try:
+            workspace_path = tempfile.mkdtemp(prefix=f"maestro-requirements-{run_id}-")
+            if clone_url:
+                await _write_log(run_id, "status", f"Cloning repository: {repo}")
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "clone", "--depth", "1", clone_url, f"{workspace_path}/repo",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, stderr = await proc.communicate()
+                if proc.returncode == 0:
+                    workspace_path = f"{workspace_path}/repo"
+                    await _write_log(run_id, "status", "Repository cloned successfully")
+                else:
+                    err = _sanitize_clone_error(stderr.decode(errors="replace")[:300] if stderr else "")
+                    await _write_log(run_id, "error", f"Clone failed: {err} — continuing without repo")
+
             result = await run_requirements_agent(
                 run_id=run_id,
                 issue_title=issue_title,
@@ -769,6 +827,7 @@ async def dispatch_requirements_agent(
                 system_prompt=system_prompt,
                 api_key=api_key,
                 model=model,
+                cwd=workspace_path,
             )
             # If finalized, update the JIRA ticket
             if result.updated_description and issue_identifier:
@@ -813,6 +872,12 @@ async def dispatch_requirements_agent(
                     run_obj.error = str(exc)
                     run_obj.finished_at = datetime.now(timezone.utc)
                     await session.commit()
+        finally:
+            if workspace_path:
+                try:
+                    shutil.rmtree(workspace_path, ignore_errors=True)
+                except Exception:
+                    pass
 
     asyncio.create_task(_run())
     return run_id
