@@ -326,6 +326,19 @@ def _adf_node_to_md(node: Any, list_depth: int = 0) -> str:
                 parts.append(f"{indent}- {text}\n")
         return "".join(parts)
 
+    if node_type == "taskList":
+        items = ""
+        for child in content:
+            items += _adf_node_to_md(child, list_depth)
+        return items + "\n"
+
+    if node_type == "taskItem":
+        indent = "  " * list_depth
+        state = node.get("attrs", {}).get("state", "TODO")
+        checkbox = "[x]" if state == "DONE" else "[ ]"
+        text = _adf_inline(content)
+        return f"{indent}- {checkbox} {text}\n"
+
     if node_type == "codeBlock":
         lang = node.get("attrs", {}).get("language", "")
         text = _adf_inline(content)

@@ -255,7 +255,8 @@ export function TaskDetailPage({
             prose-pre:bg-surface-hover prose-pre:border prose-pre:border-border prose-pre:rounded-md prose-pre:text-foreground
             [&_pre_code]:text-foreground [&_pre_code]:bg-transparent
             prose-a:text-accent prose-a:no-underline hover:prose-a:underline
-            prose-strong:text-foreground prose-hr:border-border">
+            prose-strong:text-foreground prose-hr:border-border
+            [&_input[type=checkbox]]:appearance-auto [&_input[type=checkbox]]:mr-1.5 [&_input[type=checkbox]]:align-middle [&_li:has(input[type=checkbox])]:list-none [&_li:has(input[type=checkbox])]:pl-0">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown>
           </div>
         )}
