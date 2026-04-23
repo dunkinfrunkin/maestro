@@ -87,6 +87,7 @@ Every config.yaml field maps to an environment variable. Environment variables t
 | `MAESTRO_ENCRYPTION_KEY` | `encryption.key` | Fernet key for token encryption |
 | `MAESTRO_FRONTEND_URL` | `frontend_url` | Frontend URL for CORS |
 | `MAESTRO_WORKER_MODE` | `worker.mode` | `inline` or `queue` |
+| `MAESTRO_COMMENT_POLL_INTERVAL` | `worker.comment_poll_interval` | Seconds between PR comment checks (0 to disable) |
 | `MAESTRO_CORS_ORIGINS` | - | Comma-separated allowed origins |
 | `ANTHROPIC_API_KEY` | `anthropic.api_key` | Claude API key |
 | `OPENAI_API_KEY` | `openai.api_key` | OpenAI API key |
@@ -198,14 +199,25 @@ Workers can be tuned via config.yaml, CLI flags, or environment variables:
 ```yaml
 # config.yaml
 worker:
-  concurrency: 3        # max parallel agent jobs
-  poll_interval: 2.0    # seconds between queue polls
-  mode: queue            # "inline" (in API process) or "queue" (separate workers)
+  concurrency: 3               # max parallel agent jobs
+  poll_interval: 2.0           # seconds between queue polls
+  comment_poll_interval: 60.0  # seconds between PR comment checks (0 to disable)
+  mode: queue                  # "inline" (in API process) or "queue" (separate workers)
 ```
 
 ```bash
 # CLI flags override config.yaml
-maestro worker --concurrency 5 --poll-interval 1.0
+maestro worker --concurrency 5 --poll-interval 1.0 --comment-poll-interval 30
+```
+
+```bash
+# Environment variables override config.yaml
+MAESTRO_COMMENT_POLL_INTERVAL=30 maestro worker
+```
+
+```bash
+# Docker
+docker run ... -e MAESTRO_COMMENT_POLL_INTERVAL=30 ghcr.io/dunkinfrunkin/maestro:latest maestro worker
 ```
 
 In production with separate workers, set `mode: queue` so the API server dispatches jobs to the queue instead of running agents inline.

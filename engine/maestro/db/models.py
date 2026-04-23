@@ -149,6 +149,9 @@ class TaskPipelineRecord(Base):
     pr_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     pr_number: Mapped[str] = mapped_column(String(50), nullable=False, default="")
     repo: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    last_comment_check_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
