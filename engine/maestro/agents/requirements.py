@@ -114,22 +114,16 @@ async def _get_current_max_log_id(run_id: int) -> int:
 
 
 async def _run_turn(
-    conversation: list[dict[str, Any]],
+    prompt: str,
     system_prompt: str,
     model: str,
     api_key: str,
     run_id: int,
     cwd: str,
-) -> tuple[str, float, int, int]:
-    """Run one Claude CLI turn with the full conversation history encoded in the prompt."""
+    session_id: str | None = None,
+) -> tuple[str, float, int, int, str]:
+    """Run one Claude CLI turn, resuming the session if a session_id is provided."""
     from maestro.agents.cli_runner import run_cli_with_logging
-
-    # Encode full conversation history into a single prompt string
-    history_parts = []
-    for msg in conversation:
-        prefix = "USER" if msg["role"] == "user" else "ASSISTANT"
-        history_parts.append(f"{prefix}:\n{msg['content']}")
-    prompt = "\n\n---\n\n".join(history_parts)
 
     result = await run_cli_with_logging(
         run_id=run_id,
@@ -141,6 +135,7 @@ async def _run_turn(
         allowed_tools=["Bash", "Read", "Glob", "Grep"],
         api_key=api_key,
         log_text=False,
+        resume_session_id=session_id,
     )
 
     return (
@@ -148,6 +143,7 @@ async def _run_turn(
         result.get("total_cost_usd", 0.0) or 0.0,
         result.get("input_tokens", 0) or 0,
         result.get("output_tokens", 0) or 0,
+        result.get("session_id", "") or "",
     )
 
 
@@ -160,31 +156,29 @@ async def run_requirements_agent(
     api_key: str,
     model: str,
     cwd: str | None = None,
-    allowed_tools: list[str] | None = None,
 ) -> RequirementsResult:
-    """Run the requirements agent — conversational loop using per-turn claude CLI calls."""
+    """Run the requirements agent — conversational loop using Claude CLI session resumption."""
     import os
     _cwd = cwd or os.path.expanduser("~")
 
     result = RequirementsResult()
+    session_id: str | None = None
 
     await _write_log(run_id, "status", f"Requirements agent starting for {issue_identifier}")
 
-    initial_user_message = (
+    initial_prompt = (
         f"## Ticket: {issue_title}\n\n"
         f"{issue_description or '(No description yet)'}\n\n"
         f"Please review this ticket and begin clarifying the requirements."
     )
-
-    # conversation holds the full history as alternating user/assistant messages
-    conversation: list[dict[str, Any]] = [{"role": "user", "content": initial_user_message}]
+    next_prompt = initial_prompt
 
     try:
         while True:
             await _write_log(run_id, "status", "Thinking...")
 
-            response_text, cost, in_tok, out_tok = await _run_turn(
-                conversation, system_prompt, model, api_key, run_id, _cwd
+            response_text, cost, in_tok, out_tok, session_id = await _run_turn(
+                next_prompt, system_prompt, model, api_key, run_id, _cwd, session_id
             )
 
             result.total_cost_usd += cost
@@ -196,7 +190,6 @@ async def run_requirements_agent(
                 result.status = "failed"
                 break
 
-            conversation.append({"role": "assistant", "content": response_text})
             result.messages.append({"type": "text", "text": response_text})
 
             # Check for finalization
@@ -207,7 +200,6 @@ async def run_requirements_agent(
                 match = re.search(r"UPDATED_DESCRIPTION:\s*\n(.*)", response_text, re.DOTALL)
                 proposed = match.group(1).strip() if match else issue_description
 
-                # Show the proposed description and ask for confirmation before writing to JIRA
                 await _write_log(run_id, "text", f"**Proposed updated description:**\n\n{proposed}")
                 await _write_log(run_id, "question", "Does this look good? Reply with any adjustments, or say 'yes' / 'looks good' to write this to the ticket.")
 
@@ -222,12 +214,11 @@ async def run_requirements_agent(
                 if user_response.strip().lower() in _affirmative:
                     result.updated_description = proposed
                     await _write_log(run_id, "status", "Requirements finalized")
+                    break
                 else:
-                    # User wants changes — feed their feedback back into the conversation
-                    conversation.append({"role": "user", "content": user_response})
+                    # User wants changes — resume the session with their feedback
+                    next_prompt = user_response
                     continue
-
-                break
 
             # Check for a question
             q_match = re.search(r"QUESTION:\s*(.+?)(?:\n|$)", response_text)
@@ -245,7 +236,8 @@ async def run_requirements_agent(
                     result.updated_description = issue_description
                     break
 
-                conversation.append({"role": "user", "content": user_response})
+                # Resume the session with the user's answer
+                next_prompt = user_response
             else:
                 # No protocol marker — treat as implicit finalization
                 if response_text.strip():

@@ -58,6 +58,7 @@ class RunResult:
     all_text: str = ""
     pr_url: str = ""
     review_verdict: str = ""
+    session_id: str = ""
     log_text: bool = True
 
     def to_dict(self) -> dict[str, Any]:
@@ -74,6 +75,7 @@ class RunResult:
             "all_text": self.all_text,
             "pr_url": self.pr_url,
             "review_verdict": self.review_verdict,
+            "session_id": self.session_id,
         }
 
 
@@ -197,23 +199,31 @@ async def _process_text(run_id: int, text: str, result: RunResult) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _build_claude_cmd(prompt: str, model: str, tools_str: str, system_prompt: str) -> list[str]:
-    cmd = [
-        "claude",
-        "-p", prompt,
-        "--output-format", "stream-json",
-        "--model", model,
-        "--allowedTools", tools_str,
-        "--verbose",
-    ]
-    if system_prompt:
-        cmd.extend(["--system-prompt", system_prompt])
+def _build_claude_cmd(
+    prompt: str,
+    model: str,
+    tools_str: str,
+    system_prompt: str,
+    resume_session_id: str | None = None,
+) -> list[str]:
+    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--model", model, "--verbose"]
+    if resume_session_id:
+        cmd.extend(["--resume", resume_session_id])
+    else:
+        cmd.extend(["--allowedTools", tools_str])
+        if system_prompt:
+            cmd.extend(["--system-prompt", system_prompt])
     return cmd
 
 
 async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> None:
     """Parse a single Claude stream-json event."""
     event_type = event.get("type", "")
+
+    if event_type == "system" and event.get("subtype") == "init":
+        if sid := event.get("session_id"):
+            result.session_id = sid
+        return
 
     if event_type == "tool_result":
         tool_name = event.get("tool", "")
@@ -258,6 +268,8 @@ async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> No
         usage = event.get("usage", {})
         result.input_tokens = usage.get("input_tokens", 0) or 0
         result.output_tokens = usage.get("output_tokens", 0) or 0
+        if not result.session_id and (sid := event.get("session_id")):
+            result.session_id = sid
         result_text = event.get("result", "")
 
         is_error = event.get("is_error", False)
@@ -389,6 +401,7 @@ async def run_cli_with_logging(
     allowed_tools: list[str],
     api_key: str,
     log_text: bool = True,
+    resume_session_id: str | None = None,
 ) -> dict[str, Any]:
     """Run CLI agent and stream log entries to the DB.
 
@@ -408,7 +421,7 @@ async def run_cli_with_logging(
         cmd = _build_codex_cmd(prompt, model, system_prompt)
         parse_event = _parse_codex_event
     else:
-        cmd = _build_claude_cmd(prompt, model, tools_str, system_prompt)
+        cmd = _build_claude_cmd(prompt, model, tools_str, system_prompt, resume_session_id)
         parse_event = _parse_claude_event
 
     env = {**os.environ}
