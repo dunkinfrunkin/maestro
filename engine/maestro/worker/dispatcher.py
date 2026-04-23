@@ -694,8 +694,8 @@ async def _post_review_comment(
     """Post the review agent's findings as a comment on the MR/PR."""
     import shutil
 
-    # Prefix with Maestro header
-    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}"
+    # Prefix with Maestro header and append footer
+    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}\n\n---\n*Created by Maestro*"
 
     if code_host == "gitlab":
         # Extract project path and MR number from URL

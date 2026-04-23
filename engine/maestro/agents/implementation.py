@@ -69,6 +69,7 @@ npm test
 - NEVER use `gh pr comment` — it posts a SEPARATE comment, NOT a reply in the thread
 - Each reply must start with "Fixed:"
 - Do not skip any comments
+- Every comment body you post MUST end with `\n\n---\n*Created by Maestro*`
 """
 
 SYSTEM_PROMPT_GITLAB = """You are an implementation agent for Maestro, a coding orchestration platform.
@@ -126,6 +127,7 @@ You are working with a GitLab repository.
 - Use `git push -o merge_request.create` to create MRs (not `gh`)
 - This is a GitLab repo — `gh` CLI commands will NOT work
 - Use `git` commands directly for all operations
+- Every comment body you post MUST end with `\n\n---\n*Created by Maestro*`
 """
 
 # Default for backwards compat

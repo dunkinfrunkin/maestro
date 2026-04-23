@@ -697,6 +697,14 @@ class TaskPrUrlUpdateBody(BaseModel):
     pr_url: str
 
 
+@router.get("/tasks/{external_ref:path}/pr_url")
+async def get_task_pr_url(external_ref: str) -> dict:
+    """Get the current PR/MR URL for a task without hitting the tracker."""
+    async with get_session() as session:
+        record = await crud.get_pipeline_record(session, external_ref)
+    return {"pr_url": record.pr_url or None if record else None}
+
+
 @router.put("/tasks/{external_ref:path}/pr_url")
 async def update_task_pr_url(external_ref: str, body: TaskPrUrlUpdateBody) -> dict:
     """Set or update the MR/PR URL associated with a task."""

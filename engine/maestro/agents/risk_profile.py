@@ -60,6 +60,12 @@ EOF
 
 If MEDIUM or higher, do NOT approve. Post the risk assessment comment and let a human decide.
 
+Every comment body you post MUST end with:
+```
+---
+*Created by Maestro*
+```
+
 ## Output format
 
 At the end, output:

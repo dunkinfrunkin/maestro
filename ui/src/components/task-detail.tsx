@@ -11,6 +11,7 @@ import {
   RepoEntry,
   fetchTaskRuns,
   fetchTaskDetail,
+  fetchTaskPrUrl,
   fetchRunLogs,
   updateTaskStatus,
   updateTaskPrUrl,
@@ -25,15 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
   risk_profile: "Risk Profile", deploy: "Deploy", monitor: "Monitor",
 };
 
-function LogLine({
-  log,
-  expanded,
-  onToggle,
-}: {
-  log: AgentLogEntry;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
+function LogLine({ log }: { log: AgentLogEntry }) {
   const ts = log.created_at
     ? new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
     : "";
@@ -49,23 +42,12 @@ function LogLine({
     case "question":    colorClass = "text-amber-700";    prefix = "? "; break;
   }
 
-  const isLong = log.content.length > 300;
-  const body = isLong && !expanded ? log.content.slice(0, 300) + "…" : log.content;
-
   return (
     <div className={`flex gap-2 px-3 py-0.5 font-mono text-xs leading-relaxed ${colorClass}`}>
       <span className="text-muted select-none shrink-0 text-[10px]">{ts}</span>
       <span className="whitespace-pre-wrap break-words min-w-0">
         {prefix && <span className="opacity-50">{prefix}</span>}
-        {body}
-        {isLong && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggle(); }}
-            className="ml-1 text-muted hover:text-foreground underline text-[10px]"
-          >
-            {expanded ? "Less" : "More"}
-          </button>
-        )}
+        {log.content}
       </span>
     </div>
   );
@@ -168,10 +150,10 @@ export function TaskDetailPage({
   const pollPrUrl = useCallback(async () => {
     if (livePrUrlRef.current) return;
     try {
-      const detail = await fetchTaskDetail(task.external_ref);
-      if (detail.pr_url && !livePrUrlRef.current) {
-        livePrUrlRef.current = detail.pr_url;
-        setLivePrUrl(detail.pr_url);
+      const prUrl = await fetchTaskPrUrl(task.external_ref);
+      if (prUrl && !livePrUrlRef.current) {
+        livePrUrlRef.current = prUrl;
+        setLivePrUrl(prUrl);
       }
     } catch {}
   }, [task.external_ref]);
@@ -181,6 +163,7 @@ export function TaskDetailPage({
 
   useEffect(() => {
     loadRuns();
+    pollPrUrl();
     // Only poll if there are active runs
     const hasActive = runs.some(r => r.status === "running" || r.status === "pending");
     if (hasActive) {
@@ -535,15 +518,8 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
   const lastLogIdRef = useRef(0);
   const isLive = run.status === "running" || run.status === "pending";
   const logsLoaded = useRef(false);
-  const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set());
   const logsScrollRef = useRef<HTMLDivElement>(null);
   const userScrolledUpRef = useRef(false);
-
-  const toggleLog = (id: number) => setExpandedLogs(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
 
   useEffect(() => {
     if (!isLive) return;
@@ -709,7 +685,7 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
             <div className="rounded-md border border-border bg-background overflow-hidden resize-y" style={{ minHeight: "120px", height: "500px" }}>
               <div className="h-full overflow-y-auto py-1" ref={logsScrollRef} onScroll={handleLogsScroll}>
                 {logs.map((log) => (
-                  <LogLine key={log.id} log={log} expanded={expandedLogs.has(log.id)} onToggle={() => toggleLog(log.id)} />
+                  <LogLine key={log.id} log={log} />
                 ))}
               </div>
             </div>
@@ -729,7 +705,7 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           <div className="rounded-md border border-border bg-background overflow-hidden mt-1 resize-y" style={{ minHeight: "120px", height: "300px" }}>
             <div className="h-full overflow-y-auto py-1">
               {logs.map((log) => (
-                <LogLine key={log.id} log={log} expanded={expandedLogs.has(log.id)} onToggle={() => toggleLog(log.id)} />
+                <LogLine key={log.id} log={log} />
               ))}
             </div>
           </div>

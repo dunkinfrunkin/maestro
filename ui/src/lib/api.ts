@@ -578,6 +578,13 @@ export async function fetchTaskDetail(externalRef: string): Promise<UnifiedTask>
   return res.json();
 }
 
+export async function fetchTaskPrUrl(externalRef: string): Promise<string | null> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/pr_url`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.pr_url || null;
+}
+
 export async function updateTaskPrUrl(externalRef: string, prUrl: string): Promise<void> {
   const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/pr_url`, {
     method: "PUT",
