@@ -10,6 +10,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import select
+
 from maestro.db import crud
 from maestro.db.engine import get_session
 from maestro.db.models import (
@@ -709,9 +711,21 @@ async def _auto_transition(
     reason = ""
 
     if plugin_name == "implementation":
-        # Implementation done - move to review (still in_progress internally)
+        # Check if risk profile has already run for this task
+        risk_already_ran = await _has_completed_agent_type(task_pipeline_id, "risk_profile")
+        if risk_already_ran:
+            # Risk already done - go straight to review
+            next_status = PipelineStatus.REVIEW
+            reason = "Implementation completed (risk profile already done) - moving to review"
+        else:
+            # First implementation - run risk profile before review
+            next_status = PipelineStatus.RISK_PROFILE
+            reason = "Implementation completed - moving to risk profile (runs once)"
+
+    elif plugin_name == "risk_profile":
+        # Risk profile done - now move to review
         next_status = PipelineStatus.REVIEW
-        reason = "Implementation completed - moving to review"
+        reason = "Risk profile completed - moving to review"
 
     elif plugin_name == "review":
         verdict = _extract_verdict(result)
@@ -723,8 +737,8 @@ async def _auto_transition(
                 print(f"[MAESTRO] Overriding APPROVE -> REQUEST_CHANGES: unresolved inline comments exist")
 
         if verdict == "APPROVE":
-            next_status = PipelineStatus.RISK_PROFILE
-            reason = "Review approved - moving to risk profile"
+            next_status = PipelineStatus.PENDING_APPROVAL
+            reason = "Review approved - moving to pending approval (human gate)"
         elif verdict == "REQUEST_CHANGES":
             if iteration_count < max_iterations * 2:
                 next_status = PipelineStatus.IMPLEMENT
@@ -732,19 +746,6 @@ async def _auto_transition(
             else:
                 reason = f"Review requested changes but max iterations ({max_iterations}) reached - needs human intervention"
                 logger.warning(reason)
-
-    elif plugin_name == "risk_profile":
-        import re
-        all_text = re.sub(r'[*`_~]', '', result.get("all_text", "") or result.get("last_text", ""))
-        upper = all_text.upper()
-        # After risk profile, always move to pending_approval for human gate
-        next_status = PipelineStatus.PENDING_APPROVAL
-        if "RISK_LEVEL: LOW" in upper or "RISK LEVEL: LOW" in upper or "AUTO_APPROVE: YES" in upper:
-            reason = "Risk profile: LOW - moving to pending approval (human gate)"
-        elif "RISK_LEVEL: MEDIUM" in upper or "RISK_LEVEL: HIGH" in upper or "RISK_LEVEL: CRITICAL" in upper:
-            reason = "Risk profile: elevated risk - moving to pending approval (human gate)"
-        else:
-            reason = "Risk profile completed - moving to pending approval (human gate)"
 
     elif plugin_name == "deployment":
         # Deployment stages not yet implemented - mark done for now
@@ -769,6 +770,20 @@ async def _auto_transition(
             issue_description=issue_description,
             issue_url=issue_url,
         )
+
+
+async def _has_completed_agent_type(task_pipeline_id: int, agent_type: str) -> bool:
+    """Check if an agent of the given type has already completed for this task."""
+    async with get_session() as session:
+        stmt = (
+            select(AgentRun)
+            .where(AgentRun.task_pipeline_id == task_pipeline_id)
+            .where(AgentRun.agent_type == AgentType(agent_type))
+            .where(AgentRun.status == AgentRunStatus.COMPLETED)
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
 
 async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
