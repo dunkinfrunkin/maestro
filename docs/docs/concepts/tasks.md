@@ -11,23 +11,23 @@ A task is a unit of work that flows through the Maestro pipeline. Tasks originat
 
 1. An issue is created in your tracker (GitHub Issues, Linear, Jira, GitLab)
 2. Maestro syncs it and it appears on the **Tasks** page
-3. You assign a repository and move it to **Implement**
-4. The pipeline takes over - implement → review → risk → deploy → monitor
+3. You assign a repository and move it to **In Progress**
+4. The pipeline takes over - in_progress → pending_approval → approved → deploy
 5. The task reaches **Done** or **Failed**
 
 ## Pipeline states
 
 | State | What's happening |
 |---|---|
-| **Queued** | Task is synced, waiting to be assigned and started |
-| **Implement** | Implementation Agent is writing code and opening a PR |
-| **Review** | Review Agent is posting inline comments |
-| **Risk Profile** | Risk Agent is scoring the change |
-| **Deploy** | Deploy Agent is verifying CI and merging |
-| **Monitor** | Monitor Agent is watching for regressions |
-| **Done** | Successfully completed |
-| **Failed** | Unrecoverable error at any stage |
-| **Blocked** | Needs human intervention (high-risk PR, CI failure) |
+| **todo** | Task is synced, waiting for user to trigger |
+| **in_progress** | Agentic loop: implement, AI review, AI risk profile |
+| **pending_approval** | AI work done, waiting for human review and approval |
+| **approved** | Human approved, auto-merge and deploy to lower envs (not yet implemented) |
+| **promote** | Lower envs healthy, promoting to production (not yet implemented) |
+| **deploy** | Deploying to prod, monitoring (not yet implemented) |
+| **done** | Successfully completed |
+| **failed** | Error at any stage |
+| **halted** | User manually stopped |
 
 ## Task detail
 
