@@ -168,6 +168,15 @@ class JiraIssueTracker(IssueTracker):
         jql = " AND ".join(clauses) + " ORDER BY created DESC"
         return await self._search(jql, max_results=30)
 
+    async def update_issue(self, issue_id: str, description: str) -> None:
+        """Update a JIRA ticket's description."""
+        if self._api_version == "3":
+            body = {"fields": {"description": _md_to_adf(description)}}
+        else:
+            body = {"fields": {"description": description}}
+        resp = await self._http.put(f"{self._api_base}/issue/{issue_id}", json=body)
+        resp.raise_for_status()
+
     async def _search(
         self,
         jql: str,
@@ -275,6 +284,25 @@ def _normalize_issue(item: dict[str, Any], base_url: str) -> Issue:
         created_at=_parse_dt(fields.get("created")),
         updated_at=_parse_dt(fields.get("updated")),
     )
+
+
+def _md_to_adf(text: str) -> dict[str, Any]:
+    """Wrap plain/markdown text in a minimal ADF document.
+
+    Splits on blank lines to produce paragraph nodes so JIRA renders
+    line breaks correctly. Full markdown→ADF conversion is out of scope.
+    """
+    paragraphs = []
+    for para in text.split("\n\n"):
+        para = para.strip()
+        if para:
+            paragraphs.append({
+                "type": "paragraph",
+                "content": [{"type": "text", "text": para}],
+            })
+    if not paragraphs:
+        paragraphs = [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]
+    return {"type": "doc", "version": 1, "content": paragraphs}
 
 
 def _extract_adf_text(adf: dict[str, Any]) -> str:

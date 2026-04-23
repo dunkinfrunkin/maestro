@@ -203,6 +203,7 @@ class AgentType(str, enum.Enum):
     RISK_PROFILE = "risk_profile"
     DEPLOYMENT = "deployment"
     MONITOR = "monitor"
+    REQUIREMENTS = "requirements"
 
 
 class AgentConfig(Base):

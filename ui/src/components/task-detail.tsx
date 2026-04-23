@@ -18,6 +18,8 @@ import {
   fetchRepos,
   updateTaskRepo,
   killAgentRun,
+  triggerRequirementsAgent,
+  sendAgentPrompt,
 } from "@/lib/api";
 import { ExecutionTraceChart } from "./execution-trace-chart";
 
@@ -375,6 +377,15 @@ export function TaskDetailPage({
                 </div>
               </div>
 
+              {/* Requirements Agent */}
+              <RequirementsButton
+                task={task}
+                workspaceId={workspaceId}
+                projectId={projectId}
+                runs={runs}
+                onRunStarted={loadRuns}
+              />
+
               {/* PR Link */}
               <MrUrlEditor
                 prUrl={livePrUrl}
@@ -513,7 +524,7 @@ function ExecutionTrace({ runs, task }: { runs: AgentRunResponse[]; task: Unifie
   );
 }
 
-function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: () => void; onKill: () => void }) {
+function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: () => void; onKill: () => void; }) {
   const [logs, setLogs] = useState<AgentLogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const lastLogIdRef = useRef(0);
@@ -715,7 +726,116 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
         {run.cost_usd > 0 && (
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
+
+        {/* Chat input for requirements agent */}
+        {run.agent_type === "requirements" && isLive && (
+          <RequirementsChatInput runId={run.id} logs={logs} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function RequirementsChatInput({ runId, logs }: { runId: number; logs: AgentLogEntry[] }) {
+  const [value, setValue] = useState("");
+  const [sending, setSending] = useState(false);
+
+  // Only show when the latest non-user_prompt log is a question
+  const lastMeaningfulLog = [...logs].reverse().find(l => l.entry_type !== "user_prompt");
+  if (!lastMeaningfulLog || lastMeaningfulLog.entry_type !== "question") return null;
+
+  const send = async () => {
+    const text = value.trim();
+    if (!text || sending) return;
+    setSending(true);
+    try {
+      await sendAgentPrompt(runId, text);
+      setValue("");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex gap-1.5">
+      <input
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") send(); }}
+        placeholder="Type your response..."
+        className="flex-1 text-xs px-2 py-1.5 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-amber-400"
+        autoFocus
+      />
+      <button
+        onClick={send}
+        disabled={!value.trim() || sending}
+        className="text-xs px-3 py-1.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:border-amber-700 dark:hover:bg-amber-800/40 text-amber-900 dark:text-amber-200 disabled:opacity-50 transition-colors"
+      >
+        {sending ? "…" : "Send"}
+      </button>
+    </div>
+  );
+}
+
+function RequirementsButton({
+  task,
+  workspaceId,
+  projectId,
+  runs,
+  onRunStarted,
+}: {
+  task: UnifiedTask;
+  workspaceId?: number;
+  projectId?: number;
+  runs: AgentRunResponse[];
+  onRunStarted: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const activeRun = runs.find(r => r.agent_type === "requirements" && (r.status === "running" || r.status === "pending"));
+
+  const trigger = async () => {
+    if (loading || activeRun) return;
+    setLoading(true);
+    try {
+      await triggerRequirementsAgent(task.external_ref, {
+        workspace_id: workspaceId,
+        project_id: projectId,
+        issue_title: task.title,
+        issue_description: task.description || "",
+        issue_url: task.url || "",
+        issue_identifier: task.identifier || "",
+      });
+      onRunStarted();
+    } catch (e) {
+      console.error("Failed to trigger requirements agent", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="text-xs text-muted mb-2">Requirements</div>
+      <button
+        onClick={trigger}
+        disabled={loading || !!activeRun}
+        className="w-full flex items-center justify-center gap-1.5 text-xs px-2 py-1.5 rounded-md border border-border bg-background hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {activeRun ? (
+          <>
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            Agent running...
+          </>
+        ) : (
+          <>
+            <svg className="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            {loading ? "Starting…" : "Clarify Requirements"}
+          </>
+        )}
+      </button>
     </div>
   );
 }

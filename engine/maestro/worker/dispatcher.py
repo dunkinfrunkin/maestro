@@ -318,6 +318,9 @@ AGENT_CONFIGS = {
     "monitor": {
         "tools": ["Bash", "Read", "Glob", "Grep"],
     },
+    "requirements": {
+        "tools": [],
+    },
 }
 
 # Which .agents/ files each agent reads for context
@@ -683,6 +686,131 @@ async def _execute_agent(
                 run.error = str(exc)
                 run.finished_at = datetime.now(timezone.utc)
                 await session.commit()
+
+
+async def dispatch_requirements_agent(
+    workspace_id: int,
+    task_pipeline_id: int,
+    issue_title: str = "",
+    issue_description: str = "",
+    issue_url: str = "",
+    issue_identifier: str = "",
+    triggered_by: str = "",
+) -> int | None:
+    """Dispatch the requirements agent for a task. Returns run_id or None."""
+    from maestro.agents.requirements import run_requirements_agent, DEFAULT_SYSTEM_PROMPT
+    from maestro.agents.cli_runner import _write_log
+
+    plugin = registry.get("requirements")
+    if not plugin:
+        logger.warning("Requirements plugin not registered")
+        return None
+
+    async with get_session() as session:
+        agent_config = await crud.get_agent_config(session, workspace_id, AgentType.REQUIREMENTS)
+        provider = agent_config.provider if agent_config else "anthropic"
+        try:
+            provider_enum = ApiKeyProvider(provider)
+        except ValueError:
+            provider_enum = ApiKeyProvider.ANTHROPIC
+        api_key_record = await crud.get_api_key(session, workspace_id, provider_enum)
+        if not api_key_record:
+            logger.warning("No %s API key for workspace %d, skipping requirements agent", provider, workspace_id)
+            return None
+        from maestro.db.encryption import decrypt_token
+        api_key = decrypt_token(api_key_record.encrypted_key)
+        model = agent_config.model if agent_config else "sonnet"
+        extra: dict = {}
+        if agent_config:
+            try:
+                extra = json.loads(agent_config.extra_config) if agent_config.extra_config else {}
+            except (json.JSONDecodeError, TypeError):
+                extra = {}
+
+        run = AgentRun(
+            workspace_id=workspace_id,
+            task_pipeline_id=task_pipeline_id,
+            agent_type=AgentType.REQUIREMENTS,
+            status=AgentRunStatus.RUNNING,
+            model=model,
+            triggered_by=triggered_by,
+            job_payload=json.dumps({
+                "plugin_name": "requirements",
+                "provider": provider,
+                "model": model,
+                "issue_title": issue_title,
+                "issue_description": issue_description,
+                "issue_url": issue_url,
+                "issue_identifier": issue_identifier,
+                "extra_config": extra,
+            }),
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+        run.started_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    system_prompt = extra.get("custom_prompt") or DEFAULT_SYSTEM_PROMPT
+
+    async def _run():
+        try:
+            result = await run_requirements_agent(
+                run_id=run_id,
+                issue_title=issue_title,
+                issue_description=issue_description,
+                issue_identifier=issue_identifier,
+                system_prompt=system_prompt,
+                api_key=api_key,
+                model=model,
+            )
+            # If finalized, update the JIRA ticket
+            if result.updated_description and issue_identifier:
+                try:
+                    async with get_session() as session:
+                        task_record = await session.get(TaskPipelineRecord, task_pipeline_id)
+                        if task_record:
+                            conn = await crud.get_connection(session, task_record.tracker_connection_id)
+                            if conn and conn.kind.value == "jira":
+                                from maestro.external.jira.tracker import JiraIssueTracker
+                                token = crud.get_decrypted_token(conn)
+                                tracker = JiraIssueTracker(
+                                    base_url=conn.endpoint,
+                                    api_token=token,
+                                    project_key="",
+                                    email=conn.email,
+                                )
+                                await tracker.update_issue(issue_identifier, result.updated_description)
+                                await tracker.close()
+                                await _write_log(run_id, "status", f"Updated JIRA ticket {issue_identifier}")
+                except Exception as exc:
+                    logger.exception("Failed to update JIRA ticket %s", issue_identifier)
+                    await _write_log(run_id, "error", f"Failed to update JIRA: {exc}")
+
+            async with get_session() as session:
+                run_obj = await session.get(AgentRun, run_id)
+                if run_obj:
+                    run_obj.status = AgentRunStatus.COMPLETED if result.status == "completed" else AgentRunStatus.FAILED
+                    run_obj.cost_usd = result.total_cost_usd
+                    run_obj.input_tokens = result.input_tokens
+                    run_obj.output_tokens = result.output_tokens
+                    run_obj.error = result.error or ""
+                    run_obj.summary = "Requirements finalized" if result.updated_description else ""
+                    run_obj.finished_at = datetime.now(timezone.utc)
+                    await session.commit()
+        except Exception as exc:
+            logger.exception("Requirements agent task error for run %d", run_id)
+            async with get_session() as session:
+                run_obj = await session.get(AgentRun, run_id)
+                if run_obj:
+                    run_obj.status = AgentRunStatus.FAILED
+                    run_obj.error = str(exc)
+                    run_obj.finished_at = datetime.now(timezone.utc)
+                    await session.commit()
+
+    asyncio.create_task(_run())
+    return run_id
 
 
 async def _post_review_comment(

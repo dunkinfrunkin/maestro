@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from maestro.auth import get_current_user
 from maestro.db import crud
 from maestro.db.engine import get_session
-from maestro.db.models import PipelineStatus, TaskPipelineRecord, TrackerKind, User
+from maestro.db.models import AgentRunLog, PipelineStatus, TaskPipelineRecord, TrackerKind, User
 from maestro.tracker.github import GitHubClient
 from maestro.tracker.linear import LinearClient
 
@@ -758,6 +758,92 @@ async def update_task_repo(external_ref: str, body: TaskRepoUpdateBody) -> dict:
         record.repo = body.repo
         await session.commit()
         return {"external_ref": external_ref, "repo": record.repo}
+
+
+class RequirementsAgentBody(BaseModel):
+    workspace_id: int | None = None
+    project_id: int | None = None
+    issue_title: str = ""
+    issue_description: str = ""
+    issue_url: str = ""
+    issue_identifier: str = ""
+
+
+@router.post("/tasks/{external_ref:path}/requirements")
+async def trigger_requirements_agent(
+    request: Request,
+    external_ref: str,
+    body: RequirementsAgentBody,
+) -> dict:
+    """Manually trigger the requirements agent for a task."""
+    from maestro.worker.dispatcher import dispatch_requirements_agent
+
+    workspace_id = body.workspace_id
+    if not workspace_id:
+        async with get_session() as session:
+            from sqlalchemy import select
+            from maestro.db.models import Workspace
+            ws = (await session.execute(select(Workspace).limit(1))).scalar()
+            if not ws:
+                raise HTTPException(status_code=400, detail="No workspace found")
+            workspace_id = ws.id
+
+    # Ensure pipeline record exists
+    async with get_session() as session:
+        record = await crud.get_pipeline_record(session, external_ref)
+        if not record:
+            project_id = body.project_id
+            if not project_id:
+                from sqlalchemy import select
+                from maestro.db.models import Project
+                first = (await session.execute(select(Project).limit(1))).scalar()
+                if not first:
+                    raise HTTPException(status_code=400, detail="No project exists yet")
+                project_id = first.id
+            parts = external_ref.split(":")
+            conn_id = int(parts[1]) if len(parts) >= 2 else 0
+            record = TaskPipelineRecord(
+                external_ref=external_ref,
+                tracker_connection_id=conn_id,
+                status=PipelineStatus.QUEUED,
+                project_id=project_id,
+            )
+            session.add(record)
+            await session.flush()
+            await session.commit()
+            await session.refresh(record)
+        task_pipeline_id = record.id
+
+    run_id = await dispatch_requirements_agent(
+        workspace_id=workspace_id,
+        task_pipeline_id=task_pipeline_id,
+        issue_title=body.issue_title,
+        issue_description=body.issue_description,
+        issue_url=body.issue_url,
+        issue_identifier=body.issue_identifier,
+        triggered_by="user",
+    )
+    if run_id is None:
+        raise HTTPException(status_code=400, detail="Failed to dispatch requirements agent (check API key)")
+    return {"agent_run_id": run_id}
+
+
+class AgentPromptBody(BaseModel):
+    content: str
+
+
+@router.post("/agent-runs/{run_id}/prompt")
+async def send_agent_prompt(run_id: int, body: AgentPromptBody) -> dict:
+    """Send a user prompt to a running agent (e.g., requirements agent waiting for input)."""
+    async with get_session() as session:
+        log = AgentRunLog(
+            agent_run_id=run_id,
+            entry_type="user_prompt",
+            content=body.content,
+        )
+        session.add(log)
+        await session.commit()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

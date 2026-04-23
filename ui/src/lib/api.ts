@@ -622,3 +622,32 @@ export async function updateTaskRepo(externalRef: string, repo: string, projectI
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }
+
+export async function triggerRequirementsAgent(
+  externalRef: string,
+  context: {
+    workspace_id?: number;
+    project_id?: number;
+    issue_title: string;
+    issue_description: string;
+    issue_url: string;
+    issue_identifier: string;
+  }
+): Promise<{ agent_run_id: number }> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/requirements`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function sendAgentPrompt(runId: number, content: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/agent-runs/${runId}/prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
