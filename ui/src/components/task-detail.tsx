@@ -192,8 +192,9 @@ export function TaskDetailPage({
           <div className="text-sm text-muted mt-2 prose prose-sm prose-neutral dark:prose-invert max-w-none
             prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
             prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5
-            prose-code:text-xs prose-code:bg-surface-hover prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-            prose-pre:bg-surface-hover prose-pre:border prose-pre:border-border prose-pre:rounded-md
+            prose-code:text-xs prose-code:text-foreground prose-code:bg-surface-hover prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+            prose-pre:bg-surface-hover prose-pre:border prose-pre:border-border prose-pre:rounded-md prose-pre:text-foreground
+            [&_pre_code]:text-foreground [&_pre_code]:bg-transparent
             prose-a:text-accent prose-a:no-underline hover:prose-a:underline
             prose-strong:text-foreground prose-hr:border-border">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown>
@@ -474,19 +475,24 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
     if (isLive) setShowLogs(true);
   }, [isLive]);
 
+  const seenLogIdsRef = useRef(new Set<number>());
+
   useEffect(() => {
     // Only fetch logs if visible (live or user expanded)
     if (!showLogs && !isLive) return;
     if (logsLoaded.current && !isLive) return; // Already loaded for completed run
 
     lastLogIdRef.current = 0;
+    seenLogIdsRef.current = new Set();
     setLogs([]);
     const load = async () => {
       try {
         const newLogs = await fetchRunLogs(run.id, lastLogIdRef.current);
-        if (newLogs.length > 0) {
-          setLogs((prev) => [...prev, ...newLogs]);
-          lastLogIdRef.current = newLogs[newLogs.length - 1].id;
+        const fresh = newLogs.filter((l) => !seenLogIdsRef.current.has(l.id));
+        if (fresh.length > 0) {
+          fresh.forEach((l) => seenLogIdsRef.current.add(l.id));
+          setLogs((prev) => [...prev, ...fresh]);
+          lastLogIdRef.current = fresh[fresh.length - 1].id;
         }
         if (!isLive) logsLoaded.current = true;
       } catch {}
