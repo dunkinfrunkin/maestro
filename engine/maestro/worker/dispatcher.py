@@ -263,7 +263,15 @@ async def _dispatch_agent_locked(
         # Workers will pick up the PENDING job from the DB
         print(f"[MAESTRO] Run {run_id} enqueued for worker (mode=queue)")
     else:
-        # Inline mode: execute in-process (current behavior)
+        # Inline mode: mark RUNNING immediately so the worker process doesn't
+        # also pick it up as a PENDING job and execute it a second time.
+        async with get_session() as session:
+            run = await session.get(AgentRun, run_id)
+            if run:
+                run.status = AgentRunStatus.RUNNING
+                run.started_at = datetime.now(timezone.utc)
+                await session.commit()
+
         asyncio.create_task(
             _execute_agent(
                 run_id=run_id,
