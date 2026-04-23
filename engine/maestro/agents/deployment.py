@@ -86,7 +86,7 @@ async def run_deployment_agent(
                 for block in message.content:
                     if hasattr(block, "text") and block.text:
                         text = block.text
-                        result.messages.append({"type": "text", "text": text[:500]})
+                        result.messages.append({"type": "text", "text": text})
                         _parse_output(text, result)
                     elif hasattr(block, "name"):
                         result.messages.append({"type": "tool_use", "tool": block.name})

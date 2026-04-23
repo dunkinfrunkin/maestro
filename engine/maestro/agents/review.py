@@ -271,7 +271,7 @@ async def run_review_agent(
                 for block in message.content:
                     if hasattr(block, "text") and block.text:
                         text = block.text
-                        result.messages.append({"type": "text", "text": text[:500]})
+                        result.messages.append({"type": "text", "text": text})
                         # Parse verdict from output
                         if "APPROVE" in text and "REQUEST_CHANGES" not in text:
                             result.verdict = "APPROVE"

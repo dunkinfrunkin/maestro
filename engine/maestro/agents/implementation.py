@@ -197,7 +197,7 @@ async def run_implementation_agent(
                     elif hasattr(block, "text") and block.text:
                         run.messages.append({
                             "type": "text",
-                            "text": block.text[:500],  # truncate for storage
+                            "text": block.text,
                         })
 
             elif isinstance(message, ResultMessage):
