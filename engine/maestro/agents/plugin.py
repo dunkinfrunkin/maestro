@@ -253,6 +253,35 @@ class MonitorPlugin(AgentPlugin):
         )
 
 
+class RequirementsPlugin(AgentPlugin):
+    name = "requirements"
+    display_name = "Requirements Agent"
+    description = "Interactively clarifies and finalizes ticket requirements via chat, then updates the ticket"
+    trigger_status = ""  # manual only — not triggered by pipeline status
+
+    async def run(self, context: dict[str, Any]) -> PluginResult:
+        from maestro.agents.requirements import run_requirements_agent, DEFAULT_SYSTEM_PROMPT
+        extra = context.get("extra_config", {})
+        system_prompt = extra.get("custom_prompt") or DEFAULT_SYSTEM_PROMPT
+        result = await run_requirements_agent(
+            run_id=context["run_id"],
+            issue_title=context.get("issue_title", ""),
+            issue_description=context.get("issue_description", ""),
+            issue_identifier=context.get("issue_identifier", ""),
+            system_prompt=system_prompt,
+            api_key=context["api_key"],
+            model=context["model"],
+        )
+        return PluginResult(
+            status=result.status,
+            summary="Requirements finalized" if result.updated_description else "Requirements agent completed",
+            data={"updated_description": result.updated_description},
+            messages=result.messages,
+            total_cost_usd=result.total_cost_usd,
+            error=result.error,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Plugin Registry
 # ---------------------------------------------------------------------------
@@ -287,6 +316,7 @@ class PluginRegistry:
             RiskProfilePlugin,
             DeploymentPlugin,
             MonitorPlugin,
+            RequirementsPlugin,
         ]:
             self.register(cls())
 

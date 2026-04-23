@@ -60,6 +60,12 @@ EOF
 
 If MEDIUM or higher, do NOT approve. Post the risk assessment comment and let a human decide.
 
+Every comment body you post MUST end with:
+```
+---
+*Created by Maestro*
+```
+
 ## Output format
 
 At the end, output:
@@ -117,7 +123,7 @@ async def run_risk_profile_agent(
                 for block in message.content:
                     if hasattr(block, "text") and block.text:
                         text = block.text
-                        result.messages.append({"type": "text", "text": text[:500]})
+                        result.messages.append({"type": "text", "text": text})
                         _parse_output(text, result)
                     elif hasattr(block, "name"):
                         result.messages.append({"type": "tool_use", "tool": block.name})

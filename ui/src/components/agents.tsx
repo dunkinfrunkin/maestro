@@ -61,7 +61,7 @@ export function AgentsPage({ workspaceId }: { workspaceId: number }) {
               <div className="flex items-center gap-3">
                 <span className="text-[10px] text-muted">{modelName}</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover text-muted">
-                  on {agent.triggerStatus}
+                  {agent.triggerStatus ? `on ${agent.triggerStatus}` : "manual"}
                 </span>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-muted">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />

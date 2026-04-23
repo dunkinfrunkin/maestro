@@ -47,6 +47,10 @@ class IssueTracker(ABC):
         """Search issues. Optional — not all trackers support search."""
         raise NotImplementedError
 
+    async def update_issue(self, issue_id: str, description: str) -> None:
+        """Update a ticket's description. Optional — not all trackers support writes."""
+        raise NotImplementedError
+
     async def close(self) -> None:
         """Clean up resources (HTTP clients, etc.)."""
         pass

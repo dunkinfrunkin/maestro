@@ -20,7 +20,7 @@ async def _write_log(run_id: int, entry_type: str, content: str) -> None:
             log = AgentRunLog(
                 agent_run_id=run_id,
                 entry_type=entry_type,
-                content=content[:2000],  # cap at 2000 chars
+                content=content,
             )
             session.add(log)
             await session.commit()
@@ -71,7 +71,7 @@ async def run_sdk_with_logging(
                         tool_input = ""
                         if hasattr(block, "input") and isinstance(block.input, dict):
                             if "command" in block.input:
-                                tool_input = str(block.input["command"])[:200]
+                                tool_input = str(block.input["command"])
                             elif "file_path" in block.input:
                                 tool_input = str(block.input["file_path"])
                             elif "pattern" in block.input:
@@ -109,12 +109,8 @@ async def run_sdk_with_logging(
                             if pr_match and not pr_url:
                                 pr_url = pr_match.group(0)
                                 await _write_log(run_id, "status", f"PR created: {pr_url}")
-                            # Log text in chunks if long
-                            if len(text) > 300:
-                                await _write_log(run_id, "text", text[:300] + "...")
-                            else:
-                                await _write_log(run_id, "text", text)
-                            messages.append({"type": "text", "text": text[:500]})
+                            await _write_log(run_id, "text", text)
+                            messages.append({"type": "text", "text": text})
 
             elif isinstance(message, ResultMessage):
                 total_cost_usd = getattr(message, "total_cost_usd", 0.0) or 0.0

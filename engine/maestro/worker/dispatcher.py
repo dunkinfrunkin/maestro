@@ -26,7 +26,18 @@ from maestro.agents.plugin import registry
 
 logger = logging.getLogger(__name__)
 
-# Map pipeline status -> agent type
+# Per-(task, agent) locks to prevent concurrent duplicate dispatches
+_dispatch_locks: dict[tuple[int, str], asyncio.Lock] = {}
+
+
+def _get_dispatch_lock(task_pipeline_id: int, agent_name: str) -> asyncio.Lock:
+    key = (task_pipeline_id, agent_name)
+    if key not in _dispatch_locks:
+        _dispatch_locks[key] = asyncio.Lock()
+    return _dispatch_locks[key]
+
+
+# Map pipeline status → agent type
 STATUS_TO_AGENT: dict[str, str] = {
     # New statuses
     PipelineStatus.IN_PROGRESS.value: AgentType.IMPLEMENTATION.value,
@@ -46,6 +57,7 @@ async def dispatch_agent_for_status(
     issue_title: str = "",
     issue_description: str = "",
     issue_url: str = "",
+    issue_identifier: str = "",
     triggered_by: str = "",
 ) -> int | None:
     """Dispatch the appropriate agent for a pipeline status change.
@@ -61,6 +73,33 @@ async def dispatch_agent_for_status(
         logger.warning("No plugin registered for agent: %s", agent_name)
         return None
 
+    async with _get_dispatch_lock(task_pipeline_id, agent_name):
+        return await _dispatch_agent_locked(
+            agent_name=agent_name,
+            plugin=plugin,
+            workspace_id=workspace_id,
+            task_pipeline_id=task_pipeline_id,
+            status=status,
+            issue_title=issue_title,
+            issue_description=issue_description,
+            issue_url=issue_url,
+            issue_identifier=issue_identifier,
+            triggered_by=triggered_by,
+        )
+
+
+async def _dispatch_agent_locked(
+    agent_name: str,
+    plugin,
+    workspace_id: int,
+    task_pipeline_id: int,
+    status: str,
+    issue_title: str = "",
+    issue_description: str = "",
+    issue_url: str = "",
+    issue_identifier: str = "",
+    triggered_by: str = "",
+) -> int | None:
     # Check if agent is enabled
     async with get_session() as session:
         agent_config = await crud.get_agent_config(
@@ -189,6 +228,7 @@ async def dispatch_agent_for_status(
             "issue_title": issue_title,
             "issue_description": issue_description,
             "issue_url": issue_url,
+            "issue_identifier": issue_identifier,
             "pr_url": pr_url,
             "pr_number": pr_number,
             "repo": repo,
@@ -197,6 +237,19 @@ async def dispatch_agent_for_status(
             "extra_config": extra,
             "plugin_name": agent_name,
         })
+
+        # Guard: skip if a run for this task+agent is already active
+        from sqlalchemy import select as sa_select
+        existing = await session.scalar(
+            sa_select(AgentRun.id).where(
+                AgentRun.task_pipeline_id == task_pipeline_id,
+                AgentRun.agent_type == AgentType(agent_name),
+                AgentRun.status.in_([AgentRunStatus.PENDING, AgentRunStatus.RUNNING]),
+            ).limit(1)
+        )
+        if existing:
+            print(f"[MAESTRO] Skipping duplicate dispatch: {agent_name} already active (run {existing}) for task {task_pipeline_id}")
+            return existing
 
         # Create agent run record
         run = AgentRun(
@@ -219,7 +272,15 @@ async def dispatch_agent_for_status(
         # Workers will pick up the PENDING job from the DB
         print(f"[MAESTRO] Run {run_id} enqueued for worker (mode=queue)")
     else:
-        # Inline mode: execute in-process (current behavior)
+        # Inline mode: mark RUNNING immediately so the worker process doesn't
+        # also pick it up as a PENDING job and execute it a second time.
+        async with get_session() as session:
+            run = await session.get(AgentRun, run_id)
+            if run:
+                run.status = AgentRunStatus.RUNNING
+                run.started_at = datetime.now(timezone.utc)
+                await session.commit()
+
         asyncio.create_task(
             _execute_agent(
                 run_id=run_id,
@@ -232,6 +293,7 @@ async def dispatch_agent_for_status(
                 issue_title=issue_title,
                 issue_description=issue_description,
                 issue_url=issue_url,
+                issue_identifier=issue_identifier,
                 pr_url=pr_url,
                 pr_number=pr_number,
                 repo=repo,
@@ -247,7 +309,7 @@ async def dispatch_agent_for_status(
     # Map agent type to system prompt and tools
 AGENT_CONFIGS = {
     "implementation": {
-        "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+        "tools": ["Read", "Write", "Edit", "NotebookEdit", "Bash", "Glob", "Grep", "Agent", "Skill"],
     },
     "review": {
         "tools": ["Read", "Bash", "Glob", "Grep"],
@@ -260,6 +322,9 @@ AGENT_CONFIGS = {
     },
     "monitor": {
         "tools": ["Bash", "Read", "Glob", "Grep"],
+    },
+    "requirements": {
+        "tools": [],
     },
 }
 
@@ -337,6 +402,7 @@ async def _execute_agent(
     issue_title: str,
     issue_description: str,
     issue_url: str,
+    issue_identifier: str,
     pr_url: str,
     pr_number: str,
     repo: str,
@@ -398,7 +464,13 @@ async def _execute_agent(
         # Get system prompt: custom from DB first, fall back to agent module default
         custom_prompt = extra_config.get("custom_prompt", "")
         if custom_prompt:
-            system_prompt = custom_prompt
+            system_prompt = (
+                custom_prompt
+                .replace("[ISSUE]", issue_identifier)
+                .replace("[ISSUE_TITLE]", issue_title)
+                .replace("[ISSUE_DESCRIPTION]", issue_description)
+                .replace("[ISSUE_URL]", issue_url)
+            )
         else:
             system_prompt = ""
             try:
@@ -621,6 +693,196 @@ async def _execute_agent(
                 await session.commit()
 
 
+async def dispatch_requirements_agent(
+    workspace_id: int,
+    task_pipeline_id: int,
+    issue_title: str = "",
+    issue_description: str = "",
+    issue_url: str = "",
+    issue_identifier: str = "",
+    triggered_by: str = "",
+) -> int | None:
+    """Dispatch the requirements agent for a task. Returns run_id or None."""
+    from maestro.agents.requirements import run_requirements_agent, DEFAULT_SYSTEM_PROMPT
+    from maestro.agents.cli_runner import _write_log
+
+    plugin = registry.get("requirements")
+    if not plugin:
+        logger.warning("Requirements plugin not registered")
+        return None
+
+    async with get_session() as session:
+        agent_config = await crud.get_agent_config(session, workspace_id, AgentType.REQUIREMENTS)
+        provider = agent_config.provider if agent_config else "anthropic"
+        try:
+            provider_enum = ApiKeyProvider(provider)
+        except ValueError:
+            provider_enum = ApiKeyProvider.ANTHROPIC
+        api_key_record = await crud.get_api_key(session, workspace_id, provider_enum)
+        if not api_key_record:
+            logger.warning("No %s API key for workspace %d, skipping requirements agent", provider, workspace_id)
+            return None
+        from maestro.db.encryption import decrypt_token
+        api_key = decrypt_token(api_key_record.encrypted_key)
+        model = agent_config.model if agent_config else "sonnet"
+        extra: dict = {}
+        if agent_config:
+            try:
+                extra = json.loads(agent_config.extra_config) if agent_config.extra_config else {}
+            except (json.JSONDecodeError, TypeError):
+                extra = {}
+
+        # Resolve repo and clone URL using the same logic as other agents
+        task_record = await session.get(TaskPipelineRecord, task_pipeline_id)
+        repo = task_record.repo if task_record else ""
+        conn = None
+        tracker_token = ""
+        if task_record:
+            conn = await crud.get_connection(session, task_record.tracker_connection_id)
+            if conn:
+                tracker_token = crud.get_decrypted_token(conn)
+        if not repo and task_record:
+            if conn and conn.project:
+                repo = conn.project
+            if not repo:
+                repo = _extract_repo_from_text(
+                    issue_description, issue_url,
+                    conn.kind.value if conn else "",
+                    conn.endpoint if conn else "",
+                )
+            if repo:
+                task_record.repo = repo
+                await session.commit()
+        clone_url = ""
+        clone_conn = conn
+        clone_token = tracker_token
+        if repo and conn and conn.kind.value in ("jira", "linear"):
+            all_conns = await crud.list_connections(session)
+            for c in all_conns:
+                if c.kind.value in ("github", "gitlab"):
+                    clone_conn = c
+                    clone_token = crud.get_decrypted_token(c)
+                    break
+        if repo and clone_conn:
+            clone_url = _build_clone_url(
+                repo=repo,
+                tracker_kind=clone_conn.kind.value,
+                endpoint=clone_conn.endpoint,
+                token=clone_token,
+                email=clone_conn.email,
+            )
+
+        run = AgentRun(
+            workspace_id=workspace_id,
+            task_pipeline_id=task_pipeline_id,
+            agent_type=AgentType.REQUIREMENTS,
+            status=AgentRunStatus.RUNNING,
+            model=model,
+            triggered_by=triggered_by,
+            job_payload=json.dumps({
+                "plugin_name": "requirements",
+                "provider": provider,
+                "model": model,
+                "issue_title": issue_title,
+                "issue_description": issue_description,
+                "issue_url": issue_url,
+                "issue_identifier": issue_identifier,
+                "extra_config": extra,
+            }),
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+        run.started_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    system_prompt = extra.get("custom_prompt") or DEFAULT_SYSTEM_PROMPT
+
+    async def _run():
+        import tempfile, shutil
+        workspace_path = None
+        try:
+            workspace_path = tempfile.mkdtemp(prefix=f"maestro-requirements-{run_id}-")
+            if clone_url:
+                await _write_log(run_id, "status", f"Cloning repository: {repo}")
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "clone", "--depth", "1", clone_url, f"{workspace_path}/repo",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, stderr = await proc.communicate()
+                if proc.returncode == 0:
+                    workspace_path = f"{workspace_path}/repo"
+                    await _write_log(run_id, "status", "Repository cloned successfully")
+                else:
+                    err = _sanitize_clone_error(stderr.decode(errors="replace")[:300] if stderr else "")
+                    await _write_log(run_id, "error", f"Clone failed: {err} — continuing without repo")
+
+            result = await run_requirements_agent(
+                run_id=run_id,
+                issue_title=issue_title,
+                issue_description=issue_description,
+                issue_identifier=issue_identifier,
+                system_prompt=system_prompt,
+                api_key=api_key,
+                model=model,
+                cwd=workspace_path,
+            )
+            # If finalized, update the JIRA ticket
+            if result.updated_description and issue_identifier:
+                try:
+                    async with get_session() as session:
+                        task_record = await session.get(TaskPipelineRecord, task_pipeline_id)
+                        if task_record:
+                            conn = await crud.get_connection(session, task_record.tracker_connection_id)
+                            if conn and conn.kind.value == "jira":
+                                from maestro.external.jira.tracker import JiraIssueTracker
+                                token = crud.get_decrypted_token(conn)
+                                tracker = JiraIssueTracker(
+                                    base_url=conn.endpoint,
+                                    api_token=token,
+                                    project_key="",
+                                    email=conn.email,
+                                )
+                                await tracker.update_issue(issue_identifier, result.updated_description)
+                                await tracker.close()
+                                await _write_log(run_id, "status", f"Updated JIRA ticket {issue_identifier}")
+                except Exception as exc:
+                    logger.exception("Failed to update JIRA ticket %s", issue_identifier)
+                    await _write_log(run_id, "error", f"Failed to update JIRA: {exc}")
+
+            async with get_session() as session:
+                run_obj = await session.get(AgentRun, run_id)
+                if run_obj:
+                    run_obj.status = AgentRunStatus.COMPLETED if result.status == "completed" else AgentRunStatus.FAILED
+                    run_obj.cost_usd = result.total_cost_usd
+                    run_obj.input_tokens = result.input_tokens
+                    run_obj.output_tokens = result.output_tokens
+                    run_obj.error = result.error or ""
+                    run_obj.summary = "Requirements finalized" if result.updated_description else ""
+                    run_obj.finished_at = datetime.now(timezone.utc)
+                    await session.commit()
+        except Exception as exc:
+            logger.exception("Requirements agent task error for run %d", run_id)
+            async with get_session() as session:
+                run_obj = await session.get(AgentRun, run_id)
+                if run_obj:
+                    run_obj.status = AgentRunStatus.FAILED
+                    run_obj.error = str(exc)
+                    run_obj.finished_at = datetime.now(timezone.utc)
+                    await session.commit()
+        finally:
+            if workspace_path:
+                try:
+                    shutil.rmtree(workspace_path, ignore_errors=True)
+                except Exception:
+                    pass
+
+    asyncio.create_task(_run())
+    return run_id
+
+
 async def _post_review_comment(
     pr_url: str,
     code_host: str,
@@ -630,8 +892,8 @@ async def _post_review_comment(
     """Post the review agent's findings as a comment on the MR/PR."""
     import shutil
 
-    # Prefix with Maestro header
-    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}"
+    # Prefix with Maestro header and append footer
+    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}\n\n---\n*Created by Maestro*"
 
     if code_host == "gitlab":
         # Extract project path and MR number from URL

@@ -378,6 +378,7 @@ export async function updateTaskStatus(
     issue_title?: string;
     issue_description?: string;
     issue_url?: string;
+    issue_identifier?: string;
   },
 ): Promise<{ agent_run_id?: number }> {
   const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/status`, {
@@ -618,6 +619,22 @@ export async function fetchTaskDetail(externalRef: string): Promise<UnifiedTask>
   return res.json();
 }
 
+export async function fetchTaskPrUrl(externalRef: string): Promise<string | null> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/pr_url`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.pr_url || null;
+}
+
+export async function updateTaskPrUrl(externalRef: string, prUrl: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/pr_url`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pr_url: prUrl }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
 export async function fetchTaskById(pipelineId: number): Promise<UnifiedTask> {
   const res = await authFetch(`${API_BASE}/api/v1/pipeline/${pipelineId}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -643,6 +660,35 @@ export async function updateTaskRepo(externalRef: string, repo: string, projectI
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repo, project_id: projectId }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export async function triggerRequirementsAgent(
+  externalRef: string,
+  context: {
+    workspace_id?: number;
+    project_id?: number;
+    issue_title: string;
+    issue_description: string;
+    issue_url: string;
+    issue_identifier: string;
+  }
+): Promise<{ agent_run_id: number }> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/requirements`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function sendAgentPrompt(runId: number, content: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/agent-runs/${runId}/prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 }

@@ -58,6 +58,7 @@ class RunResult:
     all_text: str = ""
     pr_url: str = ""
     review_verdict: str = ""
+    log_text: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -161,7 +162,7 @@ async def _write_log(run_id: int, entry_type: str, content: str) -> None:
             log = AgentRunLog(
                 agent_run_id=run_id,
                 entry_type=entry_type,
-                content=content[:2000],
+                content=content,
             )
             session.add(log)
             await session.commit()
@@ -186,11 +187,9 @@ async def _process_text(run_id: int, text: str, result: RunResult) -> None:
         result.review_verdict = verdict
         await _write_log(run_id, "status", f"Review verdict: {verdict}")
 
-    if len(text) > 300:
-        await _write_log(run_id, "text", text[:300] + "...")
-    else:
+    if result.log_text:
         await _write_log(run_id, "text", text)
-    result.messages.append({"type": "text", "text": text[:500]})
+    result.messages.append({"type": "text", "text": text})
 
 
 # ---------------------------------------------------------------------------
@@ -220,11 +219,10 @@ async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> No
         tool_name = event.get("tool", "")
         output = event.get("output", "")
         if output and isinstance(output, str):
-            truncated = output[:300] + "..." if len(output) > 300 else output
-            await _write_log(run_id, "tool_result", f"[{tool_name}] {truncated}")
+            await _write_log(run_id, "tool_result", f"[{tool_name}] {output}")
 
     elif event_type == "system" and event.get("message"):
-        await _write_log(run_id, "status", event["message"][:500])
+        await _write_log(run_id, "status", event["message"])
 
     elif event_type == "assistant":
         msg = event.get("message", {})
@@ -238,7 +236,7 @@ async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> No
                 snippet = ""
                 if isinstance(tool_input, dict):
                     if "command" in tool_input:
-                        snippet = str(tool_input["command"])[:200]
+                        snippet = str(tool_input["command"])
                     elif "file_path" in tool_input:
                         snippet = str(tool_input["file_path"])
                     elif "pattern" in tool_input:
@@ -261,19 +259,23 @@ async def _parse_claude_event(run_id: int, event: dict, result: RunResult) -> No
         result.input_tokens = usage.get("input_tokens", 0) or 0
         result.output_tokens = usage.get("output_tokens", 0) or 0
         result_text = event.get("result", "")
-        if result_text:
-            await _process_text(run_id, result_text, result)
 
         is_error = event.get("is_error", False)
         if is_error:
             result.status = "failed"
-            result.error = result_text[:500] if result_text else "Agent failed"
+            result.error = result_text if result_text else "Agent failed"
             await _write_log(run_id, "error", f"Agent failed: {result.error}")
         else:
             result.status = "completed"
-            await _write_log(run_id, "status",
-                f"Claude Code CLI completed (cost: ${result.total_cost_usd:.4f}, "
-                f"tokens: {result.input_tokens}in/{result.output_tokens}out)")
+            if result.log_text:
+                await _write_log(run_id, "status",
+                    f"Claude Code CLI completed (cost: ${result.total_cost_usd:.4f}, "
+                    f"tokens: {result.input_tokens}in/{result.output_tokens}out)")
+
+        # The result event's text duplicates what was already streamed via assistant events.
+        # Only fall back to it if no streaming text was captured (e.g. very short responses).
+        if result_text and not result.all_text.strip():
+            await _process_text(run_id, result_text, result)
 
 
 # ---------------------------------------------------------------------------
@@ -312,14 +314,14 @@ async def _parse_codex_event(run_id: int, event: dict, result: RunResult) -> Non
         err = event.get("error", {})
         err_msg = err.get("message", "Turn failed") if isinstance(err, dict) else str(err)
         result.status = "failed"
-        result.error = err_msg[:500]
-        await _write_log(run_id, "error", f"Turn failed: {err_msg[:500]}")
+        result.error = err_msg
+        await _write_log(run_id, "error", f"Turn failed: {err_msg}")
 
     elif event_type == "error":
         err_msg = event.get("message", "Unknown error")
         result.status = "failed"
-        result.error = err_msg[:500]
-        await _write_log(run_id, "error", f"Error: {err_msg[:500]}")
+        result.error = err_msg
+        await _write_log(run_id, "error", f"Error: {err_msg}")
 
     elif event_type in ("item.started", "item.updated", "item.completed"):
         item = event.get("item", {})
@@ -334,14 +336,13 @@ async def _parse_codex_event(run_id: int, event: dict, result: RunResult) -> Non
             cmd_str = item.get("command", "")
             status_val = item.get("status", "")
             if event_type == "item.started" and cmd_str:
-                await _write_log(run_id, "tool_use", f"Running command: {cmd_str[:200]}")
+                await _write_log(run_id, "tool_use", f"Running command: {cmd_str}")
                 result.messages.append({"type": "tool_use", "tool": "Bash"})
             elif event_type == "item.completed":
                 output = item.get("aggregated_output", "")
                 exit_code = item.get("exit_code", "")
                 if output:
-                    truncated = output[:300] + "..." if len(output) > 300 else output
-                    await _write_log(run_id, "tool_result", f"[Bash exit={exit_code}] {truncated}")
+                    await _write_log(run_id, "tool_result", f"[Bash exit={exit_code}] {output}")
                 # Check command output for PR URLs
                 if output:
                     pr = _detect_pr_url(output)
@@ -370,7 +371,7 @@ async def _parse_codex_event(run_id: int, event: dict, result: RunResult) -> Non
         elif item_type == "reasoning":
             text = item.get("text", "").strip()
             if text and event_type == "item.completed":
-                await _write_log(run_id, "status", f"Reasoning: {text[:300]}")
+                await _write_log(run_id, "status", f"Reasoning: {text}")
 
 
 # ---------------------------------------------------------------------------
@@ -387,19 +388,21 @@ async def run_cli_with_logging(
     workspace_path: str,
     allowed_tools: list[str],
     api_key: str,
+    log_text: bool = True,
 ) -> dict[str, Any]:
     """Run CLI agent and stream log entries to the DB.
 
     Returns dict with: status, error, total_cost_usd, input_tokens, output_tokens,
     messages, last_text, all_text, pr_url, review_verdict
     """
-    result = RunResult()
+    result = RunResult(log_text=log_text)
     tools_str = ",".join(allowed_tools)
 
     # Build command and env based on provider
     is_codex = provider == "openai"
     cli_name = "Codex CLI" if is_codex else "Claude Code CLI"
-    await _write_log(run_id, "status", f"Starting {cli_name} (model: {model}, tools: {tools_str})")
+    if log_text:
+        await _write_log(run_id, "status", f"Starting {cli_name} (model: {model}, tools: {tools_str})")
 
     if is_codex:
         cmd = _build_codex_cmd(prompt, model, system_prompt)
@@ -414,7 +417,8 @@ async def run_cli_with_logging(
     else:
         env["ANTHROPIC_API_KEY"] = api_key
 
-    await _write_log(run_id, "status", f"$ {cmd[0]} ... --model {model}")
+    if log_text:
+        await _write_log(run_id, "status", f"$ {cmd[0]} ... --model {model}")
 
     try:
         # Codex CLI requires explicit login — env var alone is not sufficient
@@ -451,7 +455,7 @@ async def run_cli_with_logging(
                 event = json.loads(line)
             except json.JSONDecodeError:
                 if line:
-                    await _write_log(run_id, "text", line[:500])
+                    await _write_log(run_id, "text", line)
                 continue
 
             await parse_event(run_id, event, result)
@@ -462,7 +466,7 @@ async def run_cli_with_logging(
         # If process failed but parser didn't catch it, check stderr
         if proc.returncode != 0 and result.status == "completed":
             stderr_out = await proc.stderr.read()
-            err_text = stderr_out.decode("utf-8", errors="replace")[:500]
+            err_text = stderr_out.decode("utf-8", errors="replace")
             if err_text:
                 result.status = "failed"
                 result.error = err_text

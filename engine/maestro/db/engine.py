@@ -70,60 +70,47 @@ async def init_db() -> None:
     except Exception:
         pass  # fresh DB - create_all will handle it
 
-    # Step 2: Create tables + run migrations
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(sa.text(
-            "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''"
-        ))
-        # Add token tracking columns to agent_runs
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS input_tokens INTEGER NOT NULL DEFAULT 0"
-        ))
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS output_tokens INTEGER NOT NULL DEFAULT 0"
-        ))
-        # Add provider column to agent_configs
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_configs ADD COLUMN IF NOT EXISTS provider VARCHAR(50) NOT NULL DEFAULT 'anthropic'"
-        ))
-        # Add triggered_by column to agent_runs
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) NOT NULL DEFAULT ''"
-        ))
-        # Add resource tracking columns to agent_runs
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS peak_memory_mb FLOAT NOT NULL DEFAULT 0.0"
-        ))
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS avg_cpu_percent FLOAT NOT NULL DEFAULT 0.0"
-        ))
-        # Add job_payload column to agent_runs (worker queue)
-        await conn.execute(sa.text(
-            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS job_payload TEXT NOT NULL DEFAULT '{}'"
-        ))
-        # Add worker heartbeat resource columns
-        for col, typ, default in [
-            ("cpu_percent", "FLOAT", "0.0"),
-            ("memory_used_mb", "FLOAT", "0.0"),
-            ("memory_total_mb", "FLOAT", "0.0"),
-            ("cpu_count", "INTEGER", "0"),
-            ("estimated_capacity", "INTEGER", "0"),
-        ]:
+    try:
+        async with _engine.begin() as conn:
             await conn.execute(sa.text(
-                f"ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS {col} {typ} NOT NULL DEFAULT {default}"
+                "ALTER TYPE agenttype ADD VALUE IF NOT EXISTS 'REQUIREMENTS'"
             ))
-        # Add comment polling timestamp to task_pipeline
-        await conn.execute(sa.text(
-            "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS last_comment_check_at TIMESTAMPTZ"
-        ))
-        # Migrate old model IDs to CLI aliases
-        await conn.execute(sa.text(
-            "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'"
-        ))
-        await conn.execute(sa.text(
-            "UPDATE agent_configs SET model = 'opus' WHERE model = 'claude-opus-4-6'"
-        ))
+    except Exception:
+        pass  # fresh DB — create_all will handle it
+
+    # Step 2: Create tables
+    try:
+        async with _engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception:
+        pass
+
+    # Step 3: Column migrations — each in its own transaction so concurrent startups
+    # don't deadlock (ALTER TABLE takes AccessExclusiveLock; IF NOT EXISTS makes them idempotent)
+    _ddl = [
+        "ALTER TABLE tracker_connections ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL DEFAULT ''",
+        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS input_tokens INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS output_tokens INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE agent_configs ADD COLUMN IF NOT EXISTS provider VARCHAR(50) NOT NULL DEFAULT 'anthropic'",
+        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) NOT NULL DEFAULT ''",
+        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS peak_memory_mb FLOAT NOT NULL DEFAULT 0.0",
+        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS avg_cpu_percent FLOAT NOT NULL DEFAULT 0.0",
+        "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS job_payload TEXT NOT NULL DEFAULT '{}'",
+        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS cpu_percent FLOAT NOT NULL DEFAULT 0.0",
+        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS memory_used_mb FLOAT NOT NULL DEFAULT 0.0",
+        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS memory_total_mb FLOAT NOT NULL DEFAULT 0.0",
+        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS cpu_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS estimated_capacity INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS last_comment_check_at TIMESTAMPTZ",
+        "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'",
+        "UPDATE agent_configs SET model = 'opus' WHERE model = 'claude-opus-4-6'",
+    ]
+    for stmt in _ddl:
+        try:
+            async with _engine.begin() as conn:
+                await conn.execute(sa.text(stmt))
+        except Exception:
+            pass
 
 
 async def close_db() -> None:

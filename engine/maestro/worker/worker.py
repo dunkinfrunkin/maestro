@@ -131,6 +131,7 @@ async def execute_job(job) -> None:
         issue_title=payload.get("issue_title", ""),
         issue_description=payload.get("issue_description", ""),
         issue_url=payload.get("issue_url", ""),
+        issue_identifier=payload.get("issue_identifier", ""),
         pr_url=payload.get("pr_url", ""),
         pr_number=payload.get("pr_number", ""),
         repo=payload.get("repo", ""),

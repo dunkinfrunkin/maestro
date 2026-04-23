@@ -32,6 +32,16 @@ REVIEW_VERDICT: APPROVE
 REVIEW_VERDICT: REQUEST_CHANGES
 """
 
+_FOOTER_RULE = """## Comment footer
+
+Every comment body you post (inline review comments, summary comments, reply comments) MUST end with:
+
+---
+*Created by Maestro*
+
+Append this footer to every `body` field in all API calls that post comments.
+"""
+
 # ---------------------------------------------------------------------------
 # GitHub-specific prompt (uses `gh`)
 # ---------------------------------------------------------------------------
@@ -119,7 +129,8 @@ gh api graphql -f query='query {{ repository(owner: "<OWNER>", name: "<REPO>") {
    gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="Still not fixed: <explanation>"
    ```
 
-{_VERDICT_RULES}"""
+{_VERDICT_RULES}
+{_FOOTER_RULE}"""
 
 # ---------------------------------------------------------------------------
 # GitLab-specific prompt (uses `glab`)
@@ -211,7 +222,8 @@ Look for discussions with `"resolved": false` that have review comments from pre
      -f 'body=Still not fixed: <explanation>'
    ```
 
-{_VERDICT_RULES}"""
+{_VERDICT_RULES}
+{_FOOTER_RULE}"""
 
 # Keep SYSTEM_PROMPT as alias for backward compat
 SYSTEM_PROMPT = SYSTEM_PROMPT_GITHUB
@@ -259,7 +271,7 @@ async def run_review_agent(
                 for block in message.content:
                     if hasattr(block, "text") and block.text:
                         text = block.text
-                        result.messages.append({"type": "text", "text": text[:500]})
+                        result.messages.append({"type": "text", "text": text})
                         # Parse verdict from output
                         if "APPROVE" in text and "REQUEST_CHANGES" not in text:
                             result.verdict = "APPROVE"
