@@ -10,8 +10,10 @@ import {
   UnifiedTask,
   RepoEntry,
   fetchTaskRuns,
+  fetchTaskDetail,
   fetchRunLogs,
   updateTaskStatus,
+  updateTaskPrUrl,
   fetchRepos,
   updateTaskRepo,
   killAgentRun,
@@ -22,6 +24,52 @@ const STATUS_LABELS: Record<string, string> = {
   queued: "Queued", implement: "Implement", review: "Review",
   risk_profile: "Risk Profile", deploy: "Deploy", monitor: "Monitor",
 };
+
+function LogLine({
+  log,
+  expanded,
+  onToggle,
+}: {
+  log: AgentLogEntry;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const ts = log.created_at
+    ? new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+    : "";
+
+  let colorClass = "text-foreground";
+  let prefix = "";
+  switch (log.entry_type) {
+    case "tool_use":    colorClass = "text-blue-700";     prefix = "⚙ "; break;
+    case "tool_result": colorClass = "text-muted";        prefix = "  "; break;
+    case "status":      colorClass = "text-muted italic"; prefix = "· "; break;
+    case "error":       colorClass = "text-red-700";      prefix = "✗ "; break;
+    case "user_prompt": colorClass = "text-teal-700";     prefix = "» "; break;
+    case "question":    colorClass = "text-amber-700";    prefix = "? "; break;
+  }
+
+  const isLong = log.content.length > 300;
+  const body = isLong && !expanded ? log.content.slice(0, 300) + "…" : log.content;
+
+  return (
+    <div className={`flex gap-2 px-3 py-0.5 font-mono text-xs leading-relaxed ${colorClass}`}>
+      <span className="text-muted select-none shrink-0 text-[10px]">{ts}</span>
+      <span className="whitespace-pre-wrap break-words min-w-0">
+        {prefix && <span className="opacity-50">{prefix}</span>}
+        {body}
+        {isLong && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggle(); }}
+            className="ml-1 text-muted hover:text-foreground underline text-[10px]"
+          >
+            {expanded ? "Less" : "More"}
+          </button>
+        )}
+      </span>
+    </div>
+  );
+}
 
 const formatDuration = (ms: number) => {
   if (ms === 0) return "0s";
@@ -101,21 +149,48 @@ export function TaskDetailPage({
   onTaskUpdated: () => void;
 }) {
   const [runs, setRuns] = useState<AgentRunResponse[]>([]);
+  const [livePrUrl, setLivePrUrl] = useState<string | null>(task.pr_url || null);
+  const livePrUrlRef = useRef<string | null>(task.pr_url || null);
+
+  // Sync livePrUrl when parent passes a fresh task
+  useEffect(() => {
+    if (task.pr_url && !livePrUrlRef.current) {
+      livePrUrlRef.current = task.pr_url;
+      setLivePrUrl(task.pr_url);
+    }
+  }, [task.pr_url]);
 
   const loadRuns = useCallback(() => {
     if (!task.pipeline_status) return;
     fetchTaskRuns(task.external_ref).then(setRuns).catch(() => {});
   }, [task.external_ref, task.pipeline_status]);
 
+  const pollPrUrl = useCallback(async () => {
+    if (livePrUrlRef.current) return;
+    try {
+      const detail = await fetchTaskDetail(task.external_ref);
+      if (detail.pr_url && !livePrUrlRef.current) {
+        livePrUrlRef.current = detail.pr_url;
+        setLivePrUrl(detail.pr_url);
+      }
+    } catch {}
+  }, [task.external_ref]);
+
+  // Fetch pr_url once on mount in case the list endpoint omits it
+  useEffect(() => { pollPrUrl(); }, [pollPrUrl]);
+
   useEffect(() => {
     loadRuns();
     // Only poll if there are active runs
     const hasActive = runs.some(r => r.status === "running" || r.status === "pending");
     if (hasActive) {
-      const interval = setInterval(loadRuns, 3000);
+      const interval = setInterval(() => {
+        loadRuns();
+        pollPrUrl();
+      }, 3000);
       return () => clearInterval(interval);
     }
-  }, [loadRuns, runs]);
+  }, [loadRuns, pollPrUrl, runs]);
 
   // Extract repo from identifier (e.g., "owner/repo#123" → "owner/repo")
   const repo = task.identifier.includes("#")
@@ -316,24 +391,14 @@ export function TaskDetailPage({
               </div>
 
               {/* PR Link */}
-              {task.pr_url && (
-                <div>
-                  <div className="text-xs text-muted mb-2">Pull Request</div>
-                  <a
-                    href={task.pr_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs text-accent hover:underline p-2 rounded border border-border hover:bg-surface-hover transition-colors font-mono"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    <span className="truncate">
-                      {task.pr_url.replace(/^https?:\/\//, '')}
-                    </span>
-                  </a>
-                </div>
-              )}
+              <MrUrlEditor
+                prUrl={livePrUrl}
+                onSave={async (url) => {
+                  await updateTaskPrUrl(task.external_ref, url);
+                  livePrUrlRef.current = url || null;
+                  setLivePrUrl(url || null);
+                }}
+              />
             </div>
           </div>
 
@@ -469,6 +534,29 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
   const lastLogIdRef = useRef(0);
   const isLive = run.status === "running" || run.status === "pending";
   const logsLoaded = useRef(false);
+  const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set());
+  const logsScrollRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
+
+  const toggleLog = (id: number) => setExpandedLogs(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  useEffect(() => {
+    if (!isLive) return;
+    const el = logsScrollRef.current;
+    if (!el || userScrolledUpRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [logs, isLive]);
+
+  const handleLogsScroll = () => {
+    const el = logsScrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+    userScrolledUpRef.current = !atBottom;
+  };
 
   // Auto-show logs for live runs, hide for completed
   useEffect(() => {
@@ -503,13 +591,6 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
       return () => clearInterval(interval);
     }
   }, [run.id, isLive, showLogs]);
-
-  const logTypeIcons: Record<string, string> = {
-    tool_use: "wrench",
-    text: "chat",
-    status: "info",
-    error: "alert",
-  };
 
   return (
     <div className="flex gap-3">
@@ -624,24 +705,10 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
         {/* Logs */}
         {isLive ? (
           logs.length > 0 && (
-            <div className="rounded-md border border-border bg-background overflow-hidden">
-              <div className="max-h-[500px] overflow-y-auto">
+            <div className="rounded-md border border-border bg-background overflow-hidden resize-y" style={{ minHeight: "120px", height: "500px" }}>
+              <div className="h-full overflow-y-auto py-1" ref={logsScrollRef} onScroll={handleLogsScroll}>
                 {logs.map((log) => (
-                  <div
-                    key={log.id}
-                    className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono break-all overflow-hidden ${
-                      log.entry_type === "error" ? "bg-red-50 text-red-700" :
-                      log.entry_type === "tool_use" ? "text-blue-700" :
-                      log.entry_type === "tool_result" ? "text-gray-500 text-[10px] pl-6" :
-                      log.entry_type === "status" ? "text-muted italic" :
-                      "text-foreground"
-                    }`}
-                  >
-                    <span className="text-[10px] text-muted mr-2">
-                      {log.created_at ? new Date(log.created_at).toLocaleTimeString() : ""}
-                    </span>
-                    {log.content}
-                  </div>
+                  <LogLine key={log.id} log={log} expanded={expandedLogs.has(log.id)} onToggle={() => toggleLog(log.id)} />
                 ))}
               </div>
             </div>
@@ -658,24 +725,10 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           </button>
         )}
         {showLogs && !isLive && logs.length > 0 && (
-          <div className="rounded-md border border-border bg-background overflow-hidden mt-1">
-            <div className="max-h-[300px] overflow-y-auto">
+          <div className="rounded-md border border-border bg-background overflow-hidden mt-1 resize-y" style={{ minHeight: "120px", height: "300px" }}>
+            <div className="h-full overflow-y-auto py-1">
               {logs.map((log) => (
-                <div
-                  key={log.id}
-                  className={`px-3 py-1.5 border-b border-border last:border-0 text-xs font-mono break-all overflow-hidden ${
-                    log.entry_type === "error" ? "bg-red-50 text-red-700" :
-                    log.entry_type === "tool_use" ? "text-blue-700" :
-                    log.entry_type === "tool_result" ? "text-gray-500 text-[10px] pl-6" :
-                    log.entry_type === "status" ? "text-muted italic" :
-                    "text-foreground"
-                  }`}
-                >
-                  <span className="text-[10px] text-muted mr-2">
-                    {log.created_at ? new Date(log.created_at).toLocaleTimeString() : ""}
-                  </span>
-                  {log.content}
-                </div>
+                <LogLine key={log.id} log={log} expanded={expandedLogs.has(log.id)} onToggle={() => toggleLog(log.id)} />
               ))}
             </div>
           </div>
@@ -685,6 +738,77 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MrUrlEditor({ prUrl, onSave }: { prUrl: string | null; onSave: (url: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(prUrl || "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setValue(prUrl || ""); }, [prUrl]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onSave(value.trim());
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-muted">Pull Request</span>
+        <button
+          onClick={() => setEditing(e => !e)}
+          className="text-[10px] text-muted hover:text-foreground underline"
+        >
+          {editing ? "cancel" : prUrl ? "edit" : "attach"}
+        </button>
+      </div>
+      {editing ? (
+        <div className="flex gap-1">
+          <input
+            autoFocus
+            type="text"
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+            placeholder="https://github.com/.../pull/123"
+            className="flex-1 text-xs px-2 py-1 rounded border border-border bg-background font-mono"
+          />
+          <button
+            onClick={save}
+            disabled={saving}
+            className="text-xs px-2 py-1 rounded border border-border bg-surface hover:bg-surface-hover"
+          >
+            {saving ? "…" : "Save"}
+          </button>
+        </div>
+      ) : prUrl ? (
+        <a
+          href={prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-xs text-accent hover:underline p-2 rounded border border-border hover:bg-surface-hover transition-colors font-mono"
+        >
+          <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+          <span className="truncate">{prUrl.replace(/^https?:\/\//, '')}</span>
+        </a>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="w-full text-xs text-muted border border-dashed border-border rounded p-2 hover:bg-surface-hover transition-colors"
+        >
+          + Attach PR / MR URL
+        </button>
+      )}
     </div>
   );
 }

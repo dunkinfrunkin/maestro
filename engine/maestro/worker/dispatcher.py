@@ -24,6 +24,17 @@ from maestro.agents.plugin import registry
 
 logger = logging.getLogger(__name__)
 
+# Per-(task, agent) locks to prevent concurrent duplicate dispatches
+_dispatch_locks: dict[tuple[int, str], asyncio.Lock] = {}
+
+
+def _get_dispatch_lock(task_pipeline_id: int, agent_name: str) -> asyncio.Lock:
+    key = (task_pipeline_id, agent_name)
+    if key not in _dispatch_locks:
+        _dispatch_locks[key] = asyncio.Lock()
+    return _dispatch_locks[key]
+
+
 # Map pipeline status → agent type
 STATUS_TO_AGENT: dict[str, str] = {
     PipelineStatus.IMPLEMENT.value: AgentType.IMPLEMENTATION.value,
@@ -56,6 +67,31 @@ async def dispatch_agent_for_status(
         logger.warning("No plugin registered for agent: %s", agent_name)
         return None
 
+    async with _get_dispatch_lock(task_pipeline_id, agent_name):
+        return await _dispatch_agent_locked(
+            agent_name=agent_name,
+            plugin=plugin,
+            workspace_id=workspace_id,
+            task_pipeline_id=task_pipeline_id,
+            status=status,
+            issue_title=issue_title,
+            issue_description=issue_description,
+            issue_url=issue_url,
+            triggered_by=triggered_by,
+        )
+
+
+async def _dispatch_agent_locked(
+    agent_name: str,
+    plugin,
+    workspace_id: int,
+    task_pipeline_id: int,
+    status: str,
+    issue_title: str = "",
+    issue_description: str = "",
+    issue_url: str = "",
+    triggered_by: str = "",
+) -> int | None:
     # Check if agent is enabled
     async with get_session() as session:
         agent_config = await crud.get_agent_config(
@@ -193,6 +229,19 @@ async def dispatch_agent_for_status(
             "plugin_name": agent_name,
         })
 
+        # Guard: skip if a run for this task+agent is already active
+        from sqlalchemy import select as sa_select
+        existing = await session.scalar(
+            sa_select(AgentRun.id).where(
+                AgentRun.task_pipeline_id == task_pipeline_id,
+                AgentRun.agent_type == AgentType(agent_name),
+                AgentRun.status.in_([AgentRunStatus.PENDING, AgentRunStatus.RUNNING]),
+            ).limit(1)
+        )
+        if existing:
+            print(f"[MAESTRO] Skipping duplicate dispatch: {agent_name} already active (run {existing}) for task {task_pipeline_id}")
+            return existing
+
         # Create agent run record
         run = AgentRun(
             workspace_id=workspace_id,
@@ -242,7 +291,7 @@ async def dispatch_agent_for_status(
     # Map agent type to system prompt and tools
 AGENT_CONFIGS = {
     "implementation": {
-        "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+        "tools": ["Read", "Write", "Edit", "NotebookEdit", "Bash", "Glob", "Grep", "Agent", "Skill"],
     },
     "review": {
         "tools": ["Read", "Bash", "Glob", "Grep"],

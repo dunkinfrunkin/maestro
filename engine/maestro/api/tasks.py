@@ -691,6 +691,24 @@ async def remove_task_status(external_ref: str) -> dict:
         return {"status": "removed"}
 
 
+class TaskPrUrlUpdateBody(BaseModel):
+    pr_url: str
+
+
+@router.put("/tasks/{external_ref:path}/pr_url")
+async def update_task_pr_url(external_ref: str, body: TaskPrUrlUpdateBody) -> dict:
+    """Set or update the MR/PR URL associated with a task."""
+    async with get_session() as session:
+        record = await crud.get_pipeline_record(session, external_ref)
+        if not record:
+            raise HTTPException(status_code=404, detail="Task not found")
+        pr_url = body.pr_url.strip()
+        record.pr_url = pr_url
+        record.pr_number = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
+        await session.commit()
+        return {"external_ref": external_ref, "pr_url": record.pr_url}
+
+
 class TaskRepoUpdate(BaseModel):
     repo: str
 

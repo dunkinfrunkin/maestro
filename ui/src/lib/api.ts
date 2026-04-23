@@ -577,6 +577,15 @@ export async function fetchTaskDetail(externalRef: string): Promise<UnifiedTask>
   return res.json();
 }
 
+export async function updateTaskPrUrl(externalRef: string, prUrl: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/api/v1/tasks/${externalRef}/pr_url`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pr_url: prUrl }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
 export async function fetchTaskById(pipelineId: number): Promise<UnifiedTask> {
   const res = await authFetch(`${API_BASE}/api/v1/pipeline/${pipelineId}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
