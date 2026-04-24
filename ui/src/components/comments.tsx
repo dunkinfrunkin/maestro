@@ -11,6 +11,7 @@ interface CommentEntry {
   pr_number: string;
   repo: string;
   author: string;
+  triggered_by: string;
   body: string;
   is_agent: boolean;
   agent_type: string | null;
@@ -91,8 +92,10 @@ export function CommentsPage() {
               <tr className="bg-surface border-b border-border">
                 <th className="text-left px-3 py-2 font-medium text-muted">Agent</th>
                 <th className="text-left px-3 py-2 font-medium text-muted">Comment</th>
-                <th className="text-left px-3 py-2 font-medium text-muted">File</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">Task</th>
                 <th className="text-left px-3 py-2 font-medium text-muted">PR/MR</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">Author</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">Triggered By</th>
                 <th className="text-left px-3 py-2 font-medium text-muted">Time</th>
                 <th className="text-left px-3 py-2 font-medium text-muted"></th>
               </tr>
@@ -110,8 +113,10 @@ export function CommentsPage() {
                       {c.body.replace(/\n---\n\*Created by Maestro.*\*$/s, "").trim().split("\n")[0].substring(0, 120)}
                     </div>
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap font-mono text-muted">
-                    {c.file_path ? `${c.file_path}${c.line_number ? `:${c.line_number}` : ""}` : "-"}
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <a href={`/tasks/${encodeURIComponent(c.task_ref)}`} className="text-accent hover:underline">
+                      {c.task_title}
+                    </a>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {c.pr_number ? (
@@ -119,6 +124,12 @@ export function CommentsPage() {
                         #{c.pr_number}
                       </a>
                     ) : "-"}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-muted">
+                    {c.author}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-muted">
+                    {c.triggered_by || "-"}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-muted">
                     {formatTime(c.created_at)}

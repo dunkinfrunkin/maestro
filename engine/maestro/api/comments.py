@@ -53,6 +53,22 @@ async def list_comments(
     from maestro.worker.poller import _find_codehost_connection
     from maestro.db.encryption import decrypt_token
 
+    # Pre-fetch triggered_by for each task from latest agent run
+    task_triggered_by: dict[int, str] = {}
+    async with get_session() as session:
+        for task in tasks:
+            from sqlalchemy import select
+            result = await session.execute(
+                select(AgentRun.triggered_by)
+                .where(AgentRun.task_pipeline_id == task.id)
+                .where(AgentRun.triggered_by != "")
+                .order_by(AgentRun.created_at.desc())
+                .limit(1)
+            )
+            row = result.scalar_one_or_none()
+            if row:
+                task_triggered_by[task.id] = row
+
     all_comments: list[dict] = []
 
     for task in tasks:
@@ -87,6 +103,7 @@ async def list_comments(
                     "pr_number": task.pr_number,
                     "repo": task.repo,
                     "author": c.get("user", {}).get("login", "unknown"),
+                    "triggered_by": task_triggered_by.get(task.id, ""),
                     "body": c.get("body", ""),
                     "is_agent": is_agent,
                     "agent_type": agent_type,
