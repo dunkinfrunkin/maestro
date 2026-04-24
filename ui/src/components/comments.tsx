@@ -83,61 +83,57 @@ export function CommentsPage() {
       {loading ? (
         <div className="text-sm text-muted">Loading comments...</div>
       ) : filteredComments.length === 0 ? (
-        <div className="text-sm text-muted">No comments found.</div>
+        <div className="text-sm text-muted">No agent comments found.</div>
       ) : (
-        <div className="space-y-3">
-          {filteredComments.map((c) => (
-            <div key={c.id} className="border border-border rounded-lg p-4 bg-background">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium">{c.author}</span>
-                  {c.is_agent && (
+        <div className="border border-border rounded-lg overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-surface border-b border-border">
+                <th className="text-left px-3 py-2 font-medium text-muted">Agent</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">Comment</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">File</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">PR/MR</th>
+                <th className="text-left px-3 py-2 font-medium text-muted">Time</th>
+                <th className="text-left px-3 py-2 font-medium text-muted"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredComments.map((c) => (
+                <tr key={c.id} className="border-b border-border last:border-0 hover:bg-surface-hover transition-colors">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
                       {getAgentLabel(c)}
                     </span>
-                  )}
-                  {!c.is_agent && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
-                      Human
-                    </span>
-                  )}
-                  <span className="text-[10px] text-muted">{c.repo}</span>
-                  {c.pr_number && (
-                    <a
-                      href={c.pr_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-accent hover:underline"
-                    >
-                      #{c.pr_number}
-                    </a>
-                  )}
-                </div>
-                <span className="text-[10px] text-muted flex-shrink-0">{formatTime(c.created_at)}</span>
-              </div>
-
-              {c.file_path && (
-                <div className="mt-1 text-[10px] text-muted font-mono">
-                  {c.file_path}{c.line_number ? `:${c.line_number}` : ""}
-                </div>
-              )}
-
-              <div className="mt-2 text-xs text-foreground whitespace-pre-wrap leading-relaxed">
-                {c.body.replace(/\n---\n\*Created by Maestro.*\*$/, "").trim()}
-              </div>
-
-              {c.url && (
-                <a
-                  href={c.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-2 text-[10px] text-accent hover:underline"
-                >
-                  View on {c.repo.includes("gitlab") ? "GitLab" : "GitHub"}
-                </a>
-              )}
-            </div>
-          ))}
+                  </td>
+                  <td className="px-3 py-2 max-w-md">
+                    <div className="truncate text-foreground">
+                      {c.body.replace(/\n---\n\*Created by Maestro.*\*$/s, "").trim().split("\n")[0].substring(0, 120)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap font-mono text-muted">
+                    {c.file_path ? `${c.file_path}${c.line_number ? `:${c.line_number}` : ""}` : "-"}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {c.pr_number ? (
+                      <a href={c.pr_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                        #{c.pr_number}
+                      </a>
+                    ) : "-"}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-muted">
+                    {formatTime(c.created_at)}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {c.url && (
+                      <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                        View
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
