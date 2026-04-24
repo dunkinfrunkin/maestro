@@ -44,11 +44,13 @@ RESPONSE_PROTOCOL = """
 ## REQUIRED: Response format
 CRITICAL — every single response MUST end with exactly one of the two markers below. No exceptions. Do not end a response with plain text, a numbered list, or any other format. If you do not include one of these markers, your response will be treated as an error.
 
+Once you have received the user's answers to your questions, do NOT send a follow-up acknowledgement or summary. Go directly to REQUIREMENTS_FINAL.
+
 If you have one or more questions for the user:
 QUESTION:
 <your question(s) here>
 
-If you have enough information to finalize:
+If you have enough information to finalize (including after receiving answers from the user):
 REQUIREMENTS_FINAL: YES
 UPDATED_DESCRIPTION:
 <the finalized ticket description following your output format>
@@ -202,25 +204,9 @@ async def run_requirements_agent(
                 # Resume the session with the user's answer
                 next_prompt = user_response
             else:
-                # No protocol marker — show the response and ask the user to continue
-                if response_text.strip():
-                    await _write_log(run_id, "text", response_text.strip())
-                await _write_log(run_id, "question", "Please respond to the above, or say 'done' / 'finalize' to write the requirements to the ticket.")
-
-                last_id = await _get_current_max_log_id(run_id)
-                user_response = await _wait_for_user_prompt(run_id, last_id)
-                if user_response is None:
-                    await _write_log(run_id, "status", "Timed out waiting for user response — requirements not written to ticket")
-                    result.updated_description = ""
-                    break
-
-                _done = {"done", "finalize", "finished", "complete", "yes", "y", "lgtm", "looks good", "ship it", "ok", "okay"}
-                if user_response.strip().lower() in _done:
-                    await _write_log(run_id, "status", "Agent completed without explicit finalization marker")
-                    result.updated_description = response_text.strip() or issue_description
-                    break
-
-                next_prompt = user_response
+                # Agent didn't follow the protocol — nudge it to finalize properly without involving the user
+                logger.warning("[requirements] Response missing protocol marker for run %d, nudging agent", run_id)
+                next_prompt = "You must end your response with either QUESTION: or REQUIREMENTS_FINAL: YES followed by UPDATED_DESCRIPTION:. If you have enough information, finalize now."
 
     except Exception as exc:
         logger.exception("Requirements agent error for run %d", run_id)

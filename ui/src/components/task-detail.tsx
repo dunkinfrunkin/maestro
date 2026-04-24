@@ -138,6 +138,7 @@ export function TaskDetailPage({
   const [runs, setRuns] = useState<AgentRunResponse[]>([]);
   const [livePrUrl, setLivePrUrl] = useState<string | null>(task.pr_url || null);
   const livePrUrlRef = useRef<string | null>(task.pr_url || null);
+  const prevRunsRef = useRef<AgentRunResponse[]>([]);
 
   // Sync livePrUrl when parent passes a fresh task
   useEffect(() => {
@@ -174,6 +175,17 @@ export function TaskDetailPage({
     loadRuns();
     pollPrUrl();
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh task description when a requirements run completes
+  useEffect(() => {
+    const prev = prevRunsRef.current;
+    const wasActive = prev.some(r => r.agent_type === "requirements" && (r.status === "running" || r.status === "pending"));
+    const isNowDone = runs.some(r => r.agent_type === "requirements" && r.status === "completed");
+    if (wasActive && isNowDone) {
+      onTaskUpdated();
+    }
+    prevRunsRef.current = runs;
+  }, [runs]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll only when there are active runs
   useEffect(() => {

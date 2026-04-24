@@ -245,13 +245,13 @@ async def _process_text(run_id: int, text: str, result: RunResult) -> None:
 
 
 def _build_claude_cmd(
-    prompt: str,
     model: str,
     tools_str: str,
     system_prompt: str,
     resume_session_id: str | None = None,
 ) -> list[str]:
-    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--model", model, "--verbose"]
+    # Omit positional prompt — pass via stdin to avoid arg-length limits with long/multiline prompts
+    cmd = ["claude", "--print", "--output-format", "stream-json", "--model", model, "--verbose"]
     if resume_session_id:
         cmd.extend(["--resume", resume_session_id])
     else:
@@ -466,7 +466,7 @@ async def run_cli_with_logging(
         cmd = _build_codex_cmd(prompt, model, system_prompt)
         parse_event = _parse_codex_event
     else:
-        cmd = _build_claude_cmd(prompt, model, tools_str, system_prompt, resume_session_id)
+        cmd = _build_claude_cmd(model, tools_str, system_prompt, resume_session_id)
         parse_event = _parse_claude_event
 
     env = {**os.environ}
@@ -493,6 +493,7 @@ async def run_cli_with_logging(
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=workspace_path,
+            stdin=asyncio.subprocess.PIPE if not is_codex else asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
@@ -502,6 +503,12 @@ async def run_cli_with_logging(
         print(f"[MAESTRO-CLI] Run {run_id} started, PID={proc.pid}")
         _active_processes[run_id] = (proc, result)
         sampler_task = asyncio.create_task(_sample_resources(proc, result))
+
+        # Write prompt via stdin and close so the CLI knows input is complete
+        if not is_codex and proc.stdin:
+            proc.stdin.write(prompt.encode("utf-8"))
+            await proc.stdin.drain()
+            proc.stdin.close()
 
         # Stream stdout line by line — JSONL for both Claude and Codex
         async for raw_line in proc.stdout:
