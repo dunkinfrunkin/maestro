@@ -82,11 +82,13 @@ async def poll_comments_once() -> int:
     else:
         logger.debug("[poller] No tasks with open PRs in reviewable status")
 
+    dispatched_ids: set[int] = set()
+
     for task in tasks:
         try:
             pr_state = await _fetch_pr_state(task)
             if pr_state in ("closed", "merged"):
-                logger.info("[comment-poller] PR #%s on %s is %s — removing from poll list", task.pr_number, task.repo, pr_state)
+                logger.info("[poller] PR #%s on %s is %s — removing from poll list", task.pr_number, task.repo, pr_state)
                 await _clear_pr_fields(task.id)
                 continue
 
@@ -106,6 +108,7 @@ async def poll_comments_once() -> int:
                     task.repo, task.pr_number,
                 )
                 await _dispatch_for_comments(task)
+                dispatched_ids.add(task.id)
                 dispatched += 1
             else:
                 logger.debug("[poller] No new comments on %s PR #%s", task.repo, task.pr_number)
@@ -113,6 +116,8 @@ async def poll_comments_once() -> int:
             logger.exception("[poller] Failed to check comments for task %s", task.external_ref)
 
     for task in tasks:
+        if task.id in dispatched_ids:
+            continue
         try:
             if await _has_active_or_recent_agent_run(task.id):
                 continue
@@ -458,6 +463,10 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
             logger.warning("[poller] Task %d not found, skipping dispatch", task.id)
             return
 
+        if record.status not in POLLABLE_STATUSES or not record.pr_url:
+            logger.info("[poller] Task %s is now %s / pr_url=%r — skipping comment dispatch", task.external_ref, record.status, record.pr_url)
+            return
+
         project = await session.get(Project, record.project_id)
         if not project:
             logger.warning("[poller] Project %d not found for task %d, skipping", record.project_id, task.id)
@@ -497,6 +506,10 @@ async def _dispatch_for_rebase(task: TaskPipelineRecord) -> None:
             logger.warning("[poller] Task %d not found, skipping rebase dispatch", task.id)
             return
 
+        if record.status not in POLLABLE_STATUSES or not record.pr_url:
+            logger.info("[poller] Task %s is now %s / pr_url=%r — skipping rebase dispatch", task.external_ref, record.status, record.pr_url)
+            return
+
         project = await session.get(Project, record.project_id)
         if not project:
             logger.warning("[poller] Project %d not found for task %d, skipping rebase dispatch", record.project_id, task.id)
@@ -529,24 +542,31 @@ POLLER_LOCK_ID = 73572
 
 
 async def _try_poll_with_lock() -> int:
-    """Acquire a transaction-level advisory lock, poll, then release.
+    """Acquire a session-level advisory lock, poll, then release.
 
-    Uses pg_try_advisory_xact_lock which auto-releases when the
-    transaction ends. No persistent lock to leak if the worker dies.
-    Only one worker can hold this lock at a time.
+    Uses pg_try_advisory_lock / pg_advisory_unlock (session-level) so the
+    lock persists across multiple statements for the full duration of the
+    poll, preventing any other worker from entering concurrently.
     """
     from sqlalchemy import text
 
     async with get_session() as session:
         result = await session.execute(
-            text(f"SELECT pg_try_advisory_xact_lock({POLLER_LOCK_ID})")
+            text(f"SELECT pg_try_advisory_lock({POLLER_LOCK_ID})")
         )
         acquired = result.scalar() or False
         if not acquired:
             return -1  # another worker is polling right now
 
-    # Lock released (transaction ended). Now do the actual polling.
-    return await poll_comments_once()
+    try:
+        return await poll_comments_once()
+    finally:
+        try:
+            async with get_session() as session:
+                await session.execute(text(f"SELECT pg_advisory_unlock({POLLER_LOCK_ID})"))
+                await session.commit()
+        except Exception:
+            logger.warning("[poller] Failed to release advisory lock %d", POLLER_LOCK_ID)
 
 
 async def run_comment_poller(

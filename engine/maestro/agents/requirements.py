@@ -15,21 +15,13 @@ DEFAULT_SYSTEM_PROMPT = """You are a requirements analyst helping a software tea
 
 Always begin by thoroughly exploring the repository — read relevant files, search for related code, and understand existing patterns. This is your primary source of truth and must be done before asking any questions.
 
-Once you understand the codebase, ask targeted clarifying questions to fill in remaining gaps: acceptance criteria, edge cases, scope boundaries, and technical constraints. When you have enough information, produce a finalized ticket description."""
+Once you understand the codebase, ask targeted clarifying questions to fill in remaining gaps: acceptance criteria, edge cases, scope boundaries, and technical constraints. When you have enough information, produce a finalized ticket description.
 
-RESPONSE_PROTOCOL = """
-## Response protocol
-Every response MUST end with exactly one of the following:
+## Output format
+When finalizing, write the updated JIRA description using these sections:
 
-If you have one or more questions:
-QUESTION:
-<your question(s) here>
-
-If you are ready to finalize (you have enough info):
-REQUIREMENTS_FINAL: YES
-UPDATED_DESCRIPTION:
 ## Summary
-<1-3 sentence description of what needs to be built and why>
+<1-3 sentences describing what needs to be built and why>
 
 ## Background
 <relevant context, motivation, or dependencies — omit if not applicable>
@@ -38,15 +30,30 @@ UPDATED_DESCRIPTION:
 <what is explicitly in scope; call out anything explicitly out of scope if relevant>
 
 ## Acceptance Criteria
-- [ ] <criterion 1>
-- [ ] <criterion 2>
+- [ ] <specific, testable criterion>
 - [ ] <add as many as needed>
 
 ## Technical Notes
-<implementation guidance, constraints, affected systems, schema changes, API contracts, or other technical details — omit section if not applicable>
+<implementation guidance, affected systems, schema changes, API contracts, or other technical details — omit if not applicable>
 
 ## Open Questions
-<any remaining unknowns that could not be resolved — omit section if none>
+<any remaining unknowns that could not be resolved — omit if none>"""
+
+RESPONSE_PROTOCOL = """
+
+## REQUIRED: Response format
+CRITICAL — every single response MUST end with exactly one of the two markers below. No exceptions. Do not end a response with plain text, a numbered list, or any other format. If you do not include one of these markers, your response will be treated as an error.
+
+Once you have received the user's answers to your questions, do NOT send a follow-up acknowledgement or summary. Go directly to REQUIREMENTS_FINAL.
+
+If you have one or more questions for the user:
+QUESTION:
+<your question(s) here>
+
+If you have enough information to finalize (including after receiving answers from the user):
+REQUIREMENTS_FINAL: YES
+UPDATED_DESCRIPTION:
+<the finalized ticket description following your output format>
 """
 
 
@@ -197,25 +204,9 @@ async def run_requirements_agent(
                 # Resume the session with the user's answer
                 next_prompt = user_response
             else:
-                # No protocol marker — show the response and ask the user to continue
-                if response_text.strip():
-                    await _write_log(run_id, "text", response_text.strip())
-                await _write_log(run_id, "question", "Please respond to the above, or say 'done' / 'finalize' to write the requirements to the ticket.")
-
-                last_id = await _get_current_max_log_id(run_id)
-                user_response = await _wait_for_user_prompt(run_id, last_id)
-                if user_response is None:
-                    await _write_log(run_id, "status", "Timed out waiting for user response — requirements not written to ticket")
-                    result.updated_description = ""
-                    break
-
-                _done = {"done", "finalize", "finished", "complete", "yes", "y", "lgtm", "looks good", "ship it", "ok", "okay"}
-                if user_response.strip().lower() in _done:
-                    await _write_log(run_id, "status", "Agent completed without explicit finalization marker")
-                    result.updated_description = response_text.strip() or issue_description
-                    break
-
-                next_prompt = user_response
+                # Agent didn't follow the protocol — nudge it to finalize properly without involving the user
+                logger.warning("[requirements] Response missing protocol marker for run %d, nudging agent", run_id)
+                next_prompt = "You must end your response with either QUESTION: or REQUIREMENTS_FINAL: YES followed by UPDATED_DESCRIPTION:. If you have enough information, finalize now."
 
     except Exception as exc:
         logger.exception("Requirements agent error for run %d", run_id)

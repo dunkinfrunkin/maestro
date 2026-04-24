@@ -239,8 +239,18 @@ async def _dispatch_agent_locked(
             "plugin_name": agent_name,
         })
 
+        # Serialise dispatch across all processes with a per-task advisory lock.
+        # pg_try_advisory_xact_lock is transaction-scoped — it holds until the
+        # transaction commits/rolls back, covering both the duplicate check and
+        # the INSERT so no two processes can race through both.
+        from sqlalchemy import select as sa_select, text as sa_text
+        lock_key = 90000 + (task_pipeline_id % 1_000_000)
+        acquired = await session.scalar(sa_text(f"SELECT pg_try_advisory_xact_lock({lock_key})"))
+        if not acquired:
+            print(f"[MAESTRO] Could not acquire dispatch lock for task {task_pipeline_id}, skipping")
+            return None
+
         # Guard: skip if a run for this task+agent is already active
-        from sqlalchemy import select as sa_select
         existing = await session.scalar(
             sa_select(AgentRun.id).where(
                 AgentRun.task_pipeline_id == task_pipeline_id,
@@ -252,12 +262,17 @@ async def _dispatch_agent_locked(
             print(f"[MAESTRO] Skipping duplicate dispatch: {agent_name} already active (run {existing}) for task {task_pipeline_id}")
             return existing
 
-        # Create agent run record
+        # Create agent run record — start as RUNNING in inline mode so the
+        # worker's claim_next_job loop never sees a PENDING row and picks it up
+        # concurrently. In queue mode stay PENDING so workers can claim it.
+        worker_mode = os.environ.get("MAESTRO_WORKER_MODE", "inline")
+        initial_status = AgentRunStatus.PENDING if worker_mode == "queue" else AgentRunStatus.RUNNING
         run = AgentRun(
             workspace_id=workspace_id,
             task_pipeline_id=task_pipeline_id,
             agent_type=AgentType(agent_name),
-            status=AgentRunStatus.PENDING,
+            status=initial_status,
+            started_at=datetime.now(timezone.utc) if worker_mode != "queue" else None,
             model=model,
             triggered_by=triggered_by,
             job_payload=payload,
@@ -268,19 +283,10 @@ async def _dispatch_agent_locked(
         run_id = run.id
 
     # Dispatch based on worker mode
-    worker_mode = os.environ.get("MAESTRO_WORKER_MODE", "inline")
     if worker_mode == "queue":
         # Workers will pick up the PENDING job from the DB
         print(f"[MAESTRO] Run {run_id} enqueued for worker (mode=queue)")
     else:
-        # Inline mode: mark RUNNING immediately so the worker process doesn't
-        # also pick it up as a PENDING job and execute it a second time.
-        async with get_session() as session:
-            run = await session.get(AgentRun, run_id)
-            if run:
-                run.status = AgentRunStatus.RUNNING
-                run.started_at = datetime.now(timezone.utc)
-                await session.commit()
 
         asyncio.create_task(
             _execute_agent(
@@ -531,7 +537,25 @@ async def _execute_agent(
         is_gitlab = code_host == "gitlab"
         mr_or_pr = "MR" if is_gitlab else "PR"
 
-        if plugin.name == "implementation" and pr_url:
+        if plugin.name == "implementation" and not pr_url:
+            prompt_parts.append(
+                f"\n## {mr_or_pr} description"
+                f"\nWhen opening the {mr_or_pr}, write a description that summarises the JIRA ticket for reviewers."
+                f"\nUse this format:"
+                f"\n"
+                f"\n### Summary"
+                f"\n<1-3 sentences describing what this change does and why>"
+                f"\n"
+                f"\n### In Scope"
+                f"\n<bullet list of what is explicitly covered by this change>"
+                f"\n"
+                f"\n### Out of Scope"
+                f"\n<bullet list of what is intentionally NOT included — helps reviewers know what not to flag>"
+                f"\n"
+                f"\n### Notes"
+                f"\n<any technical decisions, caveats, or follow-up items reviewers should know about — omit if none>"
+            )
+        elif plugin.name == "implementation" and pr_url:
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             if is_gitlab:
                 prompt_parts.append(

@@ -138,6 +138,7 @@ export function TaskDetailPage({
   const [runs, setRuns] = useState<AgentRunResponse[]>([]);
   const [livePrUrl, setLivePrUrl] = useState<string | null>(task.pr_url || null);
   const livePrUrlRef = useRef<string | null>(task.pr_url || null);
+  const prevRunsRef = useRef<AgentRunResponse[]>([]);
 
   // Sync livePrUrl when parent passes a fresh task
   useEffect(() => {
@@ -174,6 +175,17 @@ export function TaskDetailPage({
     loadRuns();
     pollPrUrl();
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh task description when a requirements run completes
+  useEffect(() => {
+    const prev = prevRunsRef.current;
+    const wasActive = prev.some(r => r.agent_type === "requirements" && (r.status === "running" || r.status === "pending"));
+    const isNowDone = runs.some(r => r.agent_type === "requirements" && r.status === "completed");
+    if (wasActive && isNowDone) {
+      onTaskUpdated();
+    }
+    prevRunsRef.current = runs;
+  }, [runs]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll only when there are active runs
   useEffect(() => {
@@ -691,7 +703,7 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
 
         {/* Agent output (markdown) */}
         {run.summary && !isLive && (
-          <div className="text-xs bg-background rounded-md border border-border p-3 mb-2 break-words overflow-hidden prose prose-xs prose-stone max-w-none">
+          <div className="text-xs bg-background rounded-md border border-border p-3 mb-2 overflow-x-auto prose prose-xs prose-stone max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.summary}</ReactMarkdown>
           </div>
         )}
@@ -766,23 +778,25 @@ function RequirementsChatInput({ runId, logs }: { runId: number; logs: AgentLogE
   };
 
   return (
-    <div className="mt-2 flex gap-1.5">
-      <input
-        type="text"
+    <div className="mt-2 flex flex-col gap-1.5">
+      <textarea
         value={value}
         onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") send(); }}
-        placeholder="Type your response..."
-        className="flex-1 text-xs px-2 py-1.5 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-amber-400"
+        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+        placeholder="Type your response… (Enter to send, Shift+Enter for new line)"
+        rows={3}
+        className="w-full text-xs px-2 py-1.5 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-amber-400 resize-y"
         autoFocus
       />
-      <button
-        onClick={send}
-        disabled={!value.trim() || sending}
-        className="text-xs px-3 py-1.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:border-amber-700 dark:hover:bg-amber-800/40 text-amber-900 dark:text-amber-200 disabled:opacity-50 transition-colors"
-      >
-        {sending ? "…" : "Send"}
-      </button>
+      <div className="flex justify-end">
+        <button
+          onClick={send}
+          disabled={!value.trim() || sending}
+          className="text-xs px-3 py-1.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:border-amber-700 dark:hover:bg-amber-800/40 text-amber-900 dark:text-amber-200 disabled:opacity-50 transition-colors"
+        >
+          {sending ? "…" : "Send"}
+        </button>
+      </div>
     </div>
   );
 }
