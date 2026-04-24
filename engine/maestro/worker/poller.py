@@ -383,33 +383,51 @@ async def _fetch_base_branch_sha(task: TaskPipelineRecord) -> str | None:
 
 
 async def _fetch_github_base_sha(repo: str, pr_number: str, token: str) -> str | None:
-    """Get the current HEAD SHA of the base branch via the GitHub PR object."""
+    """Get the current HEAD SHA of the base branch by resolving the branch ref directly."""
+    # First get the base branch name from the PR
     proc = await asyncio.create_subprocess_exec(
         "gh", "api", f"repos/{repo}/pulls/{pr_number}",
-        "--jq", ".base.sha",
+        "--jq", ".base.ref",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=_gh_env(token),
     )
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        logger.warning("[poller] GitHub API error fetching base SHA for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
+        logger.warning("[poller] GitHub API error fetching base ref for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
+        return None
+    base_ref = stdout.decode().strip()
+    if not base_ref:
+        return None
+
+    # Now get the current HEAD SHA of that branch
+    proc = await asyncio.create_subprocess_exec(
+        "gh", "api", f"repos/{repo}/git/ref/heads/{base_ref}",
+        "--jq", ".object.sha",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=_gh_env(token),
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        logger.warning("[poller] GitHub API error fetching branch SHA for %s %s: %s", repo, base_ref, stderr.decode()[:200])
         return None
     sha = stdout.decode().strip()
     return sha if sha else None
 
 
 async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint: str) -> str | None:
-    """Get the current HEAD SHA of the base branch via the GitLab MR object."""
+    """Get the current HEAD SHA of the base branch by resolving the branch ref directly."""
     import urllib.parse
     encoded = urllib.parse.quote(repo, safe="")
     base = (endpoint or "https://gitlab.com").rstrip("/")
-    url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
 
+    # First get the target branch name from the MR
+    mr_url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
     proc = await asyncio.create_subprocess_exec(
         "curl", "-sf",
         "-H", f"PRIVATE-TOKEN: {token}",
-        url,
+        mr_url,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -419,8 +437,29 @@ async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint
 
     try:
         mr = json.loads(stdout.decode())
-        diff_refs = mr.get("diff_refs") or {}
-        return diff_refs.get("base_sha") or None
+        target_branch = mr.get("target_branch")
+        if not target_branch:
+            return None
+    except json.JSONDecodeError:
+        return None
+
+    # Now get the current HEAD SHA of that branch
+    branch_encoded = urllib.parse.quote(target_branch, safe="")
+    branch_url = f"{base}/api/v4/projects/{encoded}/repository/branches/{branch_encoded}"
+    proc = await asyncio.create_subprocess_exec(
+        "curl", "-sf",
+        "-H", f"PRIVATE-TOKEN: {token}",
+        branch_url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return None
+
+    try:
+        branch_data = json.loads(stdout.decode())
+        return branch_data.get("commit", {}).get("id") or None
     except json.JSONDecodeError:
         return None
 
