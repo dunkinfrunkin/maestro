@@ -537,7 +537,25 @@ async def _execute_agent(
         is_gitlab = code_host == "gitlab"
         mr_or_pr = "MR" if is_gitlab else "PR"
 
-        if plugin.name == "implementation" and pr_url:
+        if plugin.name == "implementation" and not pr_url:
+            prompt_parts.append(
+                f"\n## {mr_or_pr} description"
+                f"\nWhen opening the {mr_or_pr}, write a description that summarises the JIRA ticket for reviewers."
+                f"\nUse this format:"
+                f"\n"
+                f"\n### Summary"
+                f"\n<1-3 sentences describing what this change does and why>"
+                f"\n"
+                f"\n### In Scope"
+                f"\n<bullet list of what is explicitly covered by this change>"
+                f"\n"
+                f"\n### Out of Scope"
+                f"\n<bullet list of what is intentionally NOT included — helps reviewers know what not to flag>"
+                f"\n"
+                f"\n### Notes"
+                f"\n<any technical decisions, caveats, or follow-up items reviewers should know about — omit if none>"
+            )
+        elif plugin.name == "implementation" and pr_url:
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             if is_gitlab:
                 prompt_parts.append(
