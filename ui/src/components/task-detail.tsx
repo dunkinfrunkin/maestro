@@ -691,7 +691,7 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
 
         {/* Agent output (markdown) */}
         {run.summary && !isLive && (
-          <div className="text-xs bg-background rounded-md border border-border p-3 mb-2 break-words overflow-hidden prose prose-xs prose-stone max-w-none">
+          <div className="text-xs bg-background rounded-md border border-border p-3 mb-2 overflow-x-auto prose prose-xs prose-stone max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.summary}</ReactMarkdown>
           </div>
         )}
