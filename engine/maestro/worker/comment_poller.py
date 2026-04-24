@@ -329,34 +329,25 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
 COMMENT_POLLER_LOCK_ID = 73572
 
 
-async def _try_acquire_leader_lock() -> bool:
-    """Try to acquire the comment poller leader lock.
+async def _try_poll_with_lock() -> int:
+    """Acquire a transaction-level advisory lock, poll, then release.
 
-    Uses a PostgreSQL advisory lock so only one worker across all
-    instances runs the comment poller. The lock is session-level
-    and auto-releases if the worker dies.
+    Uses pg_try_advisory_xact_lock which auto-releases when the
+    transaction ends. No persistent lock to leak if the worker dies.
+    Only one worker can hold this lock at a time.
     """
-    try:
-        from sqlalchemy import text
-        async with get_session() as session:
-            result = await session.execute(
-                text(f"SELECT pg_try_advisory_lock({COMMENT_POLLER_LOCK_ID})")
-            )
-            return result.scalar() or False
-    except Exception:
-        return False
+    from sqlalchemy import text
 
+    async with get_session() as session:
+        result = await session.execute(
+            text(f"SELECT pg_try_advisory_xact_lock({COMMENT_POLLER_LOCK_ID})")
+        )
+        acquired = result.scalar() or False
+        if not acquired:
+            return -1  # another worker is polling right now
 
-async def _release_leader_lock() -> None:
-    """Release the comment poller leader lock."""
-    try:
-        from sqlalchemy import text
-        async with get_session() as session:
-            await session.execute(
-                text(f"SELECT pg_advisory_unlock({COMMENT_POLLER_LOCK_ID})")
-            )
-    except Exception:
-        pass
+    # Lock released (transaction ended). Now do the actual polling.
+    return await poll_comments_once()
 
 
 async def run_comment_poller(
@@ -365,32 +356,20 @@ async def run_comment_poller(
 ) -> None:
     """Background loop that polls for new human comments on open PRs.
 
-    Uses leader election via PostgreSQL advisory lock so only one
-    worker runs the poller even when multiple workers are deployed.
-    If the leader dies, another worker acquires the lock automatically.
+    Each cycle tries to acquire a transaction-level advisory lock.
+    Only one worker across all instances polls per cycle. If the
+    leader dies, the lock auto-releases and the next worker takes over
+    on the very next cycle - no gap.
     """
     _shutdown = shutdown or asyncio.Event()
-    is_leader = False
+    logger.info("[comment-poller] Started (interval=%.1fs)", interval)
 
     while not _shutdown.is_set():
-        # Try to become leader if we aren't already
-        if not is_leader:
-            is_leader = await _try_acquire_leader_lock()
-            if is_leader:
-                logger.info("[comment-poller] Acquired leader lock (interval=%.1fs)", interval)
-            else:
-                logger.debug("[comment-poller] Another worker is the leader, standby")
-                try:
-                    await asyncio.wait_for(_shutdown.wait(), timeout=interval)
-                except asyncio.TimeoutError:
-                    pass
-                continue
-
-        # We are the leader - run the poll
         try:
-            logger.debug("[comment-poller] Polling...")
-            count = await poll_comments_once()
-            if count > 0:
+            count = await _try_poll_with_lock()
+            if count == -1:
+                logger.debug("[comment-poller] Another worker is polling, skipping")
+            elif count > 0:
                 logger.info("[comment-poller] Dispatched %d task(s)", count)
             else:
                 logger.debug("[comment-poller] No new comments found")
@@ -401,10 +380,5 @@ async def run_comment_poller(
             await asyncio.wait_for(_shutdown.wait(), timeout=interval)
         except asyncio.TimeoutError:
             pass
-
-    # Release leader lock on shutdown
-    if is_leader:
-        await _release_leader_lock()
-        logger.info("[comment-poller] Released leader lock")
 
     logger.info("[comment-poller] Stopped")
