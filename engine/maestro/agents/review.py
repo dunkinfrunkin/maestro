@@ -24,8 +24,22 @@ _REVIEW_CRITERIA = """## Review criteria
 
 _VERDICT_RULES = """## Verdict rules
 
-- If ALL previous comments are verified fixed AND no new issues → REVIEW_VERDICT: APPROVE
-- If ANY comment is not fixed OR you found new issues → REVIEW_VERDICT: REQUEST_CHANGES
+- If ALL previous comments are verified fixed AND no new issues -> REVIEW_VERDICT: APPROVE
+- If ANY comment is not fixed OR you found new issues -> REVIEW_VERDICT: REQUEST_CHANGES
+
+At the end of your output, include exactly one of:
+REVIEW_VERDICT: APPROVE
+REVIEW_VERDICT: REQUEST_CHANGES
+"""
+
+_VERDICT_RULES_SOFT = """## Verdict rules
+
+- If ALL previous comments are verified fixed AND no new issues -> REVIEW_VERDICT: APPROVE
+- If ANY comment is not fixed OR you found new issues -> REVIEW_VERDICT: REQUEST_CHANGES
+
+IMPORTANT: You do NOT have permission to formally approve this PR/MR.
+When approving, post a summary comment with "LGTM" instead of using the approve API.
+Do NOT call any approve endpoint. Just post your summary and output the verdict.
 
 At the end of your output, include exactly one of:
 REVIEW_VERDICT: APPROVE
@@ -76,19 +90,20 @@ To find the correct line number:
 1. Read the file with the Read tool — it shows line numbers (e.g., `34→  code here`)
 2. Use that line number (34) in the comment
 
-To post inline review comments, write the review JSON to a file then pass it:
+To post inline review comments when requesting changes, write the review JSON to a file then pass it.
+Do NOT include a summary "body" in the review - only inline comments:
 
 ```bash
 cat > /tmp/review.json << 'REVIEWJSON'
 {{
-  "body": "## Code Review Summary\\n\\nOverall assessment here.",
+  "body": "",
   "event": "REQUEST_CHANGES",
   "comments": [
     {{
       "path": "src/books.js",
       "line": 34,
       "side": "RIGHT",
-      "body": "Describe the issue and suggested fix"
+      "body": "Describe the issue and suggested fix\\n\\n---\\n*Created by Maestro*"
     }}
   ]
 }}
@@ -98,15 +113,16 @@ gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input /tmp/review.json
 ```
 
 CRITICAL RULES for inline comments:
+- Only post a review with inline comments when requesting changes. NO summary comment.
 - `line` MUST be a line number that was ADDED or CHANGED in the diff (shows with + in the diff)
 - `path` must match exactly what appears in the diff header (e.g., `src/router.js`)
 - `side` must always be `"RIGHT"`
 - If the API returns an error about the line, try a nearby changed line
-- Keep comment `body` simple — no complex markdown or special characters
+- Keep comment `body` simple - no complex markdown or special characters
 
-If approving with no issues:
+If approving with no issues, post ONLY a summary comment (no inline comments):
 ```bash
-echo '{{"body": "LGTM!", "event": "APPROVE", "comments": []}}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
+echo '{{"body": "LGTM!\\n\\n---\\n*Created by Maestro*", "event": "APPROVE", "comments": []}}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
 ### Step 5 (follow-up reviews only): Check previous comments, verify fixes, and resolve threads
@@ -190,10 +206,14 @@ CRITICAL RULES:
 - If the API returns a 400 error about position, try `old_path` + `old_line` for deleted lines
 - Post ONE discussion per finding — do not batch
 
-If approving with no issues, post a summary comment:
+IMPORTANT: When requesting changes, only post inline discussion threads. Do NOT post a summary comment.
+When approving with no issues, post ONLY a summary comment:
 ```bash
 glab api --method POST 'projects/PROJECT_ENCODED/merge_requests/NUMBER/notes' \\
-  -f 'body=LGTM! Code review passed.'
+  -f 'body=LGTM!
+
+---
+*Created by Maestro*'
 ```
 
 ### Step 4 (follow-up reviews only): Check existing threads, verify fixes, reply

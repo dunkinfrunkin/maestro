@@ -483,6 +483,18 @@ async def _execute_agent(
             except (ImportError, AttributeError):
                 system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
 
+        # For review agent: swap verdict rules based on can_approve config
+        if plugin.name == "review":
+            can_approve = extra_config.get("can_approve", False)
+            if not can_approve and not custom_prompt:
+                from maestro.agents.review import _VERDICT_RULES, _VERDICT_RULES_SOFT
+                system_prompt = system_prompt.replace(_VERDICT_RULES, _VERDICT_RULES_SOFT)
+                # Override GitHub approve command to just post a comment
+                system_prompt = system_prompt.replace(
+                    '"event": "APPROVE"',
+                    '"event": "COMMENT"',
+                )
+
         # Count previous iterations for this task (prevent infinite loops)
         from sqlalchemy import select, func as sqlfunc
         async with get_session() as session:
