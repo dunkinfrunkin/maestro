@@ -41,14 +41,14 @@ When finalizing, write the updated JIRA description using these sections:
 
 RESPONSE_PROTOCOL = """
 
-## Response protocol
-Every response MUST end with exactly one of the following:
+## REQUIRED: Response format
+CRITICAL — every single response MUST end with exactly one of the two markers below. No exceptions. Do not end a response with plain text, a numbered list, or any other format. If you do not include one of these markers, your response will be treated as an error.
 
-If you have one or more questions:
+If you have one or more questions for the user:
 QUESTION:
 <your question(s) here>
 
-If you are ready to finalize (you have enough info):
+If you have enough information to finalize:
 REQUIREMENTS_FINAL: YES
 UPDATED_DESCRIPTION:
 <the finalized ticket description following your output format>
