@@ -534,26 +534,28 @@ async def _execute_agent(
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             if is_gitlab:
                 prompt_parts.append(
-                    f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                    f"\n## THIS IS A FOLLOW-UP"
                     f"\n{mr_or_pr} !{pr_num} already exists with review comments that MUST be addressed."
                     f"\n1. Checkout the MR branch (check `git branch -a` for the branch name)"
-                    f"\n2. Read the MR comments to understand feedback"
-                    f"\n3. Address EVERY comment — do not skip any"
-                    f"\n4. Commit and push your fixes"
+                    f"\n2. Rebase on the target branch"
+                    f"\n3. Read the MR comments to understand feedback"
+                    f"\n4. Address EVERY comment - do not skip any"
+                    f"\n5. Commit and push your fixes"
                 )
             else:
                 prompt_parts.append(
-                    f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                    f"\n## THIS IS A FOLLOW-UP"
                     f"\n{mr_or_pr} #{pr_num} already exists with review comments that MUST be addressed."
                     f"\n1. Checkout the PR branch: `gh pr checkout {pr_num} --repo {repo}`"
-                    f"\n2. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
-                    f"\n3. Address EVERY comment — do not skip any"
-                    f"\n4. Commit and push your fixes"
+                    f"\n2. Rebase on the target branch"
+                    f"\n3. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
+                    f"\n4. Address EVERY comment - do not skip any"
+                    f"\n5. Commit and push your fixes"
                 )
         elif plugin.name == "review" and iteration > 1:
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             prompt_parts.append(
-                f"\n## THIS IS A RE-REVIEW (iteration {iteration}/{max_iterations})"
+                f"\n## THIS IS A RE-REVIEW"
                 f"\nThe implementation agent has pushed fixes for previous review comments."
                 f"\nCheck if EACH comment was addressed in the latest code."
                 f"\nOnly APPROVE if ALL comments are resolved and no new issues."
@@ -563,24 +565,55 @@ async def _execute_agent(
             if is_gitlab and pr_url and "/-/merge_requests/" in pr_url:
                 project_path = pr_url.split("/-/merge_requests/")[0].split("://", 1)[1].split("/", 1)[1]
                 encoded = project_path.replace("/", "%2F")
+                endpoint = pr_url.split("/-/merge_requests/")[0].rsplit("/", 1)[0].rsplit("/", 1)[0]
+                if "://" in pr_url:
+                    endpoint = pr_url.split("://")[0] + "://" + pr_url.split("://")[1].split("/")[0]
+
+                # Pre-fetch diff SHAs so the agent doesn't need to
+                diff_refs = await _fetch_gitlab_diff_refs(endpoint, encoded, pr_num, clone_url)
+                sha_block = ""
+                if diff_refs:
+                    sha_block = (
+                        f"\n\nDiff SHAs (use these for ALL inline comments):"
+                        f"\n  base_sha={diff_refs['base_sha']}"
+                        f"\n  head_sha={diff_refs['head_sha']}"
+                        f"\n  start_sha={diff_refs['start_sha']}"
+                    )
+
+                base = diff_refs['base_sha'] if diff_refs else 'BASE_SHA'
+                head = diff_refs['head_sha'] if diff_refs else 'HEAD_SHA'
+                start = diff_refs['start_sha'] if diff_refs else 'START_SHA'
+
                 prompt_parts.append(
-                    f"\n## REVIEW INSTRUCTIONS — YOU MUST POST INLINE COMMENTS"
+                    f"\n## REVIEW INSTRUCTIONS - INLINE COMMENTS ONLY"
+                    f"{sha_block}"
                     f"\n"
                     f"\n1. Checkout: `glab mr checkout {pr_num}`"
-                    f"\n2. Get SHAs: `glab api 'projects/{encoded}/merge_requests/{pr_num}' | jq -r '.diff_refs'`"
-                    f"\n3. For EACH finding, post an INLINE comment with position params:"
+                    f"\n2. Read the diff and changed files"
+                    f"\n3. For EACH finding, post an inline comment using this EXACT curl format:"
+                    f"\n"
+                    f"\n```bash"
+                    f"\ncurl --request POST \\"
+                    f"\n  --header \"PRIVATE-TOKEN: $GITLAB_TOKEN\" \\"
+                    f"\n  --form 'body=YOUR FINDING HERE\n\n---\n*Created by Maestro (Review Agent)*' \\"
+                    f"\n  --form 'position[position_type]=text' \\"
+                    f"\n  --form 'position[base_sha]={base}' \\"
+                    f"\n  --form 'position[head_sha]={head}' \\"
+                    f"\n  --form 'position[start_sha]={start}' \\"
+                    f"\n  --form 'position[new_path]=FILEPATH' \\"
+                    f"\n  --form 'position[old_path]=FILEPATH' \\"
+                    f"\n  --form 'position[new_line]=LINE_NUMBER' \\"
+                    f"\n  \"{endpoint}/api/v4/projects/{encoded}/merge_requests/{pr_num}/discussions\""
                     f"\n```"
-                    f"\nglab api --method POST 'projects/{encoded}/merge_requests/{pr_num}/discussions' \\"
-                    f"\n  -f 'body=YOUR FINDING HERE' \\"
-                    f"\n  -f 'position[position_type]=text' \\"
-                    f"\n  -f 'position[base_sha]=BASE_SHA_HERE' \\"
-                    f"\n  -f 'position[head_sha]=HEAD_SHA_HERE' \\"
-                    f"\n  -f 'position[start_sha]=START_SHA_HERE' \\"
-                    f"\n  -f 'position[new_path]=path/to/file.tsx' \\"
-                    f"\n  -f 'position[new_line]=LINE_NUMBER'"
-                    f"\n```"
-                    f"\nCRITICAL: You MUST include ALL position fields. Without them the comment is NOT inline."
-                    f"\nnew_line MUST be a line ADDED or CHANGED in the diff (shown with + prefix)."
+                    f"\n"
+                    f"\nCRITICAL RULES:"
+                    f"\n- Use --form (NOT -d or --data). JSON body does NOT work for inline comments."
+                    f"\n- old_path MUST be included and set to the same value as new_path"
+                    f"\n- Replace FILEPATH with the exact path from the diff (e.g., src/pages/api/v2/health.ts)"
+                    f"\n- Replace LINE_NUMBER with a line number that was ADDED or CHANGED (shown with + in diff)"
+                    f"\n- All position fields are REQUIRED. Without ANY of them the comment falls back to non-inline."
+                    f"\n- Post ONE comment per finding. Do NOT batch."
+                    f"\n- If there are NO issues, do NOT post any comment."
                     f"\n"
                     f"\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
                 )
@@ -893,7 +926,7 @@ async def _post_review_comment(
     import shutil
 
     # Prefix with Maestro header and append footer
-    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}\n\n---\n*Created by Maestro*"
+    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}\n\n---\n*Created by Maestro (Review Agent)*"
 
     if code_host == "gitlab":
         # Extract project path and MR number from URL
@@ -1002,12 +1035,8 @@ async def _auto_transition(
             next_status = PipelineStatus.PENDING_APPROVAL
             reason = "Review approved - moving to pending approval (human gate)"
         elif verdict == "REQUEST_CHANGES":
-            if iteration_count < max_iterations * 2:
-                next_status = PipelineStatus.IMPLEMENT
-                reason = f"Review requested changes - sending back to implement (iteration {iteration_count // 2 + 1}/{max_iterations})"
-            else:
-                reason = f"Review requested changes but max iterations ({max_iterations}) reached - needs human intervention"
-                logger.warning(reason)
+            next_status = PipelineStatus.IMPLEMENT
+            reason = "Review requested changes - sending back to implement"
 
     elif plugin_name == "deployment":
         # Deployment stages not yet implemented - mark done for now
@@ -1021,6 +1050,7 @@ async def _auto_transition(
             task = await session.get(TaskPipelineRecord, task_pipeline_id)
             if task:
                 task.status = next_status
+                task.last_comment_check_at = datetime.now(timezone.utc)
                 await session.commit()
 
         # Dispatch the next agent
@@ -1049,11 +1079,10 @@ async def _has_completed_agent_type(task_pipeline_id: int, agent_type: str) -> b
 
 
 async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
-    """Check if the PR has unresolved inline review comments.
+    """Check if the PR/MR has unresolved inline review comments.
 
-    A comment is considered resolved if it has at least one reply
-    (the implementation agent replies with 'Fixed: ...' and/or
-    the review agent replies with 'Verified').
+    GitHub: A comment is resolved if it has at least one reply.
+    GitLab: Uses the discussions API resolved state.
     """
     try:
         async with get_session() as session:
@@ -1063,45 +1092,127 @@ async def _check_unresolved_comments(task_pipeline_id: int) -> bool:
 
         pr_number = task.pr_url.rstrip("/").split("/")[-1]
         repo = task.repo
+        is_gitlab = "gitlab" in task.pr_url
 
-        # Get all inline comments with their replies
+        if is_gitlab:
+            return await _check_unresolved_gitlab(task, pr_number)
+        else:
+            return await _check_unresolved_github(repo, pr_number)
+    except Exception as exc:
+        print(f"[MAESTRO] Error checking comments: {exc}")
+        return False
+
+
+async def _check_unresolved_github(repo: str, pr_number: str) -> bool:
+    """Check unresolved comments on GitHub PR."""
+    proc = await asyncio.create_subprocess_exec(
+        "gh", "api", f"repos/{repo}/pulls/{pr_number}/comments",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return False
+
+    import json
+    comments = json.loads(stdout.decode())
+
+    top_level = [c for c in comments if not c.get("in_reply_to_id")]
+    replies_by_parent = {}
+    for c in comments:
+        parent = c.get("in_reply_to_id")
+        if parent:
+            replies_by_parent.setdefault(parent, []).append(c)
+
+    unresolved = 0
+    for comment in top_level:
+        if not replies_by_parent.get(comment["id"]):
+            unresolved += 1
+
+    if unresolved > 0:
+        print(f"[MAESTRO] Found {unresolved} unresolved inline comments on PR #{pr_number}")
+        return True
+    return False
+
+
+async def _check_unresolved_gitlab(task: TaskPipelineRecord, mr_number: str) -> bool:
+    """Check unresolved discussions on GitLab MR."""
+    from maestro.worker.comment_poller import _find_codehost_connection
+    from maestro.db.encryption import decrypt_token
+    import json
+    from urllib.parse import quote
+
+    conn = await _find_codehost_connection(task)
+    if not conn:
+        return False
+
+    token = decrypt_token(conn.encrypted_token)
+    endpoint = (conn.endpoint or "https://gitlab.com").rstrip("/")
+    encoded = quote(task.repo, safe="")
+
+    proc = await asyncio.create_subprocess_exec(
+        "curl", "-sf",
+        "-H", f"PRIVATE-TOKEN: {token}",
+        f"{endpoint}/api/v4/projects/{encoded}/merge_requests/{mr_number}/discussions",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return False
+
+    discussions = json.loads(stdout.decode())
+
+    unresolved = 0
+    for disc in discussions:
+        if disc.get("individual_note"):
+            continue
+        notes = disc.get("notes", [])
+        if not notes:
+            continue
+        first_note = notes[0]
+        if first_note.get("system"):
+            continue
+        if first_note.get("resolvable") and not first_note.get("resolved"):
+            unresolved += 1
+
+    if unresolved > 0:
+        print(f"[MAESTRO] Found {unresolved} unresolved discussions on MR !{mr_number}")
+        return True
+    return False
+
+
+async def _fetch_gitlab_diff_refs(endpoint: str, encoded_project: str, mr_number: str, clone_url: str) -> dict | None:
+    """Fetch diff SHAs from GitLab MR so the agent can post inline comments."""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(clone_url)
+        token = parsed.password or parsed.username or ""
+
         proc = await asyncio.create_subprocess_exec(
-            "gh", "api", f"repos/{repo}/pulls/{pr_number}/comments",
+            "curl", "-sf",
+            "-H", f"PRIVATE-TOKEN: {token}",
+            f"{endpoint}/api/v4/projects/{encoded_project}/merge_requests/{mr_number}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await proc.communicate()
         if proc.returncode != 0:
-            return False
+            return None
 
         import json
-        comments = json.loads(stdout.decode())
+        mr = json.loads(stdout.decode())
+        diff_refs = mr.get("diff_refs", {})
+        if not diff_refs:
+            return None
 
-        # Find top-level comments (not replies themselves)
-        # A comment is a reply if it has in_reply_to_id set
-        top_level = [c for c in comments if not c.get("in_reply_to_id")]
-        replies_by_parent = {}
-        for c in comments:
-            parent = c.get("in_reply_to_id")
-            if parent:
-                replies_by_parent.setdefault(parent, []).append(c)
-
-        unresolved = 0
-        for comment in top_level:
-            comment_id = comment["id"]
-            has_replies = len(replies_by_parent.get(comment_id, [])) > 0
-            if not has_replies:
-                unresolved += 1
-
-        if unresolved > 0:
-            print(f"[MAESTRO] Found {unresolved} unresolved inline comments (no replies) on PR #{pr_number}")
-            return True
-
-        print(f"[MAESTRO] All {len(top_level)} inline comments have replies — considered resolved")
-        return False
-    except Exception as exc:
-        print(f"[MAESTRO] Error checking comments: {exc}")
-        return False
+        return {
+            "base_sha": diff_refs.get("base_sha", ""),
+            "head_sha": diff_refs.get("head_sha", ""),
+            "start_sha": diff_refs.get("start_sha", ""),
+        }
+    except Exception:
+        return None
 
 
 def _extract_verdict(result: dict) -> str:

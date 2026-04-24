@@ -12,6 +12,7 @@ import {
   RepoEntry,
   fetchStatuses,
   findStatusInfo,
+  normalizeStatus,
   fetchTaskRuns,
   fetchTaskDetail,
   fetchTaskPrUrl,
@@ -359,7 +360,7 @@ export function TaskDetailPage({
                 )}
                 <div className="flex gap-2">
                   <select
-                    value={task.pipeline_status || ""}
+                    value={normalizeStatus(task.pipeline_status) || ""}
                     onChange={(e) => handleStatusChange(e.target.value)}
                     disabled={!hasRepo}
                     className={`flex-1 text-xs px-2 py-1 rounded-md border border-border bg-background text-foreground ${!hasRepo ? "opacity-50 cursor-not-allowed" : ""}`}
@@ -369,9 +370,9 @@ export function TaskDetailPage({
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
-                  {task.pipeline_status && task.pipeline_status !== "queued" && (
+                  {task.pipeline_status && normalizeStatus(task.pipeline_status) !== "todo" && (
                     <button
-                      onClick={() => handleStatusChange(task.pipeline_status!)}
+                      onClick={() => handleStatusChange(normalizeStatus(task.pipeline_status) || task.pipeline_status!)}
                       className="flex items-center justify-center w-8 h-6 rounded-md border border-border hover:bg-surface-hover transition-colors text-muted hover:text-foreground"
                       title="Re-run the current stage agent"
                     >

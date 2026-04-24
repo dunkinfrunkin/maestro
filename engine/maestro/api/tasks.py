@@ -382,14 +382,16 @@ async def list_tasks(
     if not connections:
         return []
 
-    all_tasks: list[UnifiedTask] = []
+    import asyncio as _aio
+    import logging as _log
 
-    for conn in connections:
+    async def _fetch_connection_tasks(conn) -> list[UnifiedTask]:
+        """Fetch tasks from a single connection."""
+        tasks: list[UnifiedTask] = []
         try:
             token = crud.get_decrypted_token(conn)
             issues = await _fetch_from_tracker(conn, token, search, user_email=user.email, max_results=offset + limit)
 
-            # Load pipeline records for these issues
             async with get_session() as session:
                 for issue in issues:
                     ext_ref = f"{conn.kind.value}:{conn.id}:{issue.id}"
@@ -414,7 +416,6 @@ async def list_tasks(
                         repo=record.repo if record and record.repo else None,
                     )
 
-                    # Apply filters
                     if label and label.lower() not in task.labels:
                         continue
                     if pipeline_status:
@@ -423,15 +424,19 @@ async def list_tasks(
                         elif pipeline_status != "none" and task.pipeline_status != pipeline_status:
                             continue
 
-                    all_tasks.append(task)
-        except Exception as exc:
-            # Log but don't fail entire request if one connection errors
-            import logging
-            logging.getLogger(__name__).exception(
+                    tasks.append(task)
+        except Exception:
+            _log.getLogger(__name__).exception(
                 "Failed to fetch from connection %s (%s)", conn.name, conn.kind.value
             )
+        return tasks
 
-    # Sort newest first
+    # Fetch from all connections in parallel
+    results = await _aio.gather(*[_fetch_connection_tasks(c) for c in connections])
+    all_tasks: list[UnifiedTask] = []
+    for task_list in results:
+        all_tasks.extend(task_list)
+
     all_tasks.sort(key=lambda t: t.created_at or "", reverse=True)
     total = len(all_tasks)
     page = all_tasks[offset : offset + limit]

@@ -22,7 +22,7 @@ from maestro.db.encryption import decrypt_token
 
 logger = logging.getLogger(__name__)
 
-MAESTRO_BOT_MARKERS = ["maestro", "Co-Authored-By: Claude", "agent"]
+MAESTRO_FOOTER = "Created by Maestro"
 
 POLLABLE_STATUSES = {
     PipelineStatus.IN_PROGRESS,
@@ -156,13 +156,16 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
 
 
 def _is_maestro_comment(body: str, user: str) -> bool:
-    """Detect if a comment was made by Maestro agents."""
-    lower_body = body.lower()
-    lower_user = user.lower()
-    for marker in MAESTRO_BOT_MARKERS:
-        if marker.lower() in lower_body or marker.lower() in lower_user:
-            return True
-    if "[bot]" in lower_user:
+    """Detect if a comment was made by Maestro agents.
+
+    Primary check: the footer '*Created by Maestro*' or 'created by Maestro'
+    is present in the body. Fallback: user is a known bot account.
+    """
+    if MAESTRO_FOOTER in body:
+        return True
+    if "created by Maestro" in body:
+        return True
+    if "[bot]" in user.lower():
         return True
     return False
 
@@ -323,19 +326,50 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
         logger.warning("[comment-poller] Dispatch returned None for task %s - agent may be disabled or no API key", task.external_ref)
 
 
+COMMENT_POLLER_LOCK_ID = 73572
+
+
+async def _try_poll_with_lock() -> int:
+    """Acquire a transaction-level advisory lock, poll, then release.
+
+    Uses pg_try_advisory_xact_lock which auto-releases when the
+    transaction ends. No persistent lock to leak if the worker dies.
+    Only one worker can hold this lock at a time.
+    """
+    from sqlalchemy import text
+
+    async with get_session() as session:
+        result = await session.execute(
+            text(f"SELECT pg_try_advisory_xact_lock({COMMENT_POLLER_LOCK_ID})")
+        )
+        acquired = result.scalar() or False
+        if not acquired:
+            return -1  # another worker is polling right now
+
+    # Lock released (transaction ended). Now do the actual polling.
+    return await poll_comments_once()
+
+
 async def run_comment_poller(
     interval: float = 60.0,
     shutdown: asyncio.Event | None = None,
 ) -> None:
-    """Background loop that polls for new human comments on open PRs."""
+    """Background loop that polls for new human comments on open PRs.
+
+    Each cycle tries to acquire a transaction-level advisory lock.
+    Only one worker across all instances polls per cycle. If the
+    leader dies, the lock auto-releases and the next worker takes over
+    on the very next cycle - no gap.
+    """
     _shutdown = shutdown or asyncio.Event()
     logger.info("[comment-poller] Started (interval=%.1fs)", interval)
 
     while not _shutdown.is_set():
         try:
-            logger.debug("[comment-poller] Polling...")
-            count = await poll_comments_once()
-            if count > 0:
+            count = await _try_poll_with_lock()
+            if count == -1:
+                logger.debug("[comment-poller] Another worker is polling, skipping")
+            elif count > 0:
                 logger.info("[comment-poller] Dispatched %d task(s)", count)
             else:
                 logger.debug("[comment-poller] No new comments found")
@@ -347,4 +381,4 @@ async def run_comment_poller(
         except asyncio.TimeoutError:
             pass
 
-    logger.info("Comment poller stopped")
+    logger.info("[comment-poller] Stopped")
