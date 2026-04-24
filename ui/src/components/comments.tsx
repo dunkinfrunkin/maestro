@@ -35,7 +35,7 @@ export function CommentsPage() {
   const { activeWorkspace, activeProject } = useDashboard();
   const [comments, setComments] = useState<CommentEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "human" | "agent">("all");
+  const [filter, setFilter] = useState<"all" | "human" | "agent">("agent");
 
   const loadComments = useCallback(async () => {
     try {
