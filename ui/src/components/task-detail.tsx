@@ -771,7 +771,7 @@ function RequirementsChatInput({ runId, logs }: { runId: number; logs: AgentLogE
         type="text"
         value={value}
         onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") send(); }}
+        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
         placeholder="Type your response..."
         className="flex-1 text-xs px-2 py-1.5 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-amber-400"
         autoFocus
