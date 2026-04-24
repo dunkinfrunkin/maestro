@@ -22,39 +22,38 @@ _REVIEW_CRITERIA = """## Review criteria
 5. **Performance**: Any obvious issues?
 """
 
+
 _CONFLICT_CHECK = """## Merge conflict check
 
-Before reviewing code, check if the branch has merge conflicts with the target branch:
+Before reviewing, check if the branch has merge conflicts:
 
 GitHub:
 ```bash
 TARGET=$(gh pr view <number> --repo <owner/repo> --json baseRefName -q '.baseRefName')
 git fetch origin
-git merge-tree $(git merge-base HEAD origin/$TARGET) HEAD origin/$TARGET | grep -c "^<<<<<<<" || true
+git merge-tree $(git merge-base HEAD origin/$TARGET) HEAD origin/$TARGET | grep "^<<<<<<< " || true
 ```
 
 GitLab:
 ```bash
+TARGET=$(glab mr view <number> --output json | python3 -c "import json,sys; print(json.load(sys.stdin)['target_branch'])")
 git fetch origin
-git merge-tree $(git merge-base HEAD origin/main) HEAD origin/main | grep -c "^<<<<<<<" || true
+git merge-tree $(git merge-base HEAD origin/$TARGET) HEAD origin/$TARGET | grep "^<<<<<<< " || true
 ```
 
-If there are merge conflicts, immediately output:
-REVIEW_VERDICT: REQUEST_CHANGES
-And post a comment: "Merge conflicts detected with the target branch. Please rebase and resolve conflicts before review can proceed."
-Do NOT review the code if there are conflicts.
+If there are merge conflicts, post ONE inline comment on any changed file (any line) listing all conflicting files. Then continue with the full code review as normal.
 """
 
 _VERDICT_RULES = """## Output rules
 
 You do NOT approve or reject. You only review and rate.
 
-- If merge conflicts exist, post a comment about the conflicts and output: REVIEW_VERDICT: REQUEST_CHANGES
-- If you find issues, post inline comments for each issue and output: REVIEW_VERDICT: REQUEST_CHANGES
+- If you find issues (including merge conflicts), post inline comments for each issue and output: REVIEW_VERDICT: REQUEST_CHANGES
 - If the code looks good with no issues, output: REVIEW_VERDICT: APPROVE
 
+ABSOLUTE RULE: NEVER post a top-level PR/MR comment, issue comment, or any non-inline comment. Every comment you post MUST be tied to a specific file and line number in the diff. There are no exceptions — not for summaries, conflict notices, or overviews.
+
 Do NOT formally approve or reject the PR/MR. Do NOT call any approve endpoint.
-Do NOT post a summary comment when there are no issues - your inline comments are sufficient.
 When there are no issues, just output the verdict line and nothing else.
 
 At the end of your output, include exactly one of:
@@ -64,12 +63,12 @@ REVIEW_VERDICT: REQUEST_CHANGES
 
 _FOOTER_RULE = """## Comment footer
 
-Every comment body you post (inline review comments, summary comments, reply comments) MUST end with:
+Every inline comment body MUST end with:
 
 ---
 *Created by Maestro (Review Agent)*
 
-Append this footer to every `body` field in all API calls that post comments.
+Append this footer to every `body` field in all API calls that post inline comments.
 """
 
 # ---------------------------------------------------------------------------
