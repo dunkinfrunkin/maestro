@@ -390,7 +390,7 @@ async def list_tasks(
         tasks: list[UnifiedTask] = []
         try:
             token = crud.get_decrypted_token(conn)
-            issues = await _fetch_from_tracker(conn, token, search, user_email=user.email, max_results=offset + limit)
+            issues = await _fetch_from_tracker(conn, token, search, user_email=user.email, max_results=200)
 
             async with get_session() as session:
                 for issue in issues:
