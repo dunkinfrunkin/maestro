@@ -49,14 +49,46 @@ When multiple processes start simultaneously (e.g., `maestro app` + `maestro wor
 - All DDL runs within a single transaction holding the lock
 - If the lock can't be acquired, the process skips migrations (tables already exist)
 
+## Auto-rebase and conflict resolution
+
+The Implementation Agent rebases on the target branch before every pass to prevent merge conflicts from accumulating:
+
+- **First run**: rebases before implementing
+- **Follow-up runs**: rebases before addressing review comments
+- Fetches the target branch name from PR/MR metadata (not hardcoded)
+- If rebase produces conflicts, the agent resolves them file by file
+- Force-pushes with `--force-with-lease` (safe - rejects if someone else pushed)
+
+The Review Agent checks for merge conflicts before reviewing:
+
+- If conflicts exist with the target branch, immediately returns REQUEST_CHANGES
+- Does not review code when conflicts are present
+- Posts a comment asking the Implementation Agent to rebase and resolve
+
+## Agent identification
+
+Each agent identifies itself in the comment footer so you can tell which agent posted what:
+
+- `*Created by Maestro (Implementation Agent)*`
+- `*Created by Maestro (Review Agent)*`
+- `*Created by Maestro (Risk Profile Agent)*`
+
+The comment poller uses this footer to detect Maestro comments and skip them when looking for new human feedback.
+
+## Review loop
+
+The implement/review loop has no iteration limit. Agents iterate as many times as needed until the Review Agent approves. The loop only stops when:
+
+- Review Agent outputs REVIEW_VERDICT: APPROVE
+- A user manually moves the task to `halted` or `failed`
+- An agent encounters an unrecoverable error
+
 ## Agent failure handling
 
 When an agent fails:
 
 - The agent run is marked as `failed` with the error message
 - Auto-transition checks the result and either retries or escalates
-- Review loop has a configurable max iteration count (default: 3) to prevent infinite loops
-- If max iterations are reached, the task stays in its current status for human intervention
 
 ## Task halting
 
