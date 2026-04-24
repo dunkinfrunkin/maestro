@@ -84,6 +84,12 @@ async def poll_comments_once() -> int:
 
     for task in tasks:
         try:
+            pr_state = await _fetch_pr_state(task)
+            if pr_state in ("closed", "merged"):
+                logger.info("[comment-poller] PR #%s on %s is %s — removing from poll list", task.pr_number, task.repo, pr_state)
+                await _clear_pr_fields(task.id)
+                continue
+
             if await _has_active_or_recent_agent_run(task.id):
                 logger.debug("[poller] Skipping %s PR #%s - agent active or recently finished", task.repo, task.pr_number)
                 continue
@@ -287,6 +293,63 @@ def _gh_env(token: str) -> dict:
     env = os.environ.copy()
     env["GH_TOKEN"] = token
     return env
+
+
+async def _fetch_pr_state(task: TaskPipelineRecord) -> str:
+    """Return the PR state: 'open', 'closed', or 'merged'. Returns 'open' on failure."""
+    conn = await _find_codehost_connection(task)
+    if not conn:
+        return "open"
+
+    token = decrypt_token(conn.encrypted_token)
+
+    if conn.kind == TrackerKind.GITHUB:
+        proc = await asyncio.create_subprocess_exec(
+            "gh", "api", f"repos/{task.repo}/pulls/{task.pr_number}",
+            "--jq", ".state + \":\" + (.merged // false | tostring)",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=_gh_env(token),
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return "open"
+        output = stdout.decode().strip()
+        state, _, merged = output.partition(":")
+        if merged == "true":
+            return "merged"
+        return state or "open"
+
+    elif conn.kind == TrackerKind.GITLAB:
+        import urllib.parse
+        encoded = urllib.parse.quote(task.repo, safe="")
+        base = (conn.endpoint or "https://gitlab.com").rstrip("/")
+        url = f"{base}/api/v4/projects/{encoded}/merge_requests/{task.pr_number}"
+        proc = await asyncio.create_subprocess_exec(
+            "curl", "-sf", "-H", f"PRIVATE-TOKEN: {token}", url,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return "open"
+        try:
+            data = json.loads(stdout.decode())
+            return data.get("state", "open")
+        except json.JSONDecodeError:
+            return "open"
+
+    return "open"
+
+
+async def _clear_pr_fields(task_id: int) -> None:
+    """Clear pr_url and pr_number so the task is never polled again."""
+    async with get_session() as session:
+        task = await session.get(TaskPipelineRecord, task_id)
+        if task:
+            task.pr_url = ""
+            task.pr_number = ""
+            await session.commit()
 
 
 async def _update_check_timestamp(task_id: int) -> None:
