@@ -173,16 +173,19 @@ export function TaskDetailPage({
   useEffect(() => {
     loadRuns();
     pollPrUrl();
-    // Only poll if there are active runs
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll only when there are active runs
+  useEffect(() => {
     const hasActive = runs.some(r => r.status === "running" || r.status === "pending");
-    if (hasActive) {
-      const interval = setInterval(() => {
-        loadRuns();
-        pollPrUrl();
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [loadRuns, pollPrUrl, runs]);
+    if (!hasActive) return;
+
+    const interval = setInterval(() => {
+      loadRuns();
+      pollPrUrl();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [runs.some(r => r.status === "running" || r.status === "pending")]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract repo from identifier (e.g., "owner/repo#123" → "owner/repo")
   const repo = task.identifier.includes("#")
@@ -734,8 +737,8 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
 
-        {/* Chat input for requirements agent */}
-        {run.agent_type === "requirements" && isLive && (
+        {/* Chat input: only shown when agent has asked a question */}
+        {isLive && (
           <RequirementsChatInput runId={run.id} logs={logs} />
         )}
       </div>
@@ -747,7 +750,6 @@ function RequirementsChatInput({ runId, logs }: { runId: number; logs: AgentLogE
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Only show when the latest non-user_prompt log is a question
   const lastMeaningfulLog = [...logs].reverse().find(l => l.entry_type !== "user_prompt");
   if (!lastMeaningfulLog || lastMeaningfulLog.entry_type !== "question") return null;
 

@@ -209,7 +209,7 @@ export function CentcomPage({ workspaceId }: { workspaceId?: number }) {
         </div>
         {metrics.active_runs.length === 0 ? (
           <div className="px-3 py-6 text-center">
-            <div className="text-[10px] uppercase tracking-widest text-muted">No active deployments</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted">No active operations</div>
           </div>
         ) : (
           <table className="w-full text-[11px]">
