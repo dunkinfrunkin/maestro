@@ -9,7 +9,7 @@ from sqlalchemy import select, func as sqlfunc
 
 from maestro.auth import get_current_user
 from maestro.db.engine import get_session
-from maestro.db.models import AgentRun, AgentRunLog, AgentRunStatus, TaskPipelineRecord, User, WorkerHeartbeat
+from maestro.db.models import AgentRun, AgentRunLog, AgentRunStatus, PipelineStatus, Project, TaskPipelineRecord, User, WorkerHeartbeat
 
 router = APIRouter(prefix="/api/v1")
 
@@ -260,6 +260,26 @@ async def get_centcom_metrics(
         )
         recent_rows = recent_result.all()
 
+        # Polled MRs — tasks with open PRs in pollable statuses
+        _pollable = {
+            PipelineStatus.IN_PROGRESS,
+            PipelineStatus.PENDING_APPROVAL,
+            PipelineStatus.REVIEW,
+            PipelineStatus.RISK_PROFILE,
+        }
+        polled_result = await session.execute(
+            select(TaskPipelineRecord)
+            .join(Project, Project.id == TaskPipelineRecord.project_id)
+            .where(
+                Project.workspace_id == workspace_id,
+                TaskPipelineRecord.pr_url != "",
+                TaskPipelineRecord.pr_number != "",
+                TaskPipelineRecord.status.in_([s.value for s in _pollable]),
+            )
+            .order_by(TaskPipelineRecord.last_comment_check_at.desc().nullsfirst())
+        )
+        polled_tasks = polled_result.scalars().all()
+
     def _run_dict(run, task):
         return {
             "id": run.id,
@@ -278,6 +298,16 @@ async def get_centcom_metrics(
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
         }
 
+    def _mr_dict(task):
+        return {
+            "external_ref": task.external_ref,
+            "pr_url": task.pr_url,
+            "pr_number": task.pr_number,
+            "repo": task.repo or "",
+            "status": task.status.value if task.status else "",
+            "last_checked_at": task.last_comment_check_at.isoformat() if task.last_comment_check_at else None,
+        }
+
     return {
         "total_runs": agg.total_runs,
         "total_cost": float(agg.total_cost),
@@ -291,6 +321,7 @@ async def get_centcom_metrics(
         "active_runs": [_run_dict(r, t) for r, t in active_rows],
         "recent_runs": [_run_dict(r, t) for r, t in recent_rows],
         "workers": await _get_workers(),
+        "polled_mrs": [_mr_dict(t) for t in polled_tasks],
     }
 
 

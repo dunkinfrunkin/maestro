@@ -489,6 +489,15 @@ export interface CentcomRun {
   finished_at: string | null;
 }
 
+export interface PolledMr {
+  external_ref: string;
+  pr_url: string;
+  pr_number: string;
+  repo: string;
+  status: string;
+  last_checked_at: string | null;
+}
+
 export interface CentcomMetrics {
   total_runs: number;
   total_cost: number;
@@ -501,6 +510,7 @@ export interface CentcomMetrics {
   status_counts: Record<string, number>;
   active_runs: CentcomRun[];
   recent_runs: CentcomRun[];
+  polled_mrs: PolledMr[];
   workers: {
     id: string;
     hostname: string;
