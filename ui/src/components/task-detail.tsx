@@ -766,23 +766,25 @@ function RequirementsChatInput({ runId, logs }: { runId: number; logs: AgentLogE
   };
 
   return (
-    <div className="mt-2 flex gap-1.5">
-      <input
-        type="text"
+    <div className="mt-2 flex flex-col gap-1.5">
+      <textarea
         value={value}
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-        placeholder="Type your response..."
-        className="flex-1 text-xs px-2 py-1.5 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-amber-400"
+        placeholder="Type your response… (Enter to send, Shift+Enter for new line)"
+        rows={3}
+        className="w-full text-xs px-2 py-1.5 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-amber-400 resize-y"
         autoFocus
       />
-      <button
-        onClick={send}
-        disabled={!value.trim() || sending}
-        className="text-xs px-3 py-1.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:border-amber-700 dark:hover:bg-amber-800/40 text-amber-900 dark:text-amber-200 disabled:opacity-50 transition-colors"
-      >
-        {sending ? "…" : "Send"}
-      </button>
+      <div className="flex justify-end">
+        <button
+          onClick={send}
+          disabled={!value.trim() || sending}
+          className="text-xs px-3 py-1.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:border-amber-700 dark:hover:bg-amber-800/40 text-amber-900 dark:text-amber-200 disabled:opacity-50 transition-colors"
+        >
+          {sending ? "…" : "Send"}
+        </button>
+      </div>
     </div>
   );
 }
