@@ -15,16 +15,15 @@ Workers claim jobs from a PostgreSQL queue using `SELECT FOR UPDATE SKIP LOCKED`
 - If a worker dies mid-job, the row lock is released and another worker can claim it
 - No external coordination (Redis, ZooKeeper) is needed - PostgreSQL handles it
 
-## Comment poller: leader election
+## Comment poller: per-cycle locking
 
-When multiple workers run simultaneously, only one should poll for new PR comments. Maestro uses a PostgreSQL advisory lock for leader election:
+When multiple workers run simultaneously, only one should poll for new PR comments. Maestro uses a PostgreSQL transaction-level advisory lock each poll cycle:
 
-- Each worker tries to acquire `pg_try_advisory_lock(73572)` on startup
-- If acquired: this worker is the leader and runs the comment poller
-- If not acquired: this worker is on standby and checks again each cycle
-- If the leader dies, the lock is auto-released and the next worker becomes leader
-
-This prevents duplicate comment detection and duplicate agent dispatches.
+- Each worker tries `pg_try_advisory_xact_lock(73572)` at the start of each cycle
+- If acquired: this worker polls for comments, lock auto-releases when the transaction ends
+- If not acquired: another worker is already polling this cycle, skip
+- No persistent lock to leak - if a worker dies mid-poll, the lock is released immediately when the connection drops
+- Next cycle, any worker can acquire the lock - no leader failover gap
 
 ## Duplicate dispatch prevention
 
