@@ -35,7 +35,25 @@ QUESTION:
 If you are ready to finalize (you have enough info):
 REQUIREMENTS_FINAL: YES
 UPDATED_DESCRIPTION:
-<full updated ticket description in markdown, including a clear summary, acceptance criteria as a checklist, and any relevant technical notes>
+## Summary
+<1-3 sentence description of what needs to be built and why>
+
+## Background
+<relevant context, motivation, or dependencies — omit if not applicable>
+
+## Scope
+<what is explicitly in scope; call out anything explicitly out of scope if relevant>
+
+## Acceptance Criteria
+- [ ] <criterion 1>
+- [ ] <criterion 2>
+- [ ] <add as many as needed>
+
+## Technical Notes
+<implementation guidance, constraints, affected systems, schema changes, API contracts, or other technical details — omit section if not applicable>
+
+## Open Questions
+<any remaining unknowns that could not be resolved — omit section if none>
 """
 
 
