@@ -117,6 +117,7 @@ async def init_db() -> None:
                 "ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS estimated_capacity INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS last_comment_check_at TIMESTAMPTZ",
                 "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS base_branch_sha VARCHAR(255) NOT NULL DEFAULT ''",
+                "ALTER TABLE task_pipeline ADD COLUMN IF NOT EXISTS base_branch_name VARCHAR(255) NOT NULL DEFAULT ''",
                 "UPDATE agent_configs SET model = 'sonnet' WHERE model = 'claude-sonnet-4-6'",
                 "UPDATE agent_configs SET model = 'opus' WHERE model = 'claude-opus-4-6'",
             ]

@@ -115,13 +115,13 @@ async def poll_comments_once() -> int:
         except Exception:
             logger.exception("[poller] Failed to check comments for task %s", task.external_ref)
 
-    for task in tasks:
-        if task.id in dispatched_ids:
-            continue
+    rebase_tasks = [t for t in tasks if t.id not in dispatched_ids]
+
+    async def _check_rebase_task(task: TaskPipelineRecord) -> None:
+        nonlocal dispatched
         try:
             if await _has_active_or_recent_agent_run(task.id):
-                continue
-
+                return
             needs_rebase = await _check_needs_rebase(task)
             if needs_rebase:
                 logger.info("[poller] Base branch updated for %s PR #%s - dispatching rebase", task.repo, task.pr_number)
@@ -131,6 +131,8 @@ async def poll_comments_once() -> int:
                 logger.debug("[poller] Base branch unchanged for %s PR #%s", task.repo, task.pr_number)
         except Exception:
             logger.exception("[poller] Failed to check rebase for task %s", task.external_ref)
+
+    await asyncio.gather(*[_check_rebase_task(t) for t in rebase_tasks])
 
     return dispatched
 
@@ -366,41 +368,26 @@ async def _update_check_timestamp(task_id: int) -> None:
             await session.commit()
 
 
-async def _fetch_base_branch_sha(task: TaskPipelineRecord) -> str | None:
-    """Fetch the current HEAD SHA of the PR/MR's target (base) branch."""
-    conn = await _find_codehost_connection(task)
-    if not conn:
-        return None
 
-    token = decrypt_token(conn.encrypted_token)
-
-    if conn.kind == TrackerKind.GITHUB:
-        return await _fetch_github_base_sha(task.repo, task.pr_number, token)
-    elif conn.kind == TrackerKind.GITLAB:
-        return await _fetch_gitlab_base_sha(task.repo, task.pr_number, token, conn.endpoint)
-
-    return None
-
-
-async def _fetch_github_base_sha(repo: str, pr_number: str, token: str) -> str | None:
-    """Get the current HEAD SHA of the base branch by resolving the branch ref directly."""
-    # First get the base branch name from the PR
-    proc = await asyncio.create_subprocess_exec(
-        "gh", "api", f"repos/{repo}/pulls/{pr_number}",
-        "--jq", ".base.ref",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=_gh_env(token),
-    )
-    stdout, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        logger.warning("[poller] GitHub API error fetching base ref for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
-        return None
-    base_ref = stdout.decode().strip()
+async def _fetch_github_base_sha(repo: str, pr_number: str, token: str, cached_branch: str = "") -> tuple[str, str] | None:
+    """Return (branch_name, current_sha). Uses cached_branch to skip the first API call."""
+    base_ref = cached_branch
     if not base_ref:
-        return None
+        proc = await asyncio.create_subprocess_exec(
+            "gh", "api", f"repos/{repo}/pulls/{pr_number}",
+            "--jq", ".base.ref",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=_gh_env(token),
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            logger.warning("[poller] GitHub API error fetching base ref for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
+            return None
+        base_ref = stdout.decode().strip()
+        if not base_ref:
+            return None
 
-    # Now get the current HEAD SHA of that branch
     proc = await asyncio.create_subprocess_exec(
         "gh", "api", f"repos/{repo}/git/ref/heads/{base_ref}",
         "--jq", ".object.sha",
@@ -413,82 +400,87 @@ async def _fetch_github_base_sha(repo: str, pr_number: str, token: str) -> str |
         logger.warning("[poller] GitHub API error fetching branch SHA for %s %s: %s", repo, base_ref, stderr.decode()[:200])
         return None
     sha = stdout.decode().strip()
-    return sha if sha else None
+    return (base_ref, sha) if sha else None
 
 
-async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint: str) -> str | None:
-    """Get the current HEAD SHA of the base branch by resolving the branch ref directly."""
+async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint: str, cached_branch: str = "") -> tuple[str, str] | None:
+    """Return (branch_name, current_sha). Uses cached_branch to skip the first API call."""
     import urllib.parse
     encoded = urllib.parse.quote(repo, safe="")
     base = (endpoint or "https://gitlab.com").rstrip("/")
 
-    # First get the target branch name from the MR
-    mr_url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
-    proc = await asyncio.create_subprocess_exec(
-        "curl", "-sf",
-        "-H", f"PRIVATE-TOKEN: {token}",
-        mr_url,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, _ = await proc.communicate()
-    if proc.returncode != 0:
-        return None
-
-    try:
-        mr = json.loads(stdout.decode())
-        target_branch = mr.get("target_branch")
-        if not target_branch:
+    target_branch = cached_branch
+    if not target_branch:
+        mr_url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
+        proc = await asyncio.create_subprocess_exec(
+            "curl", "-sf", "-H", f"PRIVATE-TOKEN: {token}", mr_url,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
             return None
-    except json.JSONDecodeError:
-        return None
+        try:
+            target_branch = json.loads(stdout.decode()).get("target_branch")
+            if not target_branch:
+                return None
+        except json.JSONDecodeError:
+            return None
 
-    # Now get the current HEAD SHA of that branch
     branch_encoded = urllib.parse.quote(target_branch, safe="")
     branch_url = f"{base}/api/v4/projects/{encoded}/repository/branches/{branch_encoded}"
     proc = await asyncio.create_subprocess_exec(
-        "curl", "-sf",
-        "-H", f"PRIVATE-TOKEN: {token}",
-        branch_url,
+        "curl", "-sf", "-H", f"PRIVATE-TOKEN: {token}", branch_url,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, _ = await proc.communicate()
     if proc.returncode != 0:
         return None
-
     try:
-        branch_data = json.loads(stdout.decode())
-        return branch_data.get("commit", {}).get("id") or None
+        sha = json.loads(stdout.decode()).get("commit", {}).get("id")
+        return (target_branch, sha) if sha else None
     except json.JSONDecodeError:
         return None
+
+
+async def _fetch_base_branch(task: TaskPipelineRecord) -> tuple[str, str] | None:
+    """Return (branch_name, current_sha) for the task's PR/MR base branch."""
+    conn = await _find_codehost_connection(task)
+    if not conn:
+        return None
+    token = decrypt_token(conn.encrypted_token)
+    cached = task.base_branch_name or ""
+    if conn.kind == TrackerKind.GITHUB:
+        return await _fetch_github_base_sha(task.repo, task.pr_number, token, cached)
+    elif conn.kind == TrackerKind.GITLAB:
+        return await _fetch_gitlab_base_sha(task.repo, task.pr_number, token, conn.endpoint, cached)
+    return None
 
 
 async def _check_needs_rebase(task: TaskPipelineRecord) -> bool:
     """Return True if the base branch has moved ahead since we last recorded its SHA."""
-    current_sha = await _fetch_base_branch_sha(task)
-    if not current_sha:
+    result = await _fetch_base_branch(task)
+    if not result:
         return False
 
-    if not task.base_branch_sha:
-        # First time seeing this PR — record the SHA, no rebase needed yet
+    branch_name, current_sha = result
+
+    needs_update = branch_name != task.base_branch_name or not task.base_branch_sha
+    needs_rebase = bool(task.base_branch_sha) and current_sha != task.base_branch_sha
+
+    if needs_update or needs_rebase:
         async with get_session() as session:
             record = await session.get(TaskPipelineRecord, task.id)
             if record:
+                record.base_branch_name = branch_name
                 record.base_branch_sha = current_sha
                 await session.commit()
-        return False
 
-    if current_sha != task.base_branch_sha:
+    if needs_rebase:
         logger.debug("[poller] Base SHA changed for %s PR #%s: %s -> %s", task.repo, task.pr_number, task.base_branch_sha[:8], current_sha[:8])
-        async with get_session() as session:
-            record = await session.get(TaskPipelineRecord, task.id)
-            if record:
-                record.base_branch_sha = current_sha
-                await session.commit()
-        return True
 
-    return False
+    return needs_rebase
 
 
 async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
@@ -579,33 +571,40 @@ async def _dispatch_for_rebase(task: TaskPipelineRecord) -> None:
 
 POLLER_LOCK_ID = 73572
 
+_poll_lock = asyncio.Lock()
+
 
 async def _try_poll_with_lock() -> int:
-    """Acquire a session-level advisory lock, poll, then release.
+    """Acquire both a local asyncio lock (same process) and a DB advisory lock
+    (across processes), then run poll_comments_once.
 
-    Uses pg_try_advisory_lock / pg_advisory_unlock (session-level) so the
-    lock persists across multiple statements for the full duration of the
-    poll, preventing any other worker from entering concurrently.
+    The asyncio lock prevents same-process re-entry. The DB advisory lock
+    prevents concurrent polling across multiple worker processes.
+
+    The DB connection is held open for the full poll so the session-level
+    lock is not released by connection pool recycling mid-cycle.
     """
     from sqlalchemy import text
 
-    async with get_session() as session:
-        result = await session.execute(
-            text(f"SELECT pg_try_advisory_lock({POLLER_LOCK_ID})")
-        )
-        acquired = result.scalar() or False
-        if not acquired:
-            return -1  # another worker is polling right now
+    if _poll_lock.locked():
+        return -1
 
-    try:
-        return await poll_comments_once()
-    finally:
-        try:
-            async with get_session() as session:
-                await session.execute(text(f"SELECT pg_advisory_unlock({POLLER_LOCK_ID})"))
-                await session.commit()
-        except Exception:
-            logger.warning("[poller] Failed to release advisory lock %d", POLLER_LOCK_ID)
+    async with _poll_lock:
+        async with get_session() as session:
+            result = await session.execute(
+                text(f"SELECT pg_try_advisory_lock({POLLER_LOCK_ID})")
+            )
+            acquired = result.scalar() or False
+            if not acquired:
+                return -1
+            try:
+                return await poll_comments_once()
+            finally:
+                try:
+                    await session.execute(text(f"SELECT pg_advisory_unlock({POLLER_LOCK_ID})"))
+                    await session.commit()
+                except Exception:
+                    logger.warning("[poller] Failed to release advisory lock %d", POLLER_LOCK_ID)
 
 
 async def run_comment_poller(
