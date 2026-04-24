@@ -583,9 +583,8 @@ POLLER_LOCK_ID = 73572
 async def _try_poll_with_lock() -> int:
     """Acquire a session-level advisory lock, poll, then release.
 
-    Uses pg_try_advisory_lock / pg_advisory_unlock (session-level) so the
-    lock persists across multiple statements for the full duration of the
-    poll, preventing any other worker from entering concurrently.
+    The session must stay open for the full poll duration — pg_try_advisory_lock
+    is connection-scoped, so closing the connection releases the lock immediately.
     """
     from sqlalchemy import text
 
@@ -597,15 +596,14 @@ async def _try_poll_with_lock() -> int:
         if not acquired:
             return -1  # another worker is polling right now
 
-    try:
-        return await poll_comments_once()
-    finally:
         try:
-            async with get_session() as session:
+            return await poll_comments_once()
+        finally:
+            try:
                 await session.execute(text(f"SELECT pg_advisory_unlock({POLLER_LOCK_ID})"))
                 await session.commit()
-        except Exception:
-            logger.warning("[poller] Failed to release advisory lock %d", POLLER_LOCK_ID)
+            except Exception:
+                logger.warning("[poller] Failed to release advisory lock %d", POLLER_LOCK_ID)
 
 
 async def run_comment_poller(
