@@ -157,6 +157,51 @@ async def _sample_resources(proc: asyncio.subprocess.Process, result: RunResult)
     result.avg_cpu_percent = round(sum(cpu_samples) / len(cpu_samples), 1) if cpu_samples else 0.0
 
 
+async def _wait_for_user_prompt(
+    run_id: int,
+    after_id: int,
+    timeout_s: float = 86400.0,
+) -> str | None:
+    """Poll agent_run_logs for a user_prompt entry newer than after_id. Returns content or None on timeout."""
+    from sqlalchemy import select as sa_select
+    import asyncio as _asyncio
+    deadline = _asyncio.get_event_loop().time() + timeout_s
+    while _asyncio.get_event_loop().time() < deadline:
+        await _asyncio.sleep(3)
+        try:
+            async with get_session() as session:
+                row = await session.scalar(
+                    sa_select(AgentRunLog)
+                    .where(
+                        AgentRunLog.agent_run_id == run_id,
+                        AgentRunLog.entry_type == "user_prompt",
+                        AgentRunLog.id > after_id,
+                    )
+                    .order_by(AgentRunLog.id)
+                    .limit(1)
+                )
+                if row:
+                    return row.content
+        except Exception:
+            logger.exception("Error polling for user prompt")
+    return None
+
+
+async def _get_current_max_log_id(run_id: int) -> int:
+    """Return the current highest log id for this run."""
+    from sqlalchemy import select as sa_select, func
+    try:
+        async with get_session() as session:
+            result = await session.scalar(
+                sa_select(func.max(AgentRunLog.id)).where(
+                    AgentRunLog.agent_run_id == run_id
+                )
+            )
+            return result or 0
+    except Exception:
+        return 0
+
+
 async def _write_log(run_id: int, entry_type: str, content: str) -> None:
     """Write a log entry to the database."""
     try:

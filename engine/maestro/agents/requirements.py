@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from maestro.db.engine import get_session
-from maestro.db.models import AgentRunLog
+from maestro.agents.cli_runner import _wait_for_user_prompt, _get_current_max_log_id, _write_log
 
 logger = logging.getLogger(__name__)
 
@@ -53,64 +51,6 @@ class RequirementsResult:
     output_tokens: int = 0
     error: str | None = None
     messages: list[dict[str, Any]] = field(default_factory=list)
-
-
-async def _write_log(run_id: int, entry_type: str, content: str) -> None:
-    try:
-        async with get_session() as session:
-            log = AgentRunLog(
-                agent_run_id=run_id,
-                entry_type=entry_type,
-                content=content,
-            )
-            session.add(log)
-            await session.commit()
-    except Exception:
-        logger.exception("Failed to write requirements agent log")
-
-
-async def _wait_for_user_prompt(
-    run_id: int,
-    after_id: int,
-    timeout_s: float = 86400.0,
-) -> str | None:
-    """Poll agent_run_logs for a user_prompt entry newer than after_id. Returns content or None on timeout."""
-    from sqlalchemy import select as sa_select
-    deadline = asyncio.get_event_loop().time() + timeout_s
-    while asyncio.get_event_loop().time() < deadline:
-        await asyncio.sleep(3)
-        try:
-            async with get_session() as session:
-                row = await session.scalar(
-                    sa_select(AgentRunLog)
-                    .where(
-                        AgentRunLog.agent_run_id == run_id,
-                        AgentRunLog.entry_type == "user_prompt",
-                        AgentRunLog.id > after_id,
-                    )
-                    .order_by(AgentRunLog.id)
-                    .limit(1)
-                )
-                if row:
-                    return row.content
-        except Exception:
-            logger.exception("Error polling for user prompt")
-    return None
-
-
-async def _get_current_max_log_id(run_id: int) -> int:
-    """Return the current highest log id for this run."""
-    from sqlalchemy import select as sa_select, func
-    try:
-        async with get_session() as session:
-            result = await session.scalar(
-                sa_select(func.max(AgentRunLog.id)).where(
-                    AgentRunLog.agent_run_id == run_id
-                )
-            )
-            return result or 0
-    except Exception:
-        return 0
 
 
 async def _run_turn(

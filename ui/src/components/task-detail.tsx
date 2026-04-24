@@ -737,12 +737,9 @@ function RunEntry({ run, onRerun, onKill }: { run: AgentRunResponse; onRerun: ()
           <div className="text-[10px] text-muted mt-1">Cost: ${run.cost_usd.toFixed(4)}</div>
         )}
 
-        {/* Chat input: requirements agent only when awaiting a response; others always when live */}
-        {isLive && run.agent_type === "requirements" && (
+        {/* Chat input: only shown when agent has asked a question */}
+        {isLive && (
           <RequirementsChatInput runId={run.id} logs={logs} />
-        )}
-        {isLive && run.agent_type !== "requirements" && (
-          <AgentChatInput runId={run.id} />
         )}
       </div>
     </div>
@@ -783,43 +780,6 @@ function RequirementsChatInput({ runId, logs }: { runId: number; logs: AgentLogE
         onClick={send}
         disabled={!value.trim() || sending}
         className="text-xs px-3 py-1.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:border-amber-700 dark:hover:bg-amber-800/40 text-amber-900 dark:text-amber-200 disabled:opacity-50 transition-colors"
-      >
-        {sending ? "…" : "Send"}
-      </button>
-    </div>
-  );
-}
-
-function AgentChatInput({ runId }: { runId: number }) {
-  const [value, setValue] = useState("");
-  const [sending, setSending] = useState(false);
-
-  const send = async () => {
-    const text = value.trim();
-    if (!text || sending) return;
-    setSending(true);
-    try {
-      await sendAgentPrompt(runId, text);
-      setValue("");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="mt-2 flex gap-1.5">
-      <input
-        type="text"
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") send(); }}
-        placeholder="Send a message to the agent..."
-        className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-background placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      />
-      <button
-        onClick={send}
-        disabled={!value.trim() || sending}
-        className="text-xs px-3 py-1.5 rounded border border-border bg-surface hover:bg-surface-hover disabled:opacity-50 transition-colors"
       >
         {sending ? "…" : "Send"}
       </button>

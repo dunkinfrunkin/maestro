@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -436,7 +437,7 @@ async def _execute_agent(
         workspace_path = tempfile.mkdtemp(prefix=f"maestro-agent-{run_id}-")
 
         # Clone repo if available
-        from maestro.agents.sdk_runner import _write_log
+        from maestro.agents.cli_runner import _write_log
         if clone_url:
             # Log repo name but not the token-embedded URL
             await _write_log(run_id, "status", f"Cloning repository: {repo}")
@@ -643,17 +644,45 @@ async def _execute_agent(
         print(f"[MAESTRO] Agent {plugin.name} prompt for run {run_id}: title={issue_title!r}, desc_len={len(issue_description)}, prompt_len={len(prompt)}")
         print(f"[MAESTRO] Prompt preview: {prompt[:500]}")
 
-        # Run with live logging via Claude Code CLI
-        result = await run_cli_with_logging(
-            run_id=run_id,
-            system_prompt=system_prompt,
-            prompt=prompt,
-            provider=provider,
-            model=model,
-            workspace_path=workspace_path,
-            allowed_tools=agent_cfg["tools"],
-            api_key=api_key,
-        )
+        # Run with live logging via Claude Code CLI, supporting mid-run user questions
+        from maestro.agents.cli_runner import _wait_for_user_prompt, _get_current_max_log_id
+        session_id: str | None = None
+        next_prompt = prompt
+        result: dict = {}
+
+        while True:
+            result = await run_cli_with_logging(
+                run_id=run_id,
+                system_prompt=system_prompt,
+                prompt=next_prompt,
+                provider=provider,
+                model=model,
+                workspace_path=workspace_path,
+                allowed_tools=agent_cfg["tools"],
+                api_key=api_key,
+                resume_session_id=session_id,
+            )
+            session_id = result.get("session_id") or session_id
+
+            # Check if the agent asked a question and is waiting for input
+            all_text = result.get("all_text", "") or ""
+            q_match = re.search(r"QUESTION:\s*(.+?)(?:\n|$)", all_text)
+            if q_match and result.get("status") == "completed":
+                question_text = q_match.group(1).strip()
+                preamble = re.split(r"\n*QUESTION:", all_text)[0].strip()
+                if preamble:
+                    await _write_log(run_id, "text", preamble)
+                await _write_log(run_id, "question", question_text)
+
+                last_id = await _get_current_max_log_id(run_id)
+                user_response = await _wait_for_user_prompt(run_id, last_id)
+                if user_response is None:
+                    await _write_log(run_id, "status", "Timed out waiting for user response — continuing with available information")
+                    break
+
+                next_prompt = user_response
+            else:
+                break
 
         # Update run record
         print(f"[MAESTRO] Agent run {run_id} ({plugin.name}) SDK finished: {result['status']}")
