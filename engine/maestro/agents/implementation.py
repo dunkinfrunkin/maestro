@@ -87,7 +87,7 @@ npm test
 - NEVER use `gh pr comment` — it posts a SEPARATE comment, NOT a reply in the thread
 - Each reply must start with "Fixed:"
 - Do not skip any comments
-- Every comment body you post MUST end with `\n\n---\n*Created by Maestro*`
+- Every comment body you post MUST end with `\n\n---\n*Created by Maestro (Implementation Agent)*`
 """
 
 SYSTEM_PROMPT_GITLAB = """You are an implementation agent for Maestro, a coding orchestration platform.
@@ -174,7 +174,7 @@ This returns discussion threads. Each discussion has an `id` and contains `notes
 curl -sf -X POST -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \\
   -H "Content-Type: application/json" \\
   "$GITLAB_ENDPOINT/api/v4/projects/$PROJECT_ENCODED/merge_requests/$MR_NUMBER/discussions/$DISCUSSION_ID/notes" \\
-  -d '{"body": "Fixed: <description>\\n\\n---\\n*Created by Maestro*"}'
+  -d '{"body": "Fixed: <description>\\n\\n---\\n*Created by Maestro (Implementation Agent)*"}'
 ```
 
 ### Step 4: Resolve the discussion thread
@@ -195,7 +195,7 @@ git add -A && git commit -m "address review feedback" && git push
 - This is a GitLab repo - `gh` CLI commands will NOT work
 - Use `git` commands and `curl` for all operations
 - Each reply must start with "Fixed:"
-- Every comment body you post MUST end with `\n\n---\n*Created by Maestro*`
+- Every comment body you post MUST end with `\n\n---\n*Created by Maestro (Implementation Agent)*`
 """
 
 # Default for backwards compat

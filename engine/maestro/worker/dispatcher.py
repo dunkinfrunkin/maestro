@@ -546,26 +546,28 @@ async def _execute_agent(
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             if is_gitlab:
                 prompt_parts.append(
-                    f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                    f"\n## THIS IS A FOLLOW-UP"
                     f"\n{mr_or_pr} !{pr_num} already exists with review comments that MUST be addressed."
                     f"\n1. Checkout the MR branch (check `git branch -a` for the branch name)"
-                    f"\n2. Read the MR comments to understand feedback"
-                    f"\n3. Address EVERY comment — do not skip any"
-                    f"\n4. Commit and push your fixes"
+                    f"\n2. Rebase on the target branch"
+                    f"\n3. Read the MR comments to understand feedback"
+                    f"\n4. Address EVERY comment - do not skip any"
+                    f"\n5. Commit and push your fixes"
                 )
             else:
                 prompt_parts.append(
-                    f"\n## THIS IS A FOLLOW-UP (iteration {iteration}/{max_iterations})"
+                    f"\n## THIS IS A FOLLOW-UP"
                     f"\n{mr_or_pr} #{pr_num} already exists with review comments that MUST be addressed."
                     f"\n1. Checkout the PR branch: `gh pr checkout {pr_num} --repo {repo}`"
-                    f"\n2. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
-                    f"\n3. Address EVERY comment — do not skip any"
-                    f"\n4. Commit and push your fixes"
+                    f"\n2. Rebase on the target branch"
+                    f"\n3. List ALL review comments: `gh api repos/{repo}/pulls/{pr_num}/comments`"
+                    f"\n4. Address EVERY comment - do not skip any"
+                    f"\n5. Commit and push your fixes"
                 )
         elif plugin.name == "review" and iteration > 1:
             pr_num = pr_url.rstrip("/").split("/")[-1] if pr_url else ""
             prompt_parts.append(
-                f"\n## THIS IS A RE-REVIEW (iteration {iteration}/{max_iterations})"
+                f"\n## THIS IS A RE-REVIEW"
                 f"\nThe implementation agent has pushed fixes for previous review comments."
                 f"\nCheck if EACH comment was addressed in the latest code."
                 f"\nOnly APPROVE if ALL comments are resolved and no new issues."
@@ -601,7 +603,7 @@ async def _execute_agent(
                     f"\n  -H \"Content-Type: application/json\" \\"
                     f"\n  \"{endpoint}/api/v4/projects/{encoded}/merge_requests/{pr_num}/discussions\" \\"
                     f"\n  -d '{{"
-                    f"\n    \"body\": \"YOUR FINDING HERE\\n\\n---\\n*Created by Maestro*\","
+                    f"\n    \"body\": \"YOUR FINDING HERE\\n\\n---\\n*Created by Maestro (Review Agent)*\","
                     f"\n    \"position\": {{"
                     f"\n      \"position_type\": \"text\","
                     f"\n      \"base_sha\": \"{diff_refs['base_sha'] if diff_refs else 'BASE_SHA'}\","
@@ -927,7 +929,7 @@ async def _post_review_comment(
     import shutil
 
     # Prefix with Maestro header and append footer
-    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}\n\n---\n*Created by Maestro*"
+    comment = f"**Maestro Review Agent** (run #{run_id})\n\n{review_text}\n\n---\n*Created by Maestro (Review Agent)*"
 
     if code_host == "gitlab":
         # Extract project path and MR number from URL
@@ -1036,12 +1038,8 @@ async def _auto_transition(
             next_status = PipelineStatus.PENDING_APPROVAL
             reason = "Review approved - moving to pending approval (human gate)"
         elif verdict == "REQUEST_CHANGES":
-            if iteration_count < max_iterations * 2:
-                next_status = PipelineStatus.IMPLEMENT
-                reason = f"Review requested changes - sending back to implement (iteration {iteration_count // 2 + 1}/{max_iterations})"
-            else:
-                reason = f"Review requested changes but max iterations ({max_iterations}) reached - needs human intervention"
-                logger.warning(reason)
+            next_status = PipelineStatus.IMPLEMENT
+            reason = "Review requested changes - sending back to implement"
 
     elif plugin_name == "deployment":
         # Deployment stages not yet implemented - mark done for now

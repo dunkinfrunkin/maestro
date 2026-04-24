@@ -21,10 +21,11 @@ The Implementation Agent is the workhorse of Maestro. It reads the task descript
 
 **Follow-up runs (after review):**
 
-1. Reads each review comment via the code host API
-2. Applies the fix in code
-3. Replies directly in the PR comment thread
-4. Pushes the commit
+1. Rebases on the target branch (resolves conflicts if any)
+2. Reads each review comment via the code host API
+3. Applies the fix in code
+4. Replies directly in the PR comment thread
+5. Commits and force-pushes with `--force-with-lease`
 
 ## Inputs
 

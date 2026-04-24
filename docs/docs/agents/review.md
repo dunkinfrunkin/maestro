@@ -12,11 +12,12 @@ The Review Agent reads pull requests and performs inline code review, posting co
 **Initial review:**
 
 1. Checks out the PR branch
-2. Reads each changed file in full context (not just the diff)
-3. Analyzes for correctness, bugs, missing validation, security issues, performance problems, and style
-4. Posts inline comments on specific lines via GitHub/GitLab API
-5. Categorizes each comment: `bug`, `style`, `performance`, `security`, `suggestion`
-6. Issues a verdict: **APPROVE** or **REQUEST_CHANGES**
+2. Checks for merge conflicts with the target branch (if conflicts: REQUEST_CHANGES immediately)
+3. Reads each changed file in full context (not just the diff)
+4. Analyzes for correctness, bugs, missing validation, security issues, performance problems, and style
+5. When requesting changes: posts only inline comments on specific lines, no summary
+6. When approving: posts only a summary comment (LGTM), no inline comments
+7. Issues a verdict: **APPROVE** or **REQUEST_CHANGES**
 
 **Verification run (after fixes):**
 
@@ -25,6 +26,15 @@ The Review Agent reads pull requests and performs inline code review, posting co
 3. Replies with confirmation in the thread
 4. Resolves the conversation via the code host API
 5. Approves once all threads are resolved
+
+**Approval behavior:**
+
+The review agent's approval can be configured as soft or formal:
+
+- `can_approve: false` (default) - posts a "LGTM" comment but does not formally approve the PR/MR
+- `can_approve: true` - formally approves via the code host API
+
+Configure in Settings > Agents > Review > extra config: `{"can_approve": true}`
 
 ## Inputs
 
