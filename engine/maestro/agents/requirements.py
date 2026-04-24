@@ -21,10 +21,10 @@ Your goal is to:
 
 ## Rules
 - Always start by exploring the repo: read relevant files, search for related code, understand existing patterns. Do this thoroughly before asking any questions.
-- Only ask ONE question at a time after exhausting automated investigation.
 - Keep questions concise and specific.
-- When you have gathered sufficient information to write a complete description, finalize.
+- When you have gathered sufficient information to write a complete description, finalize."""
 
+RESPONSE_PROTOCOL = """
 ## Response protocol
 Every response MUST end with exactly one of the following:
 
@@ -55,6 +55,12 @@ UPDATED_DESCRIPTION:
 ## Open Questions
 <any remaining unknowns that could not be resolved — omit section if none>
 """
+
+
+def build_system_prompt(custom_prompt: str | None = None) -> str:
+    """Combine user-customizable prompt body with the fixed response protocol."""
+    body = custom_prompt.strip() if custom_prompt and custom_prompt.strip() else DEFAULT_SYSTEM_PROMPT
+    return body + RESPONSE_PROTOCOL
 
 
 # Alias used by the GET /agents/{agent_type}/default-prompt endpoint

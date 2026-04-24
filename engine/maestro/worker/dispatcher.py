@@ -765,7 +765,7 @@ async def dispatch_requirements_agent(
     triggered_by: str = "",
 ) -> int | None:
     """Dispatch the requirements agent for a task. Returns run_id or None."""
-    from maestro.agents.requirements import run_requirements_agent, DEFAULT_SYSTEM_PROMPT
+    from maestro.agents.requirements import run_requirements_agent, build_system_prompt
     from maestro.agents.cli_runner import _write_log
 
     plugin = registry.get("requirements")
@@ -859,7 +859,7 @@ async def dispatch_requirements_agent(
         run.started_at = datetime.now(timezone.utc)
         await session.commit()
 
-    system_prompt = extra.get("custom_prompt") or DEFAULT_SYSTEM_PROMPT
+    system_prompt = build_system_prompt(extra.get("custom_prompt"))
 
     async def _run():
         import tempfile, shutil
