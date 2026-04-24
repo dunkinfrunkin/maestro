@@ -369,24 +369,22 @@ async def _update_check_timestamp(task_id: int) -> None:
 
 
 
-async def _fetch_github_base_sha(repo: str, pr_number: str, token: str, cached_branch: str = "") -> tuple[str, str] | None:
-    """Return (branch_name, current_sha). Uses cached_branch to skip the first API call."""
-    base_ref = cached_branch
+async def _fetch_github_base_sha(repo: str, pr_number: str, token: str) -> str | None:
+    """Get the current HEAD SHA of the base branch by resolving the branch ref directly."""
+    proc = await asyncio.create_subprocess_exec(
+        "gh", "api", f"repos/{repo}/pulls/{pr_number}",
+        "--jq", ".base.ref",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=_gh_env(token),
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        logger.warning("[poller] GitHub API error fetching base ref for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
+        return None
+    base_ref = stdout.decode().strip()
     if not base_ref:
-        proc = await asyncio.create_subprocess_exec(
-            "gh", "api", f"repos/{repo}/pulls/{pr_number}",
-            "--jq", ".base.ref",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=_gh_env(token),
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            logger.warning("[poller] GitHub API error fetching base ref for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
-            return None
-        base_ref = stdout.decode().strip()
-        if not base_ref:
-            return None
+        return None
 
     proc = await asyncio.create_subprocess_exec(
         "gh", "api", f"repos/{repo}/git/ref/heads/{base_ref}",
@@ -400,32 +398,30 @@ async def _fetch_github_base_sha(repo: str, pr_number: str, token: str, cached_b
         logger.warning("[poller] GitHub API error fetching branch SHA for %s %s: %s", repo, base_ref, stderr.decode()[:200])
         return None
     sha = stdout.decode().strip()
-    return (base_ref, sha) if sha else None
+    return sha if sha else None
 
 
-async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint: str, cached_branch: str = "") -> tuple[str, str] | None:
-    """Return (branch_name, current_sha). Uses cached_branch to skip the first API call."""
+async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint: str) -> str | None:
+    """Get the current HEAD SHA of the base branch by resolving the branch ref directly."""
     import urllib.parse
     encoded = urllib.parse.quote(repo, safe="")
     base = (endpoint or "https://gitlab.com").rstrip("/")
 
-    target_branch = cached_branch
-    if not target_branch:
-        mr_url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
-        proc = await asyncio.create_subprocess_exec(
-            "curl", "-sf", "-H", f"PRIVATE-TOKEN: {token}", mr_url,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _ = await proc.communicate()
-        if proc.returncode != 0:
+    mr_url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
+    proc = await asyncio.create_subprocess_exec(
+        "curl", "-sf", "-H", f"PRIVATE-TOKEN: {token}", mr_url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return None
+    try:
+        target_branch = json.loads(stdout.decode()).get("target_branch")
+        if not target_branch:
             return None
-        try:
-            target_branch = json.loads(stdout.decode()).get("target_branch")
-            if not target_branch:
-                return None
-        except json.JSONDecodeError:
-            return None
+    except json.JSONDecodeError:
+        return None
 
     branch_encoded = urllib.parse.quote(target_branch, safe="")
     branch_url = f"{base}/api/v4/projects/{encoded}/repository/branches/{branch_encoded}"
@@ -439,48 +435,48 @@ async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint
         return None
     try:
         sha = json.loads(stdout.decode()).get("commit", {}).get("id")
-        return (target_branch, sha) if sha else None
+        return sha if sha else None
     except json.JSONDecodeError:
         return None
 
 
-async def _fetch_base_branch(task: TaskPipelineRecord) -> tuple[str, str] | None:
-    """Return (branch_name, current_sha) for the task's PR/MR base branch."""
+async def _fetch_base_branch_sha(task: TaskPipelineRecord) -> str | None:
+    """Fetch the current HEAD SHA of the PR/MR's target (base) branch."""
     conn = await _find_codehost_connection(task)
     if not conn:
         return None
     token = decrypt_token(conn.encrypted_token)
-    cached = task.base_branch_name or ""
     if conn.kind == TrackerKind.GITHUB:
-        return await _fetch_github_base_sha(task.repo, task.pr_number, token, cached)
+        return await _fetch_github_base_sha(task.repo, task.pr_number, token)
     elif conn.kind == TrackerKind.GITLAB:
-        return await _fetch_gitlab_base_sha(task.repo, task.pr_number, token, conn.endpoint, cached)
+        return await _fetch_gitlab_base_sha(task.repo, task.pr_number, token, conn.endpoint)
     return None
 
 
 async def _check_needs_rebase(task: TaskPipelineRecord) -> bool:
     """Return True if the base branch has moved ahead since we last recorded its SHA."""
-    result = await _fetch_base_branch(task)
-    if not result:
+    current_sha = await _fetch_base_branch_sha(task)
+    if not current_sha:
         return False
 
-    branch_name, current_sha = result
-
-    needs_update = branch_name != task.base_branch_name or not task.base_branch_sha
-    needs_rebase = bool(task.base_branch_sha) and current_sha != task.base_branch_sha
-
-    if needs_update or needs_rebase:
+    if not task.base_branch_sha:
         async with get_session() as session:
             record = await session.get(TaskPipelineRecord, task.id)
             if record:
-                record.base_branch_name = branch_name
                 record.base_branch_sha = current_sha
                 await session.commit()
+        return False
 
-    if needs_rebase:
+    if current_sha != task.base_branch_sha:
         logger.debug("[poller] Base SHA changed for %s PR #%s: %s -> %s", task.repo, task.pr_number, task.base_branch_sha[:8], current_sha[:8])
+        async with get_session() as session:
+            record = await session.get(TaskPipelineRecord, task.id)
+            if record:
+                record.base_branch_sha = current_sha
+                await session.commit()
+        return True
 
-    return needs_rebase
+    return False
 
 
 async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
