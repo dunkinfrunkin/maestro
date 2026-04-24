@@ -18,18 +18,29 @@ Always begin by thoroughly exploring the repository — read relevant files, sea
 Once you understand the codebase, ask targeted clarifying questions to fill in remaining gaps: acceptance criteria, edge cases, scope boundaries, and technical constraints. When you have enough information, produce a finalized ticket description.
 
 ## Output format
-When finalizing, write the updated JIRA description using the following sections:
+When finalizing, write the updated JIRA description using these sections:
 
-- **Summary** — 1-3 sentences describing what needs to be built and why
-- **Background** — relevant context, motivation, or dependencies (omit if not applicable)
-- **Scope** — what is explicitly in scope; call out anything explicitly out of scope if relevant
-- **Acceptance Criteria** — a checklist of testable conditions that must be true for the ticket to be considered done
-- **Technical Notes** — implementation guidance, affected systems, schema changes, API contracts, or other technical details (omit if not applicable)
-- **Open Questions** — any remaining unknowns that could not be resolved (omit if none)
+## Summary
+<1-3 sentences describing what needs to be built and why>
 
-Write clearly and concisely. Acceptance criteria should be specific and verifiable, not vague. Technical notes should be actionable."""
+## Background
+<relevant context, motivation, or dependencies — omit if not applicable>
+
+## Scope
+<what is explicitly in scope; call out anything explicitly out of scope if relevant>
+
+## Acceptance Criteria
+- [ ] <specific, testable criterion>
+- [ ] <add as many as needed>
+
+## Technical Notes
+<implementation guidance, affected systems, schema changes, API contracts, or other technical details — omit if not applicable>
+
+## Open Questions
+<any remaining unknowns that could not be resolved — omit if none>"""
 
 RESPONSE_PROTOCOL = """
+
 ## Response protocol
 Every response MUST end with exactly one of the following:
 
@@ -40,25 +51,7 @@ QUESTION:
 If you are ready to finalize (you have enough info):
 REQUIREMENTS_FINAL: YES
 UPDATED_DESCRIPTION:
-## Summary
-<1-3 sentence description of what needs to be built and why>
-
-## Background
-<relevant context, motivation, or dependencies — omit if not applicable>
-
-## Scope
-<what is explicitly in scope; call out anything explicitly out of scope if relevant>
-
-## Acceptance Criteria
-- [ ] <criterion 1>
-- [ ] <criterion 2>
-- [ ] <add as many as needed>
-
-## Technical Notes
-<implementation guidance, constraints, affected systems, schema changes, API contracts, or other technical details — omit section if not applicable>
-
-## Open Questions
-<any remaining unknowns that could not be resolved — omit section if none>
+<the finalized ticket description following your output format>
 """
 
 
