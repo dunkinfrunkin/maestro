@@ -1,4 +1,4 @@
-"""Polls open PRs for new human comments and dispatches implementation agents."""
+"""Polls open PRs for new human comments and stale branches, dispatching agents as needed."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ async def _has_active_or_recent_agent_run(task_pipeline_id: int) -> bool:
 
     The 'recently completed' check prevents races with auto-transition:
     when a review agent finishes, auto-transition dispatches the next agent.
-    If the comment poller checks in that window, it would also dispatch,
+    If the poller checks in that window, it would also dispatch,
     creating a duplicate.
     """
     from sqlalchemy import or_
@@ -63,7 +63,7 @@ async def _has_active_or_recent_agent_run(task_pipeline_id: int) -> bool:
 
 
 async def poll_comments_once() -> int:
-    """Check all active PRs for new human comments. Returns count of tasks re-dispatched."""
+    """Check all active PRs for new human comments and stale branches. Returns count of tasks re-dispatched."""
     dispatched = 0
 
     async with get_session() as session:
@@ -78,33 +78,48 @@ async def poll_comments_once() -> int:
         tasks = result.scalars().all()
 
     if tasks:
-        logger.info("[comment-poller] Checking %d task(s) with open PRs", len(tasks))
+        logger.info("[poller] Checking %d task(s) with open PRs", len(tasks))
     else:
-        logger.debug("[comment-poller] No tasks with open PRs in reviewable status")
+        logger.debug("[poller] No tasks with open PRs in reviewable status")
 
     for task in tasks:
         try:
             if await _has_active_or_recent_agent_run(task.id):
-                logger.debug("[comment-poller] Skipping %s PR #%s - agent active or recently finished", task.repo, task.pr_number)
+                logger.debug("[poller] Skipping %s PR #%s - agent active or recently finished", task.repo, task.pr_number)
                 continue
 
             logger.debug(
-                "[comment-poller] Checking %s PR #%s (%s) last_check=%s",
+                "[poller] Checking %s PR #%s (%s) last_check=%s",
                 task.repo, task.pr_number, task.status.value,
                 task.last_comment_check_at.isoformat() if task.last_comment_check_at else "never",
             )
             has_new = await _check_for_new_human_comments(task)
             if has_new:
                 logger.info(
-                    "[comment-poller] New human comments on %s PR #%s - dispatching implementation agent",
+                    "[poller] New human comments on %s PR #%s - dispatching implementation agent",
                     task.repo, task.pr_number,
                 )
                 await _dispatch_for_comments(task)
                 dispatched += 1
             else:
-                logger.debug("[comment-poller] No new comments on %s PR #%s", task.repo, task.pr_number)
+                logger.debug("[poller] No new comments on %s PR #%s", task.repo, task.pr_number)
         except Exception:
-            logger.exception("[comment-poller] Failed to check comments for task %s", task.external_ref)
+            logger.exception("[poller] Failed to check comments for task %s", task.external_ref)
+
+    for task in tasks:
+        try:
+            if await _has_active_or_recent_agent_run(task.id):
+                continue
+
+            needs_rebase = await _check_needs_rebase(task)
+            if needs_rebase:
+                logger.info("[poller] Base branch updated for %s PR #%s - dispatching rebase", task.repo, task.pr_number)
+                await _dispatch_for_rebase(task)
+                dispatched += 1
+            else:
+                logger.debug("[poller] Base branch unchanged for %s PR #%s", task.repo, task.pr_number)
+        except Exception:
+            logger.exception("[poller] Failed to check rebase for task %s", task.external_ref)
 
     return dispatched
 
@@ -114,7 +129,7 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
     since = task.last_comment_check_at
 
     comments = await _fetch_pr_comments(task)
-    logger.debug("[comment-poller] Fetched %d total comments for %s PR #%s", len(comments), task.repo, task.pr_number)
+    logger.debug("[poller] Fetched %d total comments for %s PR #%s", len(comments), task.repo, task.pr_number)
 
     if not comments:
         await _update_check_timestamp(task.id)
@@ -141,26 +156,22 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
         user = comment.get("user", {}).get("login", "")
 
         if _is_maestro_comment(body, user):
-            logger.debug("[comment-poller] Skipping agent comment by %s", user)
+            logger.debug("[poller] Skipping agent comment by %s", user)
             continue
 
-        logger.debug("[comment-poller] New human comment by %s: %s", user, body[:80])
+        logger.debug("[poller] New human comment by %s: %s", user, body[:80])
         new_human_comments.append(comment)
 
     await _update_check_timestamp(task.id)
 
     if new_human_comments:
-        logger.info("[comment-poller] Found %d new human comment(s) on %s PR #%s", len(new_human_comments), task.repo, task.pr_number)
+        logger.info("[poller] Found %d new human comment(s) on %s PR #%s", len(new_human_comments), task.repo, task.pr_number)
 
     return len(new_human_comments) > 0
 
 
 def _is_maestro_comment(body: str, user: str) -> bool:
-    """Detect if a comment was made by Maestro agents.
-
-    Primary check: the footer '*Created by Maestro*' or 'created by Maestro'
-    is present in the body. Fallback: user is a known bot account.
-    """
+    """Detect if a comment was made by Maestro agents."""
     if MAESTRO_FOOTER in body:
         return True
     if "created by Maestro" in body:
@@ -177,7 +188,7 @@ async def _fetch_pr_comments(task: TaskPipelineRecord) -> list[dict]:
 
     conn = await _find_codehost_connection(task)
     if not conn:
-        logger.debug("[comment-poller] No code host connection found for %s", task.pr_url)
+        logger.debug("[poller] No code host connection found for %s", task.pr_url)
         return []
 
     token = decrypt_token(conn.encrypted_token)
@@ -210,7 +221,7 @@ async def _find_codehost_connection(task: TaskPipelineRecord) -> TrackerConnecti
             conn_domain = urlparse(conn.endpoint or "https://gitlab.com").hostname or "gitlab.com"
 
         if conn_domain and conn_domain == pr_domain:
-            logger.debug("[comment-poller] Matched connection %d (%s) for %s", conn.id, conn.kind.value, pr_domain)
+            logger.debug("[poller] Matched connection %d (%s) for %s", conn.id, conn.kind.value, pr_domain)
             return conn
 
     return None
@@ -287,6 +298,92 @@ async def _update_check_timestamp(task_id: int) -> None:
             await session.commit()
 
 
+async def _fetch_base_branch_sha(task: TaskPipelineRecord) -> str | None:
+    """Fetch the current HEAD SHA of the PR/MR's target (base) branch."""
+    conn = await _find_codehost_connection(task)
+    if not conn:
+        return None
+
+    token = decrypt_token(conn.encrypted_token)
+
+    if conn.kind == TrackerKind.GITHUB:
+        return await _fetch_github_base_sha(task.repo, task.pr_number, token)
+    elif conn.kind == TrackerKind.GITLAB:
+        return await _fetch_gitlab_base_sha(task.repo, task.pr_number, token, conn.endpoint)
+
+    return None
+
+
+async def _fetch_github_base_sha(repo: str, pr_number: str, token: str) -> str | None:
+    """Get the current HEAD SHA of the base branch via the GitHub PR object."""
+    proc = await asyncio.create_subprocess_exec(
+        "gh", "api", f"repos/{repo}/pulls/{pr_number}",
+        "--jq", ".base.sha",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=_gh_env(token),
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        logger.warning("[poller] GitHub API error fetching base SHA for %s PR #%s: %s", repo, pr_number, stderr.decode()[:200])
+        return None
+    sha = stdout.decode().strip()
+    return sha if sha else None
+
+
+async def _fetch_gitlab_base_sha(repo: str, mr_number: str, token: str, endpoint: str) -> str | None:
+    """Get the current HEAD SHA of the base branch via the GitLab MR object."""
+    import urllib.parse
+    encoded = urllib.parse.quote(repo, safe="")
+    base = (endpoint or "https://gitlab.com").rstrip("/")
+    url = f"{base}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
+
+    proc = await asyncio.create_subprocess_exec(
+        "curl", "-sf",
+        "-H", f"PRIVATE-TOKEN: {token}",
+        url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return None
+
+    try:
+        mr = json.loads(stdout.decode())
+        diff_refs = mr.get("diff_refs") or {}
+        return diff_refs.get("base_sha") or None
+    except json.JSONDecodeError:
+        return None
+
+
+async def _check_needs_rebase(task: TaskPipelineRecord) -> bool:
+    """Return True if the base branch has moved ahead since we last recorded its SHA."""
+    current_sha = await _fetch_base_branch_sha(task)
+    if not current_sha:
+        return False
+
+    if not task.base_branch_sha:
+        # First time seeing this PR — record the SHA, no rebase needed yet
+        async with get_session() as session:
+            record = await session.get(TaskPipelineRecord, task.id)
+            if record:
+                record.base_branch_sha = current_sha
+                await session.commit()
+        return False
+
+    if current_sha != task.base_branch_sha:
+        logger.debug("[poller] Base SHA changed for %s PR #%s: %s -> %s", task.repo, task.pr_number, task.base_branch_sha[:8], current_sha[:8])
+        async with get_session() as session:
+            record = await session.get(TaskPipelineRecord, task.id)
+            if record:
+                record.base_branch_sha = current_sha
+                await session.commit()
+        return True
+
+    return False
+
+
 async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
     """Move task back to implement and dispatch the implementation agent."""
     from maestro.worker.dispatcher import dispatch_agent_for_status
@@ -295,12 +392,12 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
     async with get_session() as session:
         record = await session.get(TaskPipelineRecord, task.id)
         if not record:
-            logger.warning("[comment-poller] Task %d not found, skipping dispatch", task.id)
+            logger.warning("[poller] Task %d not found, skipping dispatch", task.id)
             return
 
         project = await session.get(Project, record.project_id)
         if not project:
-            logger.warning("[comment-poller] Project %d not found for task %d, skipping", record.project_id, task.id)
+            logger.warning("[poller] Project %d not found for task %d, skipping", record.project_id, task.id)
             return
 
         workspace_id = project.workspace_id
@@ -308,7 +405,7 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
         await session.commit()
 
     logger.info(
-        "[comment-poller] Moved task %s to implement (workspace=%d, pipeline=%d)",
+        "[poller] Moved task %s to implement (workspace=%d, pipeline=%d)",
         task.external_ref, workspace_id, task.id,
     )
 
@@ -321,12 +418,51 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
     )
 
     if result:
-        logger.info("[comment-poller] Dispatched agent run %d for task %s", result, task.external_ref)
+        logger.info("[poller] Dispatched agent run %d for task %s", result, task.external_ref)
     else:
-        logger.warning("[comment-poller] Dispatch returned None for task %s - agent may be disabled or no API key", task.external_ref)
+        logger.warning("[poller] Dispatch returned None for task %s - agent may be disabled or no API key", task.external_ref)
 
 
-COMMENT_POLLER_LOCK_ID = 73572
+async def _dispatch_for_rebase(task: TaskPipelineRecord) -> None:
+    """Dispatch the implementation agent to rebase the PR branch onto the updated base."""
+    from maestro.worker.dispatcher import dispatch_agent_for_status
+    from maestro.db.models import Project
+
+    async with get_session() as session:
+        record = await session.get(TaskPipelineRecord, task.id)
+        if not record:
+            logger.warning("[poller] Task %d not found, skipping rebase dispatch", task.id)
+            return
+
+        project = await session.get(Project, record.project_id)
+        if not project:
+            logger.warning("[poller] Project %d not found for task %d, skipping rebase dispatch", record.project_id, task.id)
+            return
+
+        workspace_id = project.workspace_id
+        record.status = PipelineStatus.IN_PROGRESS
+        await session.commit()
+
+    logger.info(
+        "[poller] Moved task %s to implement for rebase (workspace=%d, pipeline=%d)",
+        task.external_ref, workspace_id, task.id,
+    )
+
+    result = await dispatch_agent_for_status(
+        workspace_id=workspace_id,
+        task_pipeline_id=task.id,
+        status=PipelineStatus.IN_PROGRESS.value,
+        issue_title=task.external_ref,
+        triggered_by="rebase_poller",
+    )
+
+    if result:
+        logger.info("[poller] Dispatched rebase agent run %d for task %s", result, task.external_ref)
+    else:
+        logger.warning("[poller] Rebase dispatch returned None for task %s", task.external_ref)
+
+
+POLLER_LOCK_ID = 73572
 
 
 async def _try_poll_with_lock() -> int:
@@ -340,7 +476,7 @@ async def _try_poll_with_lock() -> int:
 
     async with get_session() as session:
         result = await session.execute(
-            text(f"SELECT pg_try_advisory_xact_lock({COMMENT_POLLER_LOCK_ID})")
+            text(f"SELECT pg_try_advisory_xact_lock({POLLER_LOCK_ID})")
         )
         acquired = result.scalar() or False
         if not acquired:
@@ -354,7 +490,7 @@ async def run_comment_poller(
     interval: float = 60.0,
     shutdown: asyncio.Event | None = None,
 ) -> None:
-    """Background loop that polls for new human comments on open PRs.
+    """Background loop that polls for new human comments and stale branches on open PRs.
 
     Each cycle tries to acquire a transaction-level advisory lock.
     Only one worker across all instances polls per cycle. If the
@@ -362,23 +498,23 @@ async def run_comment_poller(
     on the very next cycle - no gap.
     """
     _shutdown = shutdown or asyncio.Event()
-    logger.info("[comment-poller] Started (interval=%.1fs)", interval)
+    logger.info("[poller] Started (interval=%.1fs)", interval)
 
     while not _shutdown.is_set():
         try:
             count = await _try_poll_with_lock()
             if count == -1:
-                logger.debug("[comment-poller] Another worker is polling, skipping")
+                logger.debug("[poller] Another worker is polling, skipping")
             elif count > 0:
-                logger.info("[comment-poller] Dispatched %d task(s)", count)
+                logger.info("[poller] Dispatched %d task(s)", count)
             else:
-                logger.debug("[comment-poller] No new comments found")
+                logger.debug("[poller] No new comments or rebase triggers found")
         except Exception:
-            logger.exception("[comment-poller] Poll error")
+            logger.exception("[poller] Poll error")
 
         try:
             await asyncio.wait_for(_shutdown.wait(), timeout=interval)
         except asyncio.TimeoutError:
             pass
 
-    logger.info("[comment-poller] Stopped")
+    logger.info("[poller] Stopped")
