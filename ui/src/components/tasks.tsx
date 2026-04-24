@@ -13,6 +13,7 @@ import {
   TrackerConnection,
   fetchConnections,
   findStatusInfo,
+  normalizeStatus,
 } from "@/lib/api";
 
 const COLOR_MAP: Record<string, string> = {
@@ -242,7 +243,7 @@ function TaskCard({
                 {findStatusInfo(statuses, task.pipeline_status)?.label || task.pipeline_status}
               </span>
               <select
-                value={task.pipeline_status}
+                value={normalizeStatus(task.pipeline_status) || ""}
                 onChange={(e) => onStatusChange(task, e.target.value)}
                 className="text-xs px-2 py-1 rounded-md border border-border bg-surface text-foreground"
               >
