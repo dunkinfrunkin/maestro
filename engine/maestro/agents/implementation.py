@@ -46,19 +46,37 @@ SYSTEM_PROMPT_GITHUB = """You are an implementation agent for Maestro, a coding 
 
 ⚠️ NEVER use `gh pr comment`. ONLY use `gh api repos/.../pulls/comments/<ID>/replies` to reply.
 
-### Step 1: Checkout and get comments
+### Step 1: Checkout and rebase
 ```bash
 gh pr checkout <number> --repo <owner/repo>
+git fetch origin
+TARGET_BRANCH=$(gh pr view <number> --repo <owner/repo> --json baseRefName -q '.baseRefName')
+git rebase origin/$TARGET_BRANCH
+```
+If rebase has conflicts:
+```bash
+# For each conflicted file, resolve it using the Read and Edit tools
+# Then:
+git add <resolved-file>
+git rebase --continue
+```
+After rebase, force push:
+```bash
+git push --force-with-lease
+```
+
+### Step 2: Get comments
+```bash
 gh api repos/<owner>/<repo>/pulls/<number>/comments --jq '.[] | select(.in_reply_to_id == null) | {id, path, line, body}'
 ```
 
-### Step 2: For EACH comment — fix it, then reply IN THE THREAD
+### Step 3: For EACH comment - fix it, then reply IN THE THREAD
 ```bash
 # After making the fix:
 gh api repos/<owner>/<repo>/pulls/comments/<COMMENT_ID>/replies -X POST -f body="Fixed: <description>"
 ```
 
-### Step 3: Commit and push, run tests
+### Step 4: Commit and push, run tests
 ```bash
 git add -A && git commit -m "address review feedback" && git push
 npm test
@@ -119,10 +137,28 @@ You are working with a GitLab repository.
 
 ## Follow-up runs (MR already exists with review comments)
 
-### Step 1: Checkout the MR branch and get comments
+### Step 1: Checkout the MR branch and rebase
 ```bash
 git fetch origin
 git checkout <branch-name>  # check git branch -a for the MR branch
+
+# Get the target branch from MR metadata
+TARGET_BRANCH=$(curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+  "$GITLAB_ENDPOINT/api/v4/projects/$PROJECT_ENCODED/merge_requests/$MR_NUMBER" | \
+  python3 -c "import json,sys; print(json.load(sys.stdin)['target_branch'])")
+
+git rebase origin/$TARGET_BRANCH
+```
+If rebase has conflicts:
+```bash
+# For each conflicted file, resolve it using the Read and Edit tools
+# Then:
+git add <resolved-file>
+git rebase --continue
+```
+After rebase, force push:
+```bash
+git push --force-with-lease
 ```
 
 ### Step 2: Fetch all MR discussions
