@@ -35,7 +35,7 @@ export function CommentsPage() {
   const { activeWorkspace, activeProject } = useDashboard();
   const [comments, setComments] = useState<CommentEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "human" | "agent">("agent");
+  const filter = "agent";
 
   const loadComments = useCallback(async () => {
     try {
@@ -76,23 +76,8 @@ export function CommentsPage() {
 
   return (
     <div className="p-6 max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">Comments</h1>
-        <div className="flex gap-2">
-          {(["all", "human", "agent"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
-                filter === f
-                  ? "bg-surface-hover text-foreground border-border font-medium"
-                  : "text-muted border-transparent hover:bg-surface-hover"
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold">Agent Comments</h1>
       </div>
 
       {loading ? (
