@@ -484,6 +484,7 @@ export interface CentcomRun {
   avg_cpu_percent: number;
   triggered_by: string;
   task_ref: string;
+  issue_identifier: string;
   repo: string;
   started_at: string | null;
   finished_at: string | null;

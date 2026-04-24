@@ -274,6 +274,7 @@ export function CentcomPage({ workspaceId }: { workspaceId?: number }) {
               <tr className="border-b border-border text-[9px] uppercase tracking-widest text-muted">
                 <th className="text-left px-3 py-1.5 font-medium">Status</th>
                 <th className="text-left px-3 py-1.5 font-medium">Agent</th>
+                <th className="text-left px-3 py-1.5 font-medium">Ticket</th>
                 <th className="text-left px-3 py-1.5 font-medium">Target</th>
                 <th className="text-left px-3 py-1.5 font-medium">Operator</th>
                 <th className="text-right px-3 py-1.5 font-medium">Elapsed</th>
@@ -295,6 +296,7 @@ export function CentcomPage({ workspaceId }: { workspaceId?: number }) {
                     </div>
                   </td>
                   <td className="px-3 py-2 font-semibold uppercase">{run.agent_type.replace("_", " ")}</td>
+                  <td className="px-3 py-2 font-mono text-[10px]">{run.issue_identifier || run.task_ref || "—"}</td>
                   <td className="px-3 py-2 text-muted">{run.repo ? run.repo.split("/").pop() : "—"}</td>
                   <td className="px-3 py-2 text-muted">{run.triggered_by || "—"}</td>
                   <td className="px-3 py-2 text-right">
@@ -326,6 +328,7 @@ export function CentcomPage({ workspaceId }: { workspaceId?: number }) {
               <tr className="border-b border-border text-[9px] uppercase tracking-widest text-muted">
                 <th className="text-left px-3 py-1.5 font-medium">Result</th>
                 <th className="text-left px-3 py-1.5 font-medium">Agent</th>
+                <th className="text-left px-3 py-1.5 font-medium">Ticket</th>
                 <th className="text-left px-3 py-1.5 font-medium">Target</th>
                 <th className="text-left px-3 py-1.5 font-medium">Operator</th>
                 <th className="text-right px-3 py-1.5 font-medium">Duration</th>
@@ -351,6 +354,7 @@ export function CentcomPage({ workspaceId }: { workspaceId?: number }) {
                       </span>
                     </td>
                     <td className="px-3 py-2 font-semibold uppercase">{run.agent_type.replace("_", " ")}</td>
+                    <td className="px-3 py-2 font-mono text-[10px]">{run.issue_identifier || run.task_ref || "—"}</td>
                     <td className="px-3 py-2 text-muted">{run.repo ? run.repo.split("/").pop() : "—"}</td>
                     <td className="px-3 py-2 text-muted">{run.triggered_by || "—"}</td>
                     <td className="px-3 py-2 text-right text-muted">{duration}</td>
