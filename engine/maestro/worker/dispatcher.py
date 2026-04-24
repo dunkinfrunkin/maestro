@@ -262,12 +262,17 @@ async def _dispatch_agent_locked(
             print(f"[MAESTRO] Skipping duplicate dispatch: {agent_name} already active (run {existing}) for task {task_pipeline_id}")
             return existing
 
-        # Create agent run record
+        # Create agent run record — start as RUNNING in inline mode so the
+        # worker's claim_next_job loop never sees a PENDING row and picks it up
+        # concurrently. In queue mode stay PENDING so workers can claim it.
+        worker_mode = os.environ.get("MAESTRO_WORKER_MODE", "inline")
+        initial_status = AgentRunStatus.PENDING if worker_mode == "queue" else AgentRunStatus.RUNNING
         run = AgentRun(
             workspace_id=workspace_id,
             task_pipeline_id=task_pipeline_id,
             agent_type=AgentType(agent_name),
-            status=AgentRunStatus.PENDING,
+            status=initial_status,
+            started_at=datetime.now(timezone.utc) if worker_mode != "queue" else None,
             model=model,
             triggered_by=triggered_by,
             job_payload=payload,
@@ -278,19 +283,10 @@ async def _dispatch_agent_locked(
         run_id = run.id
 
     # Dispatch based on worker mode
-    worker_mode = os.environ.get("MAESTRO_WORKER_MODE", "inline")
     if worker_mode == "queue":
         # Workers will pick up the PENDING job from the DB
         print(f"[MAESTRO] Run {run_id} enqueued for worker (mode=queue)")
     else:
-        # Inline mode: mark RUNNING immediately so the worker process doesn't
-        # also pick it up as a PENDING job and execute it a second time.
-        async with get_session() as session:
-            run = await session.get(AgentRun, run_id)
-            if run:
-                run.status = AgentRunStatus.RUNNING
-                run.started_at = datetime.now(timezone.utc)
-                await session.commit()
 
         asyncio.create_task(
             _execute_agent(
