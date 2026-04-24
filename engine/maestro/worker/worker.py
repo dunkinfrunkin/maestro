@@ -286,7 +286,7 @@ async def run_worker(
     # Comment poller background task (leader-elected via advisory lock)
     comment_task = None
     if comment_poll_interval > 0:
-        from maestro.worker.comment_poller import run_comment_poller
+        from maestro.worker.poller import run_comment_poller
         comment_task = asyncio.create_task(
             run_comment_poller(interval=comment_poll_interval, shutdown=shutdown)
         )

@@ -1166,7 +1166,7 @@ async def _check_unresolved_github(repo: str, pr_number: str) -> bool:
 
 async def _check_unresolved_gitlab(task: TaskPipelineRecord, mr_number: str) -> bool:
     """Check unresolved discussions on GitLab MR."""
-    from maestro.worker.comment_poller import _find_codehost_connection
+    from maestro.worker.poller import _find_codehost_connection
     from maestro.db.encryption import decrypt_token
     import json
     from urllib.parse import quote
