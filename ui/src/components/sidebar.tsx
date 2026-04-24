@@ -6,21 +6,35 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useDashboard } from "@/lib/dashboard-context";
 
-type Page = "operations" | "tasks" | "executions" | "agents" | "settings";
+type Page = "operations" | "tasks" | "executions" | "comments" | "agents" | "settings";
 
-const NAV_ITEMS: { id: Page; label: string; href: string; icon: string }[] = [
+type NavItem = { id: Page; label: string; href: string; icon: string };
+type NavSection = { label: string; items: NavItem[] };
+
+const NAV: (NavItem | NavSection)[] = [
   { id: "operations", label: "CENTCOM", href: "/operations", icon: "M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" },
   { id: "tasks", label: "Tasks", href: "/tasks", icon: "M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" },
-  { id: "executions", label: "Executions", href: "/executions", icon: "M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" },
   { id: "agents", label: "Agents", href: "/agents", icon: "M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" },
+  {
+    label: "Monitor",
+    items: [
+      { id: "executions", label: "Executions", href: "/executions", icon: "M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" },
+      { id: "comments", label: "Comments", href: "/comments", icon: "M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" },
+    ],
+  },
 ];
 
 function getActivePage(pathname: string): Page {
   if (pathname.startsWith("/tasks")) return "tasks";
   if (pathname.startsWith("/executions")) return "executions";
+  if (pathname.startsWith("/comments")) return "comments";
   if (pathname.startsWith("/agents")) return "agents";
   if (pathname.startsWith("/settings")) return "settings";
   return "operations";
+}
+
+function isNavItem(item: NavItem | NavSection): item is NavItem {
+  return "id" in item;
 }
 
 export function Sidebar() {
@@ -99,23 +113,52 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-3 px-2 space-y-1">
-        {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            className={`flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm transition-colors ${
-              activePage === item.id
-                ? "bg-surface-hover text-foreground font-medium"
-                : "text-muted hover:bg-surface-hover hover:text-foreground"
-            }`}
-            title={collapsed ? item.label : undefined}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-            </svg>
-            {!collapsed && <span>{item.label}</span>}
-          </Link>
-        ))}
+        {NAV.map((entry, i) => {
+          if (isNavItem(entry)) {
+            return (
+              <Link
+                key={entry.id}
+                href={entry.href}
+                className={`flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm transition-colors ${
+                  activePage === entry.id
+                    ? "bg-surface-hover text-foreground font-medium"
+                    : "text-muted hover:bg-surface-hover hover:text-foreground"
+                }`}
+                title={collapsed ? entry.label : undefined}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d={entry.icon} />
+                </svg>
+                {!collapsed && <span>{entry.label}</span>}
+              </Link>
+            );
+          }
+          return (
+            <div key={`section-${i}`}>
+              {!collapsed && (
+                <div className="text-[10px] text-muted uppercase tracking-wider px-3 pt-3 pb-1">{entry.label}</div>
+              )}
+              {collapsed && <div className="border-t border-border my-2 mx-2" />}
+              {entry.items.map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm transition-colors ${
+                    activePage === item.id
+                      ? "bg-surface-hover text-foreground font-medium"
+                      : "text-muted hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                  title={collapsed ? item.label : undefined}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                  </svg>
+                  {!collapsed && <span>{item.label}</span>}
+                </Link>
+              ))}
+            </div>
+          );
+        })}
       </nav>
 
       {/* Footer: User with dropdown menu */}
