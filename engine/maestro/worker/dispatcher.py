@@ -239,8 +239,18 @@ async def _dispatch_agent_locked(
             "plugin_name": agent_name,
         })
 
+        # Serialise dispatch across all processes with a per-task advisory lock.
+        # pg_try_advisory_xact_lock is transaction-scoped — it holds until the
+        # transaction commits/rolls back, covering both the duplicate check and
+        # the INSERT so no two processes can race through both.
+        from sqlalchemy import select as sa_select, text as sa_text
+        lock_key = 90000 + (task_pipeline_id % 1_000_000)
+        acquired = await session.scalar(sa_text(f"SELECT pg_try_advisory_xact_lock({lock_key})"))
+        if not acquired:
+            print(f"[MAESTRO] Could not acquire dispatch lock for task {task_pipeline_id}, skipping")
+            return None
+
         # Guard: skip if a run for this task+agent is already active
-        from sqlalchemy import select as sa_select
         existing = await session.scalar(
             sa_select(AgentRun.id).where(
                 AgentRun.task_pipeline_id == task_pipeline_id,
