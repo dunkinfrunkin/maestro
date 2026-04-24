@@ -22,9 +22,10 @@ router = APIRouter(prefix="/api/v1")
 async def list_comments(
     project_id: int | None = Query(None),
     source: str | None = Query(None),
-    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
-) -> list[dict]:
+) -> dict:
     """Fetch recent PR/MR comments across all tasks.
 
     Aggregates comments from all open PRs/MRs in the project.
@@ -41,7 +42,7 @@ async def list_comments(
         )
         if project_id:
             stmt = stmt.where(TaskPipelineRecord.project_id == project_id)
-        stmt = stmt.order_by(TaskPipelineRecord.updated_at.desc()).limit(20)
+        stmt = stmt.order_by(TaskPipelineRecord.updated_at.desc()).limit(50)
 
         result = await session.execute(stmt)
         tasks = result.scalars().all()
@@ -116,7 +117,9 @@ async def list_comments(
             logger.exception("Failed to fetch comments for task %s", task.external_ref)
 
     all_comments.sort(key=lambda c: c["created_at"], reverse=True)
-    return all_comments[:limit]
+    total = len(all_comments)
+    page = all_comments[offset : offset + limit]
+    return {"comments": page, "total": total, "offset": offset, "limit": limit}
 
 
 async def _fetch_comments_for_task(task: TaskPipelineRecord, conn, token: str) -> list[dict]:
