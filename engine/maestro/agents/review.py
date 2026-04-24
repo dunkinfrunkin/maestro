@@ -41,15 +41,14 @@ git fetch origin
 git merge-tree $(git merge-base HEAD origin/$TARGET) HEAD origin/$TARGET | grep "^<<<<<<< " || true
 ```
 
-If there are merge conflicts, post ONE inline comment on any changed file (any line) listing all conflicting files. Do NOT review the code further. Output: REVIEW_VERDICT: REQUEST_CHANGES
+If there are merge conflicts, post ONE inline comment on any changed file (any line) listing all conflicting files. Then continue with the full code review as normal.
 """
 
 _VERDICT_RULES = """## Output rules
 
 You do NOT approve or reject. You only review and rate.
 
-- If merge conflicts exist, post one inline comment listing all conflicting files and output: REVIEW_VERDICT: REQUEST_CHANGES
-- If you find issues, post inline comments for each issue and output: REVIEW_VERDICT: REQUEST_CHANGES
+- If you find issues (including merge conflicts), post inline comments for each issue and output: REVIEW_VERDICT: REQUEST_CHANGES
 - If the code looks good with no issues, output: REVIEW_VERDICT: APPROVE
 
 ABSOLUTE RULE: NEVER post a top-level PR/MR comment, issue comment, or any non-inline comment. Every comment you post MUST be tied to a specific file and line number in the diff. There are no exceptions — not for summaries, conflict notices, or overviews.
