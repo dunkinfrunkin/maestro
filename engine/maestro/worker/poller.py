@@ -463,6 +463,10 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
             logger.warning("[poller] Task %d not found, skipping dispatch", task.id)
             return
 
+        if record.status not in POLLABLE_STATUSES or not record.pr_url:
+            logger.info("[poller] Task %s is now %s / pr_url=%r — skipping comment dispatch", task.external_ref, record.status, record.pr_url)
+            return
+
         project = await session.get(Project, record.project_id)
         if not project:
             logger.warning("[poller] Project %d not found for task %d, skipping", record.project_id, task.id)
@@ -500,6 +504,10 @@ async def _dispatch_for_rebase(task: TaskPipelineRecord) -> None:
         record = await session.get(TaskPipelineRecord, task.id)
         if not record:
             logger.warning("[poller] Task %d not found, skipping rebase dispatch", task.id)
+            return
+
+        if record.status not in POLLABLE_STATUSES or not record.pr_url:
+            logger.info("[poller] Task %s is now %s / pr_url=%r — skipping rebase dispatch", task.external_ref, record.status, record.pr_url)
             return
 
         project = await session.get(Project, record.project_id)
