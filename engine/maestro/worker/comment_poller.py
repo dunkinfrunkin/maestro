@@ -22,7 +22,7 @@ from maestro.db.encryption import decrypt_token
 
 logger = logging.getLogger(__name__)
 
-MAESTRO_FOOTER = "*Created by Maestro*"
+MAESTRO_FOOTER = "Created by Maestro"
 
 POLLABLE_STATUSES = {
     PipelineStatus.IN_PROGRESS,

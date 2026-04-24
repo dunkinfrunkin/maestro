@@ -76,7 +76,7 @@ _FOOTER_RULE = """## Comment footer
 Every comment body you post (inline review comments, summary comments, reply comments) MUST end with:
 
 ---
-*Created by Maestro*
+*Created by Maestro (Review Agent)*
 
 Append this footer to every `body` field in all API calls that post comments.
 """
@@ -129,7 +129,7 @@ cat > /tmp/review.json << 'REVIEWJSON'
       "path": "src/books.js",
       "line": 34,
       "side": "RIGHT",
-      "body": "Describe the issue and suggested fix\\n\\n---\\n*Created by Maestro*"
+      "body": "Describe the issue and suggested fix\\n\\n---\\n*Created by Maestro (Review Agent)*"
     }}
   ]
 }}
@@ -148,7 +148,7 @@ CRITICAL RULES for inline comments:
 
 If approving with no issues, post ONLY a summary comment (no inline comments):
 ```bash
-echo '{{"body": "LGTM!\\n\\n---\\n*Created by Maestro*", "event": "APPROVE", "comments": []}}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
+echo '{{"body": "LGTM!\\n\\n---\\n*Created by Maestro (Review Agent)*", "event": "APPROVE", "comments": []}}' | gh api repos/OWNER/REPO/pulls/NUMBER/reviews -X POST --input -
 ```
 
 ### Step 5 (follow-up reviews only): Check previous comments, verify fixes, and resolve threads
@@ -240,7 +240,7 @@ glab api --method POST 'projects/PROJECT_ENCODED/merge_requests/NUMBER/notes' \\
   -f 'body=LGTM!
 
 ---
-*Created by Maestro*'
+*Created by Maestro (Review Agent)*'
 ```
 
 ### Step 4 (follow-up reviews only): Check existing threads, verify fixes, reply
