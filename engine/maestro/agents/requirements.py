@@ -28,8 +28,9 @@ Your goal is to:
 ## Response protocol
 Every response MUST end with exactly one of the following:
 
-If you have another question:
-QUESTION: <your single question here>
+If you have one or more questions:
+QUESTION:
+<your question(s) here>
 
 If you are ready to finalize (you have enough info):
 REQUIREMENTS_FINAL: YES
@@ -161,7 +162,7 @@ async def run_requirements_agent(
                     continue
 
             # Check for a question
-            q_match = re.search(r"QUESTION:\s*(.+?)(?:\n|$)", response_text)
+            q_match = re.search(r"QUESTION:\s*\n?(.*)", response_text, re.DOTALL)
             if q_match:
                 question_text = q_match.group(1).strip()
                 preamble = re.split(r"\n*QUESTION:", response_text)[0].strip()
@@ -179,12 +180,25 @@ async def run_requirements_agent(
                 # Resume the session with the user's answer
                 next_prompt = user_response
             else:
-                # No protocol marker — treat as implicit finalization
+                # No protocol marker — show the response and ask the user to continue
                 if response_text.strip():
                     await _write_log(run_id, "text", response_text.strip())
-                await _write_log(run_id, "status", "Agent completed without explicit finalization marker")
-                result.updated_description = response_text.strip() or issue_description
-                break
+                await _write_log(run_id, "question", "Please respond to the above, or say 'done' / 'finalize' to write the requirements to the ticket.")
+
+                last_id = await _get_current_max_log_id(run_id)
+                user_response = await _wait_for_user_prompt(run_id, last_id)
+                if user_response is None:
+                    await _write_log(run_id, "status", "Timed out waiting for user response — requirements not written to ticket")
+                    result.updated_description = ""
+                    break
+
+                _done = {"done", "finalize", "finished", "complete", "yes", "y", "lgtm", "looks good", "ship it", "ok", "okay"}
+                if user_response.strip().lower() in _done:
+                    await _write_log(run_id, "status", "Agent completed without explicit finalization marker")
+                    result.updated_description = response_text.strip() or issue_description
+                    break
+
+                next_prompt = user_response
 
     except Exception as exc:
         logger.exception("Requirements agent error for run %d", run_id)
