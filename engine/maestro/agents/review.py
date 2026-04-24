@@ -22,34 +22,11 @@ _REVIEW_CRITERIA = """## Review criteria
 5. **Performance**: Any obvious issues?
 """
 
-_CONFLICT_CHECK = """## Merge conflict check
-
-Before reviewing code, check if the branch has merge conflicts with the target branch:
-
-GitHub:
-```bash
-TARGET=$(gh pr view <number> --repo <owner/repo> --json baseRefName -q '.baseRefName')
-git fetch origin
-git merge-tree $(git merge-base HEAD origin/$TARGET) HEAD origin/$TARGET | grep -c "^<<<<<<<" || true
-```
-
-GitLab:
-```bash
-git fetch origin
-git merge-tree $(git merge-base HEAD origin/main) HEAD origin/main | grep -c "^<<<<<<<" || true
-```
-
-If there are merge conflicts, immediately output:
-REVIEW_VERDICT: REQUEST_CHANGES
-Post a single inline comment on any changed file (tied to a line number) noting the conflicts. Do NOT post a top-level PR/MR comment.
-Do NOT review the code if there are conflicts.
-"""
 
 _VERDICT_RULES = """## Output rules
 
 You do NOT approve or reject. You only review and rate.
 
-- If merge conflicts exist, post a single inline comment on any changed file noting the conflicts, then output: REVIEW_VERDICT: REQUEST_CHANGES
 - If you find issues, post inline comments for each issue and output: REVIEW_VERDICT: REQUEST_CHANGES
 - If the code looks good with no issues, output: REVIEW_VERDICT: APPROVE
 
@@ -79,7 +56,6 @@ Append this footer to every `body` field in all API calls that post inline comme
 
 SYSTEM_PROMPT_GITHUB = f"""You are a senior code reviewer. You post inline review comments directly on PRs.
 
-{_CONFLICT_CHECK}
 {_REVIEW_CRITERIA}
 
 ## Step-by-step procedure
@@ -170,7 +146,6 @@ gh api graphql -f query='query {{ repository(owner: "<OWNER>", name: "<REPO>") {
 SYSTEM_PROMPT_GITLAB = f"""You are a senior code reviewer. You post inline review comments directly on MRs using `glab`.
 IMPORTANT: This is a GitLab repository. Use `glab` (NOT `gh`) for ALL operations.
 
-{_CONFLICT_CHECK}
 {_REVIEW_CRITERIA}
 
 ## Step-by-step procedure
