@@ -483,18 +483,6 @@ async def _execute_agent(
             except (ImportError, AttributeError):
                 system_prompt = f"You are the {plugin.display_name}. {plugin.description}"
 
-        # For review agent: swap verdict rules based on can_approve config
-        if plugin.name == "review":
-            can_approve = extra_config.get("can_approve", False)
-            if not can_approve and not custom_prompt:
-                from maestro.agents.review import _VERDICT_RULES, _VERDICT_RULES_SOFT
-                system_prompt = system_prompt.replace(_VERDICT_RULES, _VERDICT_RULES_SOFT)
-                # Override GitHub approve command to just post a comment
-                system_prompt = system_prompt.replace(
-                    '"event": "APPROVE"',
-                    '"event": "COMMENT"',
-                )
-
         # Count previous iterations for this task (prevent infinite loops)
         from sqlalchemy import select, func as sqlfunc
         async with get_session() as session:
@@ -592,31 +580,40 @@ async def _execute_agent(
                         f"\n  start_sha={diff_refs['start_sha']}"
                     )
 
+                base = diff_refs['base_sha'] if diff_refs else 'BASE_SHA'
+                head = diff_refs['head_sha'] if diff_refs else 'HEAD_SHA'
+                start = diff_refs['start_sha'] if diff_refs else 'START_SHA'
+
                 prompt_parts.append(
-                    f"\n## REVIEW INSTRUCTIONS - YOU MUST POST INLINE COMMENTS"
+                    f"\n## REVIEW INSTRUCTIONS - INLINE COMMENTS ONLY"
                     f"{sha_block}"
                     f"\n"
                     f"\n1. Checkout: `glab mr checkout {pr_num}`"
-                    f"\n2. For EACH finding, post an INLINE comment with position params:"
+                    f"\n2. Read the diff and changed files"
+                    f"\n3. For EACH finding, post an inline comment using this EXACT curl format:"
+                    f"\n"
+                    f"\n```bash"
+                    f"\ncurl --request POST \\"
+                    f"\n  --header \"PRIVATE-TOKEN: $GITLAB_TOKEN\" \\"
+                    f"\n  --form 'body=YOUR FINDING HERE\n\n---\n*Created by Maestro (Review Agent)*' \\"
+                    f"\n  --form 'position[position_type]=text' \\"
+                    f"\n  --form 'position[base_sha]={base}' \\"
+                    f"\n  --form 'position[head_sha]={head}' \\"
+                    f"\n  --form 'position[start_sha]={start}' \\"
+                    f"\n  --form 'position[new_path]=FILEPATH' \\"
+                    f"\n  --form 'position[old_path]=FILEPATH' \\"
+                    f"\n  --form 'position[new_line]=LINE_NUMBER' \\"
+                    f"\n  \"{endpoint}/api/v4/projects/{encoded}/merge_requests/{pr_num}/discussions\""
                     f"\n```"
-                    f"\ncurl -sf -X POST -H \"PRIVATE-TOKEN: $GITLAB_TOKEN\" \\"
-                    f"\n  -H \"Content-Type: application/json\" \\"
-                    f"\n  \"{endpoint}/api/v4/projects/{encoded}/merge_requests/{pr_num}/discussions\" \\"
-                    f"\n  -d '{{"
-                    f"\n    \"body\": \"YOUR FINDING HERE\\n\\n---\\n*Created by Maestro (Review Agent)*\","
-                    f"\n    \"position\": {{"
-                    f"\n      \"position_type\": \"text\","
-                    f"\n      \"base_sha\": \"{diff_refs['base_sha'] if diff_refs else 'BASE_SHA'}\","
-                    f"\n      \"head_sha\": \"{diff_refs['head_sha'] if diff_refs else 'HEAD_SHA'}\","
-                    f"\n      \"start_sha\": \"{diff_refs['start_sha'] if diff_refs else 'START_SHA'}\","
-                    f"\n      \"new_path\": \"path/to/file.tsx\","
-                    f"\n      \"new_line\": 42"
-                    f"\n    }}"
-                    f"\n  }}'"
-                    f"\n```"
-                    f"\nCRITICAL: You MUST include ALL position fields. Without them the comment is NOT inline."
-                    f"\nnew_line MUST be a line ADDED or CHANGED in the diff (shown with + prefix)."
-                    f"\nUse curl with PRIVATE-TOKEN header (GITLAB_TOKEN is in env)."
+                    f"\n"
+                    f"\nCRITICAL RULES:"
+                    f"\n- Use --form (NOT -d or --data). JSON body does NOT work for inline comments."
+                    f"\n- old_path MUST be included and set to the same value as new_path"
+                    f"\n- Replace FILEPATH with the exact path from the diff (e.g., src/pages/api/v2/health.ts)"
+                    f"\n- Replace LINE_NUMBER with a line number that was ADDED or CHANGED (shown with + in diff)"
+                    f"\n- All position fields are REQUIRED. Without ANY of them the comment falls back to non-inline."
+                    f"\n- Post ONE comment per finding. Do NOT batch."
+                    f"\n- If there are NO issues, do NOT post any comment."
                     f"\n"
                     f"\nOutput REVIEW_VERDICT: APPROVE or REVIEW_VERDICT: REQUEST_CHANGES"
                 )
