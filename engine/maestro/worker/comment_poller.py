@@ -22,7 +22,7 @@ from maestro.db.encryption import decrypt_token
 
 logger = logging.getLogger(__name__)
 
-MAESTRO_BOT_MARKERS = ["maestro", "Co-Authored-By: Claude", "agent"]
+MAESTRO_FOOTER = "*Created by Maestro*"
 
 POLLABLE_STATUSES = {
     PipelineStatus.IN_PROGRESS,
@@ -156,13 +156,16 @@ async def _check_for_new_human_comments(task: TaskPipelineRecord) -> bool:
 
 
 def _is_maestro_comment(body: str, user: str) -> bool:
-    """Detect if a comment was made by Maestro agents."""
-    lower_body = body.lower()
-    lower_user = user.lower()
-    for marker in MAESTRO_BOT_MARKERS:
-        if marker.lower() in lower_body or marker.lower() in lower_user:
-            return True
-    if "[bot]" in lower_user:
+    """Detect if a comment was made by Maestro agents.
+
+    Primary check: the footer '*Created by Maestro*' or 'created by Maestro'
+    is present in the body. Fallback: user is a known bot account.
+    """
+    if MAESTRO_FOOTER in body:
+        return True
+    if "created by Maestro" in body:
+        return True
+    if "[bot]" in user.lower():
         return True
     return False
 
@@ -323,15 +326,67 @@ async def _dispatch_for_comments(task: TaskPipelineRecord) -> None:
         logger.warning("[comment-poller] Dispatch returned None for task %s - agent may be disabled or no API key", task.external_ref)
 
 
+COMMENT_POLLER_LOCK_ID = 73572
+
+
+async def _try_acquire_leader_lock() -> bool:
+    """Try to acquire the comment poller leader lock.
+
+    Uses a PostgreSQL advisory lock so only one worker across all
+    instances runs the comment poller. The lock is session-level
+    and auto-releases if the worker dies.
+    """
+    try:
+        from sqlalchemy import text
+        async with get_session() as session:
+            result = await session.execute(
+                text(f"SELECT pg_try_advisory_lock({COMMENT_POLLER_LOCK_ID})")
+            )
+            return result.scalar() or False
+    except Exception:
+        return False
+
+
+async def _release_leader_lock() -> None:
+    """Release the comment poller leader lock."""
+    try:
+        from sqlalchemy import text
+        async with get_session() as session:
+            await session.execute(
+                text(f"SELECT pg_advisory_unlock({COMMENT_POLLER_LOCK_ID})")
+            )
+    except Exception:
+        pass
+
+
 async def run_comment_poller(
     interval: float = 60.0,
     shutdown: asyncio.Event | None = None,
 ) -> None:
-    """Background loop that polls for new human comments on open PRs."""
+    """Background loop that polls for new human comments on open PRs.
+
+    Uses leader election via PostgreSQL advisory lock so only one
+    worker runs the poller even when multiple workers are deployed.
+    If the leader dies, another worker acquires the lock automatically.
+    """
     _shutdown = shutdown or asyncio.Event()
-    logger.info("[comment-poller] Started (interval=%.1fs)", interval)
+    is_leader = False
 
     while not _shutdown.is_set():
+        # Try to become leader if we aren't already
+        if not is_leader:
+            is_leader = await _try_acquire_leader_lock()
+            if is_leader:
+                logger.info("[comment-poller] Acquired leader lock (interval=%.1fs)", interval)
+            else:
+                logger.debug("[comment-poller] Another worker is the leader, standby")
+                try:
+                    await asyncio.wait_for(_shutdown.wait(), timeout=interval)
+                except asyncio.TimeoutError:
+                    pass
+                continue
+
+        # We are the leader - run the poll
         try:
             logger.debug("[comment-poller] Polling...")
             count = await poll_comments_once()
@@ -347,4 +402,9 @@ async def run_comment_poller(
         except asyncio.TimeoutError:
             pass
 
-    logger.info("Comment poller stopped")
+    # Release leader lock on shutdown
+    if is_leader:
+        await _release_leader_lock()
+        logger.info("[comment-poller] Released leader lock")
+
+    logger.info("[comment-poller] Stopped")

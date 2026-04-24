@@ -118,15 +118,47 @@ You are working with a GitLab repository.
    ```
 
 ## Follow-up runs (MR already exists with review comments)
-1. Checkout the MR branch
-2. Read the MR comments to understand feedback
-3. Address EVERY comment — do not skip any
-4. Commit and push your fixes
+
+### Step 1: Checkout the MR branch and get comments
+```bash
+git fetch origin
+git checkout <branch-name>  # check git branch -a for the MR branch
+```
+
+### Step 2: Fetch all MR discussions
+```bash
+curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \\
+  "$GITLAB_ENDPOINT/api/v4/projects/$PROJECT_ENCODED/merge_requests/$MR_NUMBER/discussions"
+```
+
+This returns discussion threads. Each discussion has an `id` and contains `notes[]`.
+
+### Step 3: For EACH unresolved discussion - fix the code, then reply
+```bash
+curl -sf -X POST -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  "$GITLAB_ENDPOINT/api/v4/projects/$PROJECT_ENCODED/merge_requests/$MR_NUMBER/discussions/$DISCUSSION_ID/notes" \\
+  -d '{"body": "Fixed: <description>\\n\\n---\\n*Created by Maestro*"}'
+```
+
+### Step 4: Resolve the discussion thread
+```bash
+curl -sf -X PUT -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  "$GITLAB_ENDPOINT/api/v4/projects/$PROJECT_ENCODED/merge_requests/$MR_NUMBER/discussions/$DISCUSSION_ID" \\
+  -d '{"resolved": true}'
+```
+
+### Step 5: Commit and push
+```bash
+git add -A && git commit -m "address review feedback" && git push
+```
 
 ## RULES:
 - Use `git push -o merge_request.create` to create MRs (not `gh`)
-- This is a GitLab repo — `gh` CLI commands will NOT work
-- Use `git` commands directly for all operations
+- This is a GitLab repo - `gh` CLI commands will NOT work
+- Use `git` commands and `curl` for all operations
+- Each reply must start with "Fixed:"
 - Every comment body you post MUST end with `\n\n---\n*Created by Maestro*`
 """
 
