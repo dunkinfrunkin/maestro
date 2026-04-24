@@ -173,19 +173,16 @@ export function TaskDetailPage({
   useEffect(() => {
     loadRuns();
     pollPrUrl();
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Poll only when there are active runs
-  useEffect(() => {
+    // Only poll if there are active runs
     const hasActive = runs.some(r => r.status === "running" || r.status === "pending");
-    if (!hasActive) return;
-
-    const interval = setInterval(() => {
-      loadRuns();
-      pollPrUrl();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [runs.some(r => r.status === "running" || r.status === "pending")]);  // eslint-disable-line react-hooks/exhaustive-deps
+    if (hasActive) {
+      const interval = setInterval(() => {
+        loadRuns();
+        pollPrUrl();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [loadRuns, pollPrUrl, runs]);
 
   // Extract repo from identifier (e.g., "owner/repo#123" → "owner/repo")
   const repo = task.identifier.includes("#")
