@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from maestro.api.agent_runs import router as agent_runs_router
 from maestro.api.agents import router as agents_router
 from maestro.api.auth import router as auth_router
+from maestro.api.comments import router as comments_router
 from maestro.api.routes import router as api_router
 from maestro.api.statuses import router as statuses_router
 from maestro.api.tasks import router as tasks_router
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(auth_router, prefix="/api")  # also serve at /api/auth/*
     app.include_router(api_router)
+    app.include_router(comments_router)
     app.include_router(statuses_router)
     app.include_router(tasks_router)
     app.include_router(workspaces_router)
