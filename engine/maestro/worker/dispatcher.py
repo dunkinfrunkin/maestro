@@ -1053,6 +1053,7 @@ async def _auto_transition(
             task = await session.get(TaskPipelineRecord, task_pipeline_id)
             if task:
                 task.status = next_status
+                task.last_comment_check_at = datetime.now(timezone.utc)
                 await session.commit()
 
         # Dispatch the next agent
