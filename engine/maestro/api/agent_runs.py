@@ -281,6 +281,12 @@ async def get_centcom_metrics(
         polled_tasks = polled_result.scalars().all()
 
     def _run_dict(run, task):
+        import json as _json
+        try:
+            payload = _json.loads(run.job_payload or "{}")
+        except Exception:
+            payload = {}
+        issue_identifier = payload.get("issue_identifier") or task.external_ref
         return {
             "id": run.id,
             "agent_type": run.agent_type.value if run.agent_type else "",
@@ -293,6 +299,7 @@ async def get_centcom_metrics(
             "avg_cpu_percent": run.avg_cpu_percent,
             "triggered_by": run.triggered_by or "",
             "task_ref": task.external_ref,
+            "issue_identifier": issue_identifier,
             "repo": task.repo or "",
             "started_at": run.started_at.isoformat() if run.started_at else None,
             "finished_at": run.finished_at.isoformat() if run.finished_at else None,
